@@ -5,13 +5,15 @@ interface ElevenLabsVoiceProps {
   voiceId: string;
   onComplete?: () => void;
   onError?: () => void;
+  onRateLimitExceeded?: () => void;
 }
 
 const ElevenLabsVoice: React.FC<ElevenLabsVoiceProps> = ({
   text,
   voiceId,
   onComplete,
-  onError
+  onError,
+  onRateLimitExceeded
 }) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const isPlayingRef = useRef(false);
@@ -44,6 +46,15 @@ const ElevenLabsVoice: React.FC<ElevenLabsVoiceProps> = ({
         });
 
         if (!response.ok) {
+          // Check specifically for rate limit error (429)
+          if (response.status === 429) {
+            console.warn('ElevenLabs API rate limit exceeded (429). Implementing cooldown...');
+            isPlayingRef.current = false;
+            if (onRateLimitExceeded) {
+              onRateLimitExceeded();
+            }
+            return;
+          }
           throw new Error(`ElevenLabs API error: ${response.status}`);
         }
 
@@ -88,7 +99,7 @@ const ElevenLabsVoice: React.FC<ElevenLabsVoiceProps> = ({
       }
       isPlayingRef.current = false;
     };
-  }, [text, voiceId, onComplete, onError]);
+  }, [text, voiceId, onComplete, onError, onRateLimitExceeded]);
 
   // Cleanup on unmount
   useEffect(() => {

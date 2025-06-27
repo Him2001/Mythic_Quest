@@ -10,6 +10,8 @@ export class VoiceMessageService {
   private static messageQueue: QueuedMessage[] = [];
   private static isPlaying = false;
   private static currentMessageId: string | null = null;
+  private static rateLimitCooldownUntil: number = 0;
+  private static readonly COOLDOWN_DURATION = 60000; // 1 minute cooldown
 
   // Welcome messages based on quest count
   static getWelcomeMessage(user: User, activeQuestCount: number): string {
@@ -126,9 +128,36 @@ export class VoiceMessageService {
     return null;
   }
 
+  // Handle rate limit error by setting cooldown
+  static handleRateLimitError() {
+    this.rateLimitCooldownUntil = Date.now() + this.COOLDOWN_DURATION;
+    console.warn(`ElevenLabs rate limit hit. Voice messages disabled until ${new Date(this.rateLimitCooldownUntil).toLocaleTimeString()}`);
+    
+    // Clear the current queue to prevent further rate limit hits
+    this.clearQueue();
+    this.setPlaying(false);
+  }
+
+  // Check if we're still in cooldown period
+  static isInCooldown(): boolean {
+    return Date.now() < this.rateLimitCooldownUntil;
+  }
+
+  // Get remaining cooldown time in seconds
+  static getRemainingCooldownTime(): number {
+    if (!this.isInCooldown()) return 0;
+    return Math.ceil((this.rateLimitCooldownUntil - Date.now()) / 1000);
+  }
+
   // Queue management with strict prioritization
   static queueMessage(message: string, priority: number = 5) {
     if (!message || message.trim() === '') return;
+    
+    // Don't queue messages if we're in cooldown
+    if (this.isInCooldown()) {
+      console.warn(`Voice message queuing disabled due to rate limit cooldown. ${this.getRemainingCooldownTime()}s remaining.`);
+      return;
+    }
     
     // Clear any existing messages with the same priority to prevent duplicates
     this.messageQueue = this.messageQueue.filter(msg => msg.priority !== priority);
@@ -155,6 +184,12 @@ export class VoiceMessageService {
   }
 
   static getNextMessage(): string | null {
+    // Don't return messages if we're in cooldown
+    if (this.isInCooldown()) {
+      console.warn(`Voice messages disabled due to rate limit cooldown. ${this.getRemainingCooldownTime()}s remaining.`);
+      return null;
+    }
+    
     if (this.messageQueue.length === 0) return null;
     
     const nextMessage = this.messageQueue.shift();
