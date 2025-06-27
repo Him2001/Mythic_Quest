@@ -3,8 +3,17 @@ import { SupabaseService } from './supabaseService';
 import { User } from '../types';
 
 export class SupabaseAuthService {
+  // Check if Supabase is available
+  private static isAvailable(): boolean {
+    return supabase !== null;
+  }
+
   // Sign up with email and password
   static async signUp(email: string, password: string, username: string): Promise<{ user: User | null; error: string | null }> {
+    if (!this.isAvailable()) {
+      return { user: null, error: 'Supabase is not configured' };
+    }
+
     try {
       // First, check if username is already taken
       const { data: existingUser } = await supabase
@@ -61,6 +70,10 @@ export class SupabaseAuthService {
 
   // Sign in with email and password
   static async signIn(email: string, password: string): Promise<{ user: User | null; error: string | null }> {
+    if (!this.isAvailable()) {
+      return { user: null, error: 'Supabase is not configured' };
+    }
+
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -90,6 +103,10 @@ export class SupabaseAuthService {
 
   // Sign out
   static async signOut(): Promise<{ error: string | null }> {
+    if (!this.isAvailable()) {
+      return { error: null }; // No error in demo mode
+    }
+
     try {
       const { error } = await supabase.auth.signOut();
       return { error: error ? error.message : null };
@@ -100,6 +117,10 @@ export class SupabaseAuthService {
 
   // Get current session
   static async getCurrentSession(): Promise<{ user: User | null; error: string | null }> {
+    if (!this.isAvailable()) {
+      return { user: null, error: null };
+    }
+
     try {
       const { data: { session }, error } = await supabase.auth.getSession();
 
@@ -123,24 +144,40 @@ export class SupabaseAuthService {
 
   // Update user progress (XP, level, coins)
   static async updateUserProgress(userId: string, xp: number, level: number, coins: number): Promise<{ success: boolean; error: string | null }> {
+    if (!this.isAvailable()) {
+      return { success: true, error: null }; // Success in demo mode
+    }
+
     const success = await SupabaseService.updateUserProgress(userId, xp, level, coins);
     return { success, error: success ? null : 'Failed to update user progress' };
   }
 
   // Update user coins
   static async updateUserCoins(userId: string, coins: number): Promise<{ success: boolean; error: string | null }> {
+    if (!this.isAvailable()) {
+      return { success: true, error: null }; // Success in demo mode
+    }
+
     const success = await SupabaseService.updateUserProfile(userId, { coins });
     return { success, error: success ? null : 'Failed to update user coins' };
   }
 
   // Update quests completed
   static async updateQuestsCompleted(userId: string, questsCompleted: number): Promise<{ success: boolean; error: string | null }> {
+    if (!this.isAvailable()) {
+      return { success: true, error: null }; // Success in demo mode
+    }
+
     const success = await SupabaseService.updateUserProfile(userId, { total_quests_completed: questsCompleted });
     return { success, error: success ? null : 'Failed to update quests completed' };
   }
 
   // Update walking distance
   static async updateWalkingDistance(userId: string, dailyDistance: number, totalDistance: number, lastWalkingDate: string): Promise<{ success: boolean; error: string | null }> {
+    if (!this.isAvailable()) {
+      return { success: true, error: null }; // Success in demo mode
+    }
+
     const success = await SupabaseService.updateUserProfile(userId, {
       daily_walking_distance: dailyDistance,
       total_walking_distance: totalDistance,
@@ -157,6 +194,10 @@ export class SupabaseAuthService {
     xpEarned: number,
     coinsEarned: number
   ): Promise<{ success: boolean; error: string | null }> {
+    if (!this.isAvailable()) {
+      return { success: true, error: null }; // Success in demo mode
+    }
+
     const success = await SupabaseService.recordQuestCompletion(userId, questName, questType, xpEarned, coinsEarned);
     return { success, error: success ? null : 'Failed to record quest completion' };
   }
@@ -201,6 +242,10 @@ export class SupabaseAuthService {
 
   // Reset password
   static async resetPassword(email: string): Promise<{ success: boolean; error: string | null }> {
+    if (!this.isAvailable()) {
+      return { success: false, error: 'Supabase is not configured' };
+    }
+
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`
@@ -218,6 +263,17 @@ export class SupabaseAuthService {
 
   // Listen to auth state changes
   static onAuthStateChange(callback: (user: User | null) => void) {
+    if (!this.isAvailable()) {
+      // Return a dummy subscription for demo mode
+      return {
+        data: {
+          subscription: {
+            unsubscribe: () => {}
+          }
+        }
+      };
+    }
+
     return supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         const profile = await SupabaseService.getUserProfile(session.user.id);
