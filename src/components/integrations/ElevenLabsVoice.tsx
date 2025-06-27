@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 interface ElevenLabsVoiceProps {
   text: string;
   voiceId: string;
+  isServiceInCooldown?: boolean;
   onComplete?: () => void;
   onError?: () => void;
   onRateLimitExceeded?: () => void;
@@ -10,7 +11,8 @@ interface ElevenLabsVoiceProps {
 
 const ElevenLabsVoice: React.FC<ElevenLabsVoiceProps> = ({ 
   text, 
-  voiceId, 
+  voiceId,
+  isServiceInCooldown = false,
   onComplete, 
   onError,
   onRateLimitExceeded 
@@ -19,7 +21,17 @@ const ElevenLabsVoice: React.FC<ElevenLabsVoiceProps> = ({
   const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    if (!text || text.trim() === '') return;
+    // Don't proceed if service is in cooldown or no text provided
+    if (!text || text.trim() === '' || isServiceInCooldown) {
+      if (isServiceInCooldown) {
+        console.log('ElevenLabs service is in cooldown, skipping voice synthesis');
+        // Call onComplete to allow queue processing to continue
+        if (onComplete) {
+          onComplete();
+        }
+      }
+      return;
+    }
 
     const playVoice = async () => {
       try {
@@ -104,7 +116,7 @@ const ElevenLabsVoice: React.FC<ElevenLabsVoiceProps> = ({
       }
       setIsPlaying(false);
     };
-  }, [text, voiceId, onComplete, onError, onRateLimitExceeded]);
+  }, [text, voiceId, isServiceInCooldown, onComplete, onError, onRateLimitExceeded]);
 
   // Cleanup on unmount
   useEffect(() => {
