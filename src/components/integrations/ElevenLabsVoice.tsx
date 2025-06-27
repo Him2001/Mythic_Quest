@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 interface ElevenLabsVoiceProps {
   text: string;
@@ -9,38 +9,63 @@ interface ElevenLabsVoiceProps {
 
 const ElevenLabsVoice: React.FC<ElevenLabsVoiceProps> = ({
   text,
-  voiceId = 'MezYwaNLTOfydzsFJwwt', // Eldrin the Mage
+  voiceId = "MezYwaNLTOfydzsFJwwt",
   onComplete,
   onError
 }) => {
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [hasPlayed, setHasPlayed] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  const API_KEY = 'sk_2373d20772128d71bfc6997232f631eed0f769241a18c032';
+  // API Key
+  const API_KEY = "sk_2373d20772128d71bfc6997232f631eed0f769241a18c032";
 
   useEffect(() => {
-    if (!text || !text.trim()) {
-      return;
+    // Only play if we have text and haven't played this text yet
+    if (text && text.trim() && !hasPlayed && !isLoading) {
+      playVoice();
     }
 
-    generateAndPlayVoice();
+    // Cleanup function
+    return () => {
+      cleanup();
+    };
   }, [text]);
 
-  const generateAndPlayVoice = async () => {
-    if (!API_KEY) {
-      const errorMsg = 'ElevenLabs API key not configured';
-      setError(errorMsg);
-      onError?.(errorMsg);
+  const cleanup = () => {
+    // Abort any ongoing fetch request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+
+    // Stop and cleanup audio
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      audioRef.current.removeEventListener('ended', handleAudioEnd);
+      audioRef.current.removeEventListener('error', handleAudioError);
+      audioRef.current = null;
+    }
+
+    setIsLoading(false);
+  };
+
+  const playVoice = async () => {
+    if (!text || !text.trim() || hasPlayed || isLoading) {
       return;
     }
 
-    setIsGenerating(true);
-    setError(null);
+    setIsLoading(true);
+    setHasPlayed(true);
 
     try {
-      console.log('🎵 Generating voice for:', text.substring(0, 50) + '...');
-      
+      // Create new abort controller for this request
+      abortControllerRef.current = new AbortController();
+
+      console.log('🎵 ElevenLabs: Generating voice for:', text.substring(0, 50) + '...');
+
       const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
         method: 'POST',
         headers: {
@@ -50,14 +75,15 @@ const ElevenLabsVoice: React.FC<ElevenLabsVoiceProps> = ({
         },
         body: JSON.stringify({
           text: text,
-          model_id: 'eleven_monolingual_v1',
+          model_id: "eleven_monolingual_v1",
           voice_settings: {
             stability: 0.75,
             similarity_boost: 0.85,
             style: 0.2,
             use_speaker_boost: true
           }
-        })
+        }),
+        signal: abortControllerRef.current.signal
       });
 
       if (!response.ok) {
@@ -66,71 +92,66 @@ const ElevenLabsVoice: React.FC<ElevenLabsVoiceProps> = ({
 
       const audioBlob = await response.blob();
       const audioUrl = URL.createObjectURL(audioBlob);
-      setAudioUrl(audioUrl);
 
-      // Create and play audio
+      // Create and configure audio element
       const audio = new Audio(audioUrl);
-      audio.volume = 0.8; // Set volume to 80%
-      
-      audio.onended = () => {
-        console.log('🎵 Voice playback completed');
-        URL.revokeObjectURL(audioUrl);
-        setAudioUrl(null);
-        onComplete?.();
-      };
+      audioRef.current = audio;
 
-      audio.onerror = (e) => {
-        console.error('🎵 Audio playback error:', e);
-        const errorMsg = 'Audio playback failed';
-        setError(errorMsg);
-        onError?.(errorMsg);
-        URL.revokeObjectURL(audioUrl);
-        setAudioUrl(null);
-      };
+      // Set audio properties
+      audio.volume = 0.8;
+      audio.preload = 'auto';
 
-      console.log('🎵 Playing voice...');
+      // Add event listeners
+      audio.addEventListener('ended', handleAudioEnd);
+      audio.addEventListener('error', handleAudioError);
+
+      // Play the audio
+      console.log('🎵 ElevenLabs: Playing voice...');
       await audio.play();
 
-    } catch (error) {
-      console.error('🎵 ElevenLabs voice generation error:', error);
-      const errorMsg = error instanceof Error ? error.message : 'Voice generation failed';
-      setError(errorMsg);
-      onError?.(errorMsg);
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        console.log('🎵 ElevenLabs: Request aborted');
+        return;
+      }
+
+      console.error('🎵 ElevenLabs Error:', error);
+      const errorMessage = error.message || 'Failed to generate voice';
+      
+      if (onError) {
+        onError(errorMessage);
+      }
+      
+      // Call onComplete even on error to prevent hanging
+      if (onComplete) {
+        onComplete();
+      }
     } finally {
-      setIsGenerating(false);
+      setIsLoading(false);
+      abortControllerRef.current = null;
     }
   };
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (audioUrl) {
-        URL.revokeObjectURL(audioUrl);
-      }
-    };
-  }, [audioUrl]);
+  const handleAudioEnd = () => {
+    console.log('🎵 ElevenLabs: Audio playback completed');
+    cleanup();
+    if (onComplete) {
+      onComplete();
+    }
+  };
 
-  // Debug info (only in development)
-  if (process.env.NODE_ENV === 'development') {
-    return (
-      <div className="fixed bottom-4 left-4 bg-black/80 text-white p-3 rounded-lg text-xs font-mono z-50 max-w-xs">
-        <div className="mb-2">
-          <strong>🎵 ElevenLabs Voice Status:</strong>
-        </div>
-        <div>API Key: ✅ Active</div>
-        <div>Voice ID: {voiceId}</div>
-        <div>Status: {isGenerating ? '🔄 Generating...' : audioUrl ? '🔊 Playing' : '⏸️ Ready'}</div>
-        {error && <div className="text-red-400">❌ Error: {error}</div>}
-        {text && (
-          <div className="mt-2 p-2 bg-gray-800 rounded text-xs">
-            <strong>Current Text:</strong><br />
-            {text.substring(0, 100)}{text.length > 100 ? '...' : ''}
-          </div>
-        )}
-      </div>
-    );
-  }
+  const handleAudioError = (event: Event) => {
+    console.error('🎵 ElevenLabs: Audio playback error:', event);
+    cleanup();
+    if (onError) {
+      onError('Audio playback failed');
+    }
+    if (onComplete) {
+      onComplete();
+    }
+  };
 
+  // This component doesn't render anything visible
   return null;
 };
 
