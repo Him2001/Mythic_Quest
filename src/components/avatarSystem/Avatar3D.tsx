@@ -47,16 +47,12 @@ function Avatar3DModel({ url }: Avatar3DModelProps) {
     }
   }, [scene, animations]);
 
-  // Update animation mixer
+  // Update animation mixer only - NO rotation
   useFrame((state, delta) => {
     if (mixerRef.current) {
       mixerRef.current.update(delta);
     }
-    
-    // Optional: slight rotation for better viewing
-    if (meshRef.current) {
-      meshRef.current.rotation.y += delta * 0.1;
-    }
+    // Removed rotation - avatar stays facing forward
   });
 
   // Scale and position the model
@@ -88,9 +84,7 @@ function FallbackAvatar() {
 
   useFrame((state, delta) => {
     if (meshRef.current) {
-      // Gentle rotation
-      meshRef.current.rotation.y += delta * 0.2;
-      // Breathing effect
+      // Breathing effect only - no rotation
       const breathe = Math.sin(state.clock.elapsedTime * 2) * 0.05 + 1;
       meshRef.current.scale.setScalar(breathe);
       // Slight head bob
@@ -180,7 +174,12 @@ const Avatar3D: React.FC<Avatar3DProps> = ({ className = '' }) => {
     <div className={`w-48 h-48 sm:w-56 sm:h-56 ${className}`}>
       <Canvas
         camera={{ position: [0, 0, 6], fov: 45 }}
-        style={{ width: '100%', height: '100%' }}
+        style={{ 
+          width: '100%', 
+          height: '100%',
+          background: 'transparent' // Make canvas background transparent
+        }}
+        gl={{ alpha: true, antialias: true }} // Enable transparency
         onError={(error) => {
           console.warn('Canvas error, switching to fallback:', error);
           setUsesFallback(true);
