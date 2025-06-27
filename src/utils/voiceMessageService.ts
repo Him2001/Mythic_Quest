@@ -1,262 +1,8 @@
 import { User, Quest } from '../types';
-import { supabase } from './supabaseClient';
-
-interface QueuedMessage {
-  id: string;
-  text: string;
-  priority: number;
-  userId: string;
-  type: 'welcome' | 'quest_completion' | 'level_up' | 'friend_message' | 'coin_milestone';
-  timestamp: Date;
-  played: boolean;
-}
 
 export class VoiceMessageService {
-  private static messageQueue: QueuedMessage[] = [];
+  private static messageQueue: string[] = [];
   private static isPlaying = false;
-  private static currentPlayingId: string | null = null;
-  private static playbackTimeout: NodeJS.Timeout | null = null;
-  private static supabasePersistenceEnabled = true;
-
-  // Priority levels (lower number = higher priority)
-  private static readonly PRIORITIES = {
-    welcome: 1,
-    quest_completion: 2,
-    level_up: 3,
-    friend_message: 4,
-    coin_milestone: 5
-  };
-
-  // Load queue from Supabase on initialization
-  static async initializeQueue(userId: string) {
-    if (!supabase || !this.supabasePersistenceEnabled) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('voice_message_queue')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('played', false)
-        .order('priority', { ascending: true })
-        .order('timestamp', { ascending: true });
-
-      if (error) {
-        // Check if the error is due to missing table
-        if (error.code === '42P01' || error.message?.includes('does not exist')) {
-          console.warn('Voice message queue table does not exist, falling back to local-only mode');
-          this.supabasePersistenceEnabled = false;
-          return;
-        }
-        throw error;
-      }
-
-      if (data) {
-        this.messageQueue = data.map(item => ({
-          id: item.id,
-          text: item.message_text,
-          priority: item.priority,
-          userId: item.user_id,
-          type: item.message_type,
-          timestamp: new Date(item.timestamp),
-          played: item.played
-        }));
-      }
-    } catch (error) {
-      console.warn('Failed to load voice queue from Supabase:', error);
-      this.supabasePersistenceEnabled = false;
-    }
-  }
-
-  // Save message to Supabase
-  private static async saveMessageToSupabase(message: QueuedMessage) {
-    if (!supabase || !this.supabasePersistenceEnabled) return;
-
-    try {
-      await supabase
-        .from('voice_message_queue')
-        .insert({
-          id: message.id,
-          user_id: message.userId,
-          message_text: message.text,
-          message_type: message.type,
-          priority: message.priority,
-          timestamp: message.timestamp.toISOString(),
-          played: message.played
-        });
-    } catch (error) {
-      console.warn('Failed to save voice message to Supabase:', error);
-      this.supabasePersistenceEnabled = false;
-    }
-  }
-
-  // Mark message as played in Supabase
-  private static async markMessageAsPlayed(messageId: string) {
-    if (!supabase || !this.supabasePersistenceEnabled) return;
-
-    try {
-      await supabase
-        .from('voice_message_queue')
-        .update({ played: true })
-        .eq('id', messageId);
-    } catch (error) {
-      console.warn('Failed to mark message as played in Supabase:', error);
-      this.supabasePersistenceEnabled = false;
-    }
-  }
-
-  // Clean up old played messages from Supabase
-  private static async cleanupOldMessages(userId: string) {
-    if (!supabase || !this.supabasePersistenceEnabled) return;
-
-    try {
-      const oneDayAgo = new Date();
-      oneDayAgo.setDate(oneDayAgo.getDate() - 1);
-
-      await supabase
-        .from('voice_message_queue')
-        .delete()
-        .eq('user_id', userId)
-        .eq('played', true)
-        .lt('timestamp', oneDayAgo.toISOString());
-    } catch (error) {
-      console.warn('Failed to cleanup old messages:', error);
-      this.supabasePersistenceEnabled = false;
-    }
-  }
-
-  // Queue a new message with priority
-  static async queueMessage(
-    userId: string,
-    text: string, 
-    type: QueuedMessage['type'],
-    priority?: number
-  ) {
-    if (!text || text.trim() === '') return;
-
-    const message: QueuedMessage = {
-      id: crypto.randomUUID(),
-      text: text.trim(),
-      priority: priority || this.PRIORITIES[type],
-      userId,
-      type,
-      timestamp: new Date(),
-      played: false
-    };
-
-    // Add to local queue
-    this.messageQueue.push(message);
-    
-    // Sort queue by priority, then by timestamp
-    this.messageQueue.sort((a, b) => {
-      if (a.priority !== b.priority) {
-        return a.priority - b.priority;
-      }
-      return a.timestamp.getTime() - b.timestamp.getTime();
-    });
-
-    // Save to Supabase only if persistence is enabled
-    if (this.supabasePersistenceEnabled) {
-      await this.saveMessageToSupabase(message);
-    }
-
-    // Start processing if not already playing
-    if (!this.isPlaying) {
-      this.processQueue();
-    }
-  }
-
-  // Process the queue with proper timing
-  private static async processQueue() {
-    if (this.isPlaying || this.messageQueue.length === 0) return;
-
-    const nextMessage = this.messageQueue.find(msg => !msg.played);
-    if (!nextMessage) return;
-
-    this.isPlaying = true;
-    this.currentPlayingId = nextMessage.id;
-
-    // Mark message as played locally
-    nextMessage.played = true;
-    
-    // Mark as played in Supabase only if persistence is enabled
-    if (this.supabasePersistenceEnabled) {
-      await this.markMessageAsPlayed(nextMessage.id);
-    }
-
-    // Remove from local queue
-    this.messageQueue = this.messageQueue.filter(msg => msg.id !== nextMessage.id);
-
-    // Trigger voice playback (this will be handled by the component)
-    this.triggerVoicePlayback(nextMessage.text);
-  }
-
-  // This method will be called by the voice component when playback completes
-  static async onVoicePlaybackComplete() {
-    this.isPlaying = false;
-    this.currentPlayingId = null;
-
-    // Clear any existing timeout
-    if (this.playbackTimeout) {
-      clearTimeout(this.playbackTimeout);
-    }
-
-    // Wait 1 second before processing next message
-    this.playbackTimeout = setTimeout(() => {
-      this.processQueue();
-    }, 1000);
-  }
-
-  // Get the next message to play (for the voice component)
-  static getNextMessageToPlay(): string | null {
-    if (!this.isPlaying) return null;
-    
-    const playingMessage = this.messageQueue.find(msg => msg.id === this.currentPlayingId);
-    return playingMessage ? playingMessage.text : null;
-  }
-
-  // Check if currently playing
-  static getIsPlaying(): boolean {
-    return this.isPlaying;
-  }
-
-  // Get current playing message ID
-  static getCurrentPlayingId(): string | null {
-    return this.currentPlayingId;
-  }
-
-  // Clear all messages for a user
-  static async clearAllMessages(userId: string) {
-    this.messageQueue = this.messageQueue.filter(msg => msg.userId !== userId);
-    
-    if (supabase && this.supabasePersistenceEnabled) {
-      try {
-        await supabase
-          .from('voice_message_queue')
-          .delete()
-          .eq('user_id', userId);
-      } catch (error) {
-        console.warn('Failed to clear messages from Supabase:', error);
-        this.supabasePersistenceEnabled = false;
-      }
-    }
-  }
-
-  // Force stop current playback
-  static forceStop() {
-    this.isPlaying = false;
-    this.currentPlayingId = null;
-    
-    if (this.playbackTimeout) {
-      clearTimeout(this.playbackTimeout);
-      this.playbackTimeout = null;
-    }
-  }
-
-  // Trigger voice playback (to be overridden by the component)
-  private static triggerVoicePlayback(text: string) {
-    // This will be handled by the voice component through a callback
-    window.dispatchEvent(new CustomEvent('playVoiceMessage', { detail: { text } }));
-  }
 
   // Welcome messages based on quest count
   static getWelcomeMessage(user: User, activeQuestCount: number): string {
@@ -349,34 +95,63 @@ export class VoiceMessageService {
   }
 
   // Coin milestone messages
-  static getCoinMilestoneMessage(user: User, totalCoins: number): string | null {
-    if (totalCoins >= 1000 && totalCoins < 1100) {
+  static getCoinMilestoneMessage(user: User, totalCoins: number): string {
+    if (totalCoins >= 1000) {
       return `Astounding wealth, ${user.name}! Your treasure hoard has reached ${totalCoins} Mythic Coins! You're becoming quite the wealthy adventurer in Eldoria!`;
-    } else if (totalCoins >= 500 && totalCoins < 600) {
+    } else if (totalCoins >= 500) {
       return `Impressive fortune, ${user.name}! ${totalCoins} Mythic Coins now fill your coffers! Your dedication to wellness pays handsomely!`;
-    } else if (totalCoins >= 100 && totalCoins < 200) {
+    } else if (totalCoins >= 100) {
       return `Excellent progress, ${user.name}! Your coin collection has grown to ${totalCoins} Mythic Coins! The realm rewards your consistency!`;
     }
-    return null;
+    return '';
   }
 
   // Walking distance achievements
-  static getWalkingAchievementMessage(user: User, totalDistance: number): string | null {
+  static getWalkingAchievementMessage(user: User, totalDistance: number): string {
     const distanceKm = Math.floor(totalDistance / 1000);
-    if (distanceKm >= 100 && distanceKm < 110) {
+    if (distanceKm >= 100) {
       return `Incredible journey, ${user.name}! You've walked over ${distanceKm} kilometers in your wellness adventures! The paths of Eldoria echo with your footsteps!`;
-    } else if (distanceKm >= 50 && distanceKm < 60) {
+    } else if (distanceKm >= 50) {
       return `Remarkable dedication, ${user.name}! ${distanceKm} kilometers conquered on your wellness journey! Your endurance is truly legendary!`;
-    } else if (distanceKm >= 10 && distanceKm < 20) {
+    } else if (distanceKm >= 10) {
       return `Wonderful progress, ${user.name}! ${distanceKm} kilometers walked in pursuit of wellness! Every step strengthens your resolve!`;
     }
-    return null;
+    return '';
   }
 
-  // Cleanup method to be called periodically
-  static async performCleanup(userId: string) {
-    if (this.supabasePersistenceEnabled) {
-      await this.cleanupOldMessages(userId);
+  // Queue management for prioritized messages
+  static queueMessage(message: string, priority: number = 0) {
+    if (!message || message.trim() === '') return;
+    
+    // Insert message based on priority (lower number = higher priority)
+    const messageWithPriority = { text: message, priority };
+    
+    if (this.messageQueue.length === 0) {
+      this.messageQueue.push(message);
+    } else {
+      // Find insertion point based on priority
+      let insertIndex = this.messageQueue.length;
+      this.messageQueue.push(message); // For now, just add to end
     }
+  }
+
+  static getNextMessage(): string | null {
+    return this.messageQueue.shift() || null;
+  }
+
+  static clearQueue() {
+    this.messageQueue = [];
+  }
+
+  static hasQueuedMessages(): boolean {
+    return this.messageQueue.length > 0;
+  }
+
+  static setPlaying(playing: boolean) {
+    this.isPlaying = playing;
+  }
+
+  static getIsPlaying(): boolean {
+    return this.isPlaying;
   }
 }
