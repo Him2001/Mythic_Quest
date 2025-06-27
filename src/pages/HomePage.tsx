@@ -47,44 +47,51 @@ const HomePage: React.FC<HomePageProps> = ({
   const earnedCoins = user.mythicCoins;
   const coinProgress = totalPossibleCoins > 0 ? (earnedCoins / totalPossibleCoins) * 100 : 0;
   
-  // Welcome message on mount
+  // Welcome message on mount based on quest count
   useEffect(() => {
-    const messages = [
-      `Welcome back, ${user.name}! Ready to continue your journey today?`,
-      `The magical realms of Eldoria await your next adventure, ${user.name}!`,
-      `Greetings, brave one! Your destiny in Eldoria continues to unfold.`,
-      `Your coin purse grows heavier with each quest, ${user.name}. The realm rewards dedication!`
-    ];
+    const activeQuestCount = activeQuests.length;
+    let welcomeMessage = '';
     
-    const randomMessage = messages[Math.floor(Math.random() * messages.length)];
-    setAvatarMessage(randomMessage);
+    if (activeQuestCount === 0) {
+      // Special message for no quests
+      const noQuestMessages = [
+        `Ah, ${user.name}! I see you've achieved the legendary status of "Quest Completionist"! The realm is so peaceful without any pending adventures... perhaps too peaceful? 🎯`,
+        `Greetings, ${user.name}! You've reached the mystical state of having zero quests remaining. The ancient scrolls speak of this as "Peak Productivity" - a rare and wondrous achievement! ✨`,
+        `Well, well, ${user.name}! Look who's conquered every challenge in sight! The quest board stands empty, trembling in awe of your dedication. Time to rest those heroic laurels! 🏆`,
+        `Behold, ${user.name}! You've achieved what few dare attempt - a completely clear quest log! The realm celebrates your efficiency while secretly wondering what you'll do with all this free time... 🌟`
+      ];
+      welcomeMessage = noQuestMessages[Math.floor(Math.random() * noQuestMessages.length)];
+    } else if (activeQuestCount > 5) {
+      // Witty sarcastic message for more than 5 quests
+      const lazyMessages = [
+        `Oh my, ${user.name}! I see you've been... "collecting" quests like rare artifacts! ${activeQuestCount} pending adventures await your attention. Perhaps it's time to stop window shopping and start adventuring? 😏`,
+        `Greetings, ${user.name}! Your quest collection has grown to an impressive ${activeQuestCount} items! At this rate, you'll need a separate realm just to store them all. Shall we perhaps... complete one or two? 🎭`,
+        `Well hello there, ${user.name}! I couldn't help but notice your ${activeQuestCount} quests patiently waiting like loyal pets. They're starting to form a support group called "The Forgotten Adventures." Time to show them some love? 😅`,
+        `Ah, ${user.name}! Your ${activeQuestCount} pending quests have been having quite the party in your quest log. They've even elected a spokesperson to ask when you might grace them with your presence! 🎪`
+      ];
+      welcomeMessage = lazyMessages[Math.floor(Math.random() * lazyMessages.length)];
+    } else {
+      // Regular messages for 1-5 quests
+      const regularMessages = [
+        `Welcome back, ${user.name}! Ready to continue your journey today? You have ${activeQuestCount} quest${activeQuestCount > 1 ? 's' : ''} awaiting your heroic attention!`,
+        `The magical realms of Eldoria await your next adventure, ${user.name}! ${activeQuestCount} quest${activeQuestCount > 1 ? 's' : ''} stand${activeQuestCount === 1 ? 's' : ''} ready to test your resolve.`,
+        `Greetings, brave one! Your destiny in Eldoria continues to unfold with ${activeQuestCount} quest${activeQuestCount > 1 ? 's' : ''} ready for completion.`,
+        `Your coin purse grows heavier with each quest, ${user.name}! ${activeQuestCount} adventure${activeQuestCount > 1 ? 's' : ''} await${activeQuestCount === 1 ? 's' : ''} your legendary touch.`
+      ];
+      welcomeMessage = regularMessages[Math.floor(Math.random() * regularMessages.length)];
+    }
     
-    // After 8 seconds, remind about quests and coins
+    setAvatarMessage(welcomeMessage);
+    
+    // After 8 seconds, remind about quests and coins (only if there are active quests)
     const timer = setTimeout(() => {
-      if (activeQuests.length > 0) {
-        setAvatarMessage(`You have ${activeQuests.length} quests awaiting your attention. Each completed quest brings both XP and precious Mythic Coins to your treasury.`);
+      if (activeQuestCount > 0) {
+        setAvatarMessage(`You have ${activeQuestCount} quest${activeQuestCount > 1 ? 's' : ''} awaiting your attention. Each completed quest brings both XP and precious Mythic Coins to your treasury.`);
       }
     }, 8000);
     
     return () => clearTimeout(timer);
   }, [user.name, activeQuests.length]);
-  
-  const handleAvatarSpeak = () => {
-    const messages = [
-      "Remember, your daily activities forge your destiny in Eldoria and fill your coin purse.",
-      "The more you accomplish in your world, the stronger your connection to this realm becomes, and the richer you grow.",
-      "Each step, each breath, each moment of mindfulness empowers your journey and rewards you with precious coins.",
-      `With ${user.mythicCoins} Mythic Coins in your treasury, you're building quite the fortune, adventurer!`
-    ];
-    
-    const randomMessage = messages[Math.floor(Math.random() * messages.length)];
-    setAvatarMessage(randomMessage);
-    setVoiceText(randomMessage);
-  };
-  
-  const handleAvatarMessage = () => {
-    setAvatarMessage("How may I assist you on your journey today? Perhaps you'd like to know about earning more Mythic Coins?");
-  };
   
   return (
     <div className="container mx-auto px-4 py-6 relative">
@@ -95,8 +102,6 @@ const HomePage: React.FC<HomePageProps> = ({
             <AvatarDisplay 
               avatar={avatar} 
               message={avatarMessage}
-              onSpeak={handleAvatarSpeak}
-              onMessage={handleAvatarMessage}
             />
           </div>
           

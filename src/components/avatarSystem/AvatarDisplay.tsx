@@ -1,22 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Avatar as AvatarType } from '../../types';
-import Button from '../ui/Button';
-import { MessageCircle, Volume2, Sparkles } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 
 interface AvatarDisplayProps {
   avatar: AvatarType;
   message?: string;
   className?: string;
-  onSpeak?: () => void;
-  onMessage?: () => void;
 }
 
 const AvatarDisplay: React.FC<AvatarDisplayProps> = ({
   avatar,
   message,
-  className = '',
-  onSpeak,
-  onMessage
+  className = ''
 }) => {
   const [isAnimating, setIsAnimating] = useState(false);
   const [displayMessage, setDisplayMessage] = useState('');
@@ -87,28 +82,6 @@ const AvatarDisplay: React.FC<AvatarDisplayProps> = ({
           </p>
         </div>
       )}
-      
-      {/* Interaction buttons */}
-      <div className="flex space-x-3 mt-2">
-        <Button 
-          variant="outline" 
-          size="sm"
-          icon={<Volume2 size={16} />}
-          onClick={onSpeak}
-          className="magical-glow"
-        >
-          Speak
-        </Button>
-        <Button 
-          variant="outline" 
-          size="sm"
-          icon={<MessageCircle size={16} />}
-          onClick={onMessage}
-          className="magical-glow"
-        >
-          Message
-        </Button>
-      </div>
     </div>
   );
 };
