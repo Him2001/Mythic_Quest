@@ -2,8 +2,17 @@ import { supabase } from './supabaseClient';
 import { User, SocialPost, DirectMessage, Conversation, Chronicle, Quest } from '../types';
 
 export class SupabaseService {
+  // Check if Supabase is available
+  private static isAvailable(): boolean {
+    return supabase !== null;
+  }
+
   // User Profile Management
   static async getUserProfile(userId: string) {
+    if (!this.isAvailable()) {
+      return null;
+    }
+
     try {
       const { data, error } = await supabase
         .from('user_profiles')
@@ -24,6 +33,10 @@ export class SupabaseService {
   }
 
   static async createProfile(userId: string, username: string, email?: string) {
+    if (!this.isAvailable()) {
+      return null;
+    }
+
     try {
       const profileData = {
         id: userId,
@@ -59,6 +72,10 @@ export class SupabaseService {
   }
 
   static async updateUserProfile(userId: string, updates: any) {
+    if (!this.isAvailable()) {
+      return true; // Success in demo mode
+    }
+
     try {
       const { error } = await supabase
         .from('user_profiles')
@@ -89,6 +106,10 @@ export class SupabaseService {
     xpEarned: number,
     coinsEarned: number
   ) {
+    if (!this.isAvailable()) {
+      return true; // Success in demo mode
+    }
+
     try {
       const { error } = await supabase
         .from('quests_completed')
@@ -126,6 +147,10 @@ export class SupabaseService {
   }
 
   static async getUserQuestHistory(userId: string) {
+    if (!this.isAvailable()) {
+      return [];
+    }
+
     try {
       const { data, error } = await supabase
         .from('quests_completed')
@@ -154,6 +179,10 @@ export class SupabaseService {
     questTag?: any,
     achievementTag?: any
   ) {
+    if (!this.isAvailable()) {
+      return { id: crypto.randomUUID(), user_id: userId, content }; // Mock success in demo mode
+    }
+
     try {
       const postData: any = {
         user_id: userId,
@@ -193,6 +222,10 @@ export class SupabaseService {
   }
 
   static async getFeedPosts(userId: string) {
+    if (!this.isAvailable()) {
+      return [];
+    }
+
     try {
       // Get posts from user and their friends
       const { data, error } = await supabase
@@ -221,6 +254,10 @@ export class SupabaseService {
   }
 
   static async likePost(postId: string, userId: string) {
+    if (!this.isAvailable()) {
+      return true; // Success in demo mode
+    }
+
     try {
       // Check if already liked
       const { data: existingLike } = await supabase
@@ -254,6 +291,10 @@ export class SupabaseService {
   }
 
   static async addComment(postId: string, userId: string, content: string) {
+    if (!this.isAvailable()) {
+      return { id: crypto.randomUUID(), content, user_id: userId }; // Mock success in demo mode
+    }
+
     try {
       const { data, error } = await supabase
         .from('post_comments')
@@ -285,6 +326,10 @@ export class SupabaseService {
 
   // Messaging System
   static async createConversation(user1Id: string, user2Id: string) {
+    if (!this.isAvailable()) {
+      return { id: crypto.randomUUID(), user1_id: user1Id, user2_id: user2Id }; // Mock success in demo mode
+    }
+
     try {
       // Check if conversation already exists
       const { data: existing } = await supabase
@@ -327,6 +372,10 @@ export class SupabaseService {
     mediaUrl?: string,
     mediaType?: 'image' | 'video'
   ) {
+    if (!this.isAvailable()) {
+      return { id: crypto.randomUUID(), message_text: messageText }; // Mock success in demo mode
+    }
+
     try {
       const { data, error } = await supabase
         .from('messages')
@@ -354,6 +403,10 @@ export class SupabaseService {
   }
 
   static async getConversations(userId: string) {
+    if (!this.isAvailable()) {
+      return [];
+    }
+
     try {
       const { data, error } = await supabase
         .from('conversations')
@@ -386,6 +439,10 @@ export class SupabaseService {
   }
 
   static async getMessages(conversationId: string) {
+    if (!this.isAvailable()) {
+      return [];
+    }
+
     try {
       const { data, error } = await supabase
         .from('messages')
@@ -412,6 +469,10 @@ export class SupabaseService {
   }
 
   static async markMessagesAsRead(conversationId: string, userId: string) {
+    if (!this.isAvailable()) {
+      return true; // Success in demo mode
+    }
+
     try {
       const { error } = await supabase
         .from('messages')
@@ -444,6 +505,10 @@ export class SupabaseService {
     imageUrl?: string,
     isPrivate: boolean = false
   ) {
+    if (!this.isAvailable()) {
+      return { id: crypto.randomUUID(), title, content }; // Mock success in demo mode
+    }
+
     try {
       const { data, error } = await supabase
         .from('chronicles')
@@ -474,6 +539,10 @@ export class SupabaseService {
   }
 
   static async getUserChronicles(userId: string) {
+    if (!this.isAvailable()) {
+      return [];
+    }
+
     try {
       const { data, error } = await supabase
         .from('chronicles')
@@ -494,6 +563,10 @@ export class SupabaseService {
   }
 
   static async getFriendsChronicles(userId: string) {
+    if (!this.isAvailable()) {
+      return [];
+    }
+
     try {
       // Get public chronicles from friends
       const { data, error } = await supabase
@@ -524,6 +597,10 @@ export class SupabaseService {
   }
 
   static async updateChroniclePrivacy(chronicleId: string, isPrivate: boolean) {
+    if (!this.isAvailable()) {
+      return true; // Success in demo mode
+    }
+
     try {
       const { error } = await supabase
         .from('chronicles')
@@ -543,6 +620,10 @@ export class SupabaseService {
   }
 
   static async deleteChronicle(chronicleId: string) {
+    if (!this.isAvailable()) {
+      return true; // Success in demo mode
+    }
+
     try {
       const { error } = await supabase
         .from('chronicles')
@@ -563,6 +644,10 @@ export class SupabaseService {
 
   // Friend System
   static async sendFriendRequest(senderId: string, receiverId: string) {
+    if (!this.isAvailable()) {
+      return { id: crypto.randomUUID(), sender_id: senderId, receiver_id: receiverId }; // Mock success in demo mode
+    }
+
     try {
       const { data, error } = await supabase
         .from('friend_requests')
@@ -586,6 +671,10 @@ export class SupabaseService {
   }
 
   static async acceptFriendRequest(requestId: string) {
+    if (!this.isAvailable()) {
+      return true; // Success in demo mode
+    }
+
     try {
       // Get the friend request
       const { data: request, error: requestError } = await supabase
@@ -631,6 +720,10 @@ export class SupabaseService {
   }
 
   static async getFriendRequests(userId: string) {
+    if (!this.isAvailable()) {
+      return [];
+    }
+
     try {
       const { data, error } = await supabase
         .from('friend_requests')
@@ -664,6 +757,10 @@ export class SupabaseService {
   }
 
   static async getFriends(userId: string) {
+    if (!this.isAvailable()) {
+      return [];
+    }
+
     try {
       const { data, error } = await supabase
         .from('friendships')
@@ -698,6 +795,10 @@ export class SupabaseService {
 
   // Real-time subscriptions
   static subscribeToUserUpdates(userId: string, callback: (payload: any) => void) {
+    if (!this.isAvailable()) {
+      return { unsubscribe: () => {} }; // Mock subscription in demo mode
+    }
+
     return supabase
       .channel(`user_${userId}`)
       .on('postgres_changes', {
@@ -710,6 +811,10 @@ export class SupabaseService {
   }
 
   static subscribeToConversation(conversationId: string, callback: (payload: any) => void) {
+    if (!this.isAvailable()) {
+      return { unsubscribe: () => {} }; // Mock subscription in demo mode
+    }
+
     return supabase
       .channel(`conversation_${conversationId}`)
       .on('postgres_changes', {
@@ -722,6 +827,10 @@ export class SupabaseService {
   }
 
   static subscribeToFeedUpdates(callback: (payload: any) => void) {
+    if (!this.isAvailable()) {
+      return { unsubscribe: () => {} }; // Mock subscription in demo mode
+    }
+
     return supabase
       .channel('feed_updates')
       .on('postgres_changes', {
@@ -734,6 +843,10 @@ export class SupabaseService {
 
   // Analytics and Stats
   static async getUserStats(userId: string) {
+    if (!this.isAvailable()) {
+      return { profile: null, totalQuests: 0, totalPosts: 0 };
+    }
+
     try {
       const [profile, questsCount, postsCount] = await Promise.all([
         this.getUserProfile(userId),
