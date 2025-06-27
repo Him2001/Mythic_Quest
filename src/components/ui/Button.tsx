@@ -1,55 +1,67 @@
 import React from 'react';
+import { LucideIcon } from 'lucide-react';
+import { SoundEffects } from '../../utils/soundEffects';
 
 interface ButtonProps {
   children: React.ReactNode;
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
   size?: 'sm' | 'md' | 'lg';
-  onClick?: () => void;
-  className?: string;
-  disabled?: boolean;
-  type?: 'button' | 'submit' | 'reset';
   fullWidth?: boolean;
+  disabled?: boolean;
   icon?: React.ReactNode;
+  onClick?: () => void;
+  type?: 'button' | 'submit' | 'reset';
+  className?: string;
+  soundEffect?: string; // Custom sound effect
 }
 
 const Button: React.FC<ButtonProps> = ({
   children,
   variant = 'primary',
   size = 'md',
-  onClick,
-  className = '',
-  disabled = false,
-  type = 'button',
   fullWidth = false,
-  icon
+  disabled = false,
+  icon,
+  onClick,
+  type = 'button',
+  className = '',
+  soundEffect = 'click'
 }) => {
-  const baseStyles = 'fantasy-button flex items-center justify-center';
+  const baseClasses = 'inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
   
-  const variantStyles = {
-    primary: 'text-amber-50 hover:text-white',
-    secondary: 'bg-emerald-800 hover:bg-emerald-700 text-emerald-50',
-    outline: 'bg-transparent border-2 border-amber-600 text-amber-600 hover:text-amber-500 hover:border-amber-500',
-    ghost: 'bg-transparent text-amber-700 hover:text-amber-600 hover:bg-amber-50/50'
+  const variantClasses = {
+    primary: 'bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white shadow-lg hover:shadow-xl focus:ring-amber-500',
+    secondary: 'bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white shadow-lg hover:shadow-xl focus:ring-purple-500',
+    outline: 'border-2 border-amber-500 text-amber-700 hover:bg-amber-50 focus:ring-amber-500',
+    ghost: 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 focus:ring-gray-500',
+    danger: 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-lg hover:shadow-xl focus:ring-red-500'
   };
   
-  const sizeStyles = {
-    sm: 'text-sm py-2 px-3',
-    md: 'text-base py-2.5 px-4',
-    lg: 'text-lg py-3 px-6'
+  const sizeClasses = {
+    sm: 'px-3 py-1.5 text-sm',
+    md: 'px-4 py-2 text-base',
+    lg: 'px-6 py-3 text-lg'
   };
-
-  const widthStyle = fullWidth ? 'w-full' : '';
-  const disabledStyle = disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer';
+  
+  const widthClass = fullWidth ? 'w-full' : '';
+  
+  const handleClick = () => {
+    if (!disabled && onClick) {
+      // Play sound effect
+      SoundEffects.playSound(soundEffect);
+      onClick();
+    }
+  };
   
   return (
     <button
       type={type}
-      className={`${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${widthStyle} ${disabledStyle} ${className} text-shadow-glow`}
-      onClick={onClick}
       disabled={disabled}
+      onClick={handleClick}
+      className={`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${widthClass} ${className}`}
     >
       {icon && <span className="mr-2">{icon}</span>}
-      <span className="font-cinzel font-bold tracking-wide">{children}</span>
+      {children}
     </button>
   );
 };

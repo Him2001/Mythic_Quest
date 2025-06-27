@@ -7,7 +7,7 @@ import ProgressBar from '../ui/ProgressBar';
 import { CheckCircle, MapPin, Play, Square, Navigation, Award, AlertCircle, Coins, Plus } from 'lucide-react';
 import { gpsTracker } from '../../utils/gpsTracker';
 import { CoinSystem } from '../../utils/coinSystem';
-import { VoiceMessageService } from '../../utils/voiceMessageService';
+import { SoundEffects } from '../../utils/soundEffects';
 
 interface WalkingQuestCardProps {
   quest: Quest;
@@ -55,6 +55,10 @@ const WalkingQuestCard: React.FC<WalkingQuestCardProps> = ({
   const handleStartTracking = async () => {
     try {
       setError('');
+      
+      // Play movement sound
+      SoundEffects.playSound('movement');
+      
       await gpsTracker.requestPermission();
       setPermissionGranted(true);
       
@@ -65,19 +69,27 @@ const WalkingQuestCard: React.FC<WalkingQuestCardProps> = ({
         (errorMsg) => {
           setError(errorMsg);
           setIsTracking(false);
+          SoundEffects.playSound('error');
         }
       );
       
       setIsTracking(true);
       onStart(quest.id);
+      
+      // Play notification sound
+      SoundEffects.playSound('notification');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start GPS tracking');
+      SoundEffects.playSound('error');
     }
   };
 
   const handleStopTracking = () => {
     const finalDistance = gpsTracker.stopTracking();
     setIsTracking(false);
+    
+    // Play stop sound
+    SoundEffects.playSound('click');
   };
 
   const handleCompleteQuest = () => {
@@ -85,9 +97,13 @@ const WalkingQuestCard: React.FC<WalkingQuestCardProps> = ({
       handleStopTracking();
     }
     
-    // Queue voice message for quest completion
-    const questMessage = `Excellent work! You've completed "${quest.title}" by walking ${formatDistance(currentDistance)}! Your dedication earns you ${quest.xpReward} XP and ${coinReward} Mythic Coins!`;
-    VoiceMessageService.queueMessage(questMessage, 2); // Priority 2
+    // Play quest completion sound
+    SoundEffects.playSound('quest-complete');
+    
+    // Play coin sound after a short delay
+    setTimeout(() => {
+      SoundEffects.playSound('coin');
+    }, 500);
     
     onComplete(quest.id, currentDistance);
   };
@@ -201,6 +217,7 @@ const WalkingQuestCard: React.FC<WalkingQuestCardProps> = ({
                   onClick={handleStartTracking}
                   icon={<Play size={16} />}
                   className="font-cinzel magical-glow"
+                  soundEffect="movement"
                 >
                   <div className="flex items-center justify-center">
                     <span>Start GPS Tracking</span>
@@ -219,6 +236,7 @@ const WalkingQuestCard: React.FC<WalkingQuestCardProps> = ({
                     onClick={handleStopTracking}
                     icon={<Square size={16} />}
                     className="font-cinzel"
+                    soundEffect="click"
                   >
                     Stop Tracking
                   </Button>
@@ -228,6 +246,7 @@ const WalkingQuestCard: React.FC<WalkingQuestCardProps> = ({
                       fullWidth
                       onClick={handleCompleteQuest}
                       className="font-cinzel magical-glow animate-pulse"
+                      soundEffect="quest-complete"
                     >
                       <div className="flex items-center justify-center">
                         <span>Complete Quest!</span>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SupabaseAuthService } from './utils/supabaseAuthService';
 import { SupabaseService } from './utils/supabaseService';
+import { SoundEffects } from './utils/soundEffects';
 import { User } from './types';
 
 // Auth Components
@@ -65,6 +66,16 @@ function App() {
     xpEarned: number;
     coinsEarned: number;
   } | null>(null);
+
+  // Initialize sound effects on app load
+  useEffect(() => {
+    SoundEffects.initialize();
+    
+    // Play welcome sound sequence after a short delay
+    setTimeout(() => {
+      SoundEffects.playWelcomeSequence();
+    }, 1000);
+  }, []);
 
   // Check for admin session on app load
   const checkAdminSession = () => {
@@ -208,6 +219,9 @@ function App() {
     setUser(userData);
     setIsAuthenticated(true);
     setConnectionError(null);
+    
+    // Play portal sound for sign in
+    SoundEffects.playSound('portal');
   };
 
   const handleSignOut = async () => {
@@ -222,6 +236,9 @@ function App() {
       setIsAuthenticated(false);
       setActiveTab('home');
       setConnectionError(null);
+      
+      // Play portal sound for sign out
+      SoundEffects.playSound('portal');
     } catch (error) {
       console.error('Error signing out:', error);
       // Force sign out even if there's an error
@@ -332,6 +349,9 @@ function App() {
     // Create transaction record
     const transaction = CoinSystem.createTransaction(-amount, 'purchase', description);
     setCoinTransactions(prev => [transaction, ...prev]);
+    
+    // Play coin spend sound
+    SoundEffects.playSound('coin');
   };
 
   const addToInventory = (item: InventoryItem) => {

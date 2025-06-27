@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { Coins, Sparkles, Plus } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Coins, Plus } from 'lucide-react';
+import { SoundEffects } from '../../utils/soundEffects';
 
 interface CoinAnimationProps {
   amount: number;
   trigger: boolean;
-  onComplete?: () => void;
-  position?: 'top-right' | 'center' | 'bottom-right';
+  onComplete: () => void;
+  position?: 'top-right' | 'center' | 'top-left';
   type?: 'quest' | 'level_up' | 'bonus';
 }
 
@@ -19,103 +20,111 @@ const CoinAnimation: React.FC<CoinAnimationProps> = ({
   const [isVisible, setIsVisible] = useState(false);
   const [animationPhase, setAnimationPhase] = useState<'enter' | 'float' | 'exit'>('enter');
 
-  const positionStyles = {
-    'top-right': 'fixed top-4 right-4 z-50',
-    'center': 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50',
-    'bottom-right': 'fixed bottom-4 right-4 z-50'
-  };
-
-  const typeStyles = {
-    quest: {
-      bg: 'from-amber-500 to-yellow-500',
-      border: 'border-amber-400',
-      text: 'Quest Reward!',
-      icon: <Coins size={24} className="text-white" />
-    },
-    level_up: {
-      bg: 'from-purple-500 to-indigo-500',
-      border: 'border-purple-400',
-      text: 'Level Up Bonus!',
-      icon: <Sparkles size={24} className="text-white" />
-    },
-    bonus: {
-      bg: 'from-green-500 to-emerald-500',
-      border: 'border-green-400',
-      text: 'Bonus Coins!',
-      icon: <Plus size={24} className="text-white" />
-    }
-  };
-
-  const style = typeStyles[type];
-
   useEffect(() => {
     if (trigger && amount > 0) {
+      // Play coin sound effect
+      SoundEffects.playSound('coin');
+      
       setIsVisible(true);
       setAnimationPhase('enter');
 
       // Enter phase
-      setTimeout(() => {
+      const enterTimer = setTimeout(() => {
         setAnimationPhase('float');
       }, 300);
 
       // Float phase
-      setTimeout(() => {
+      const floatTimer = setTimeout(() => {
         setAnimationPhase('exit');
-      }, 2000);
+      }, 1500);
 
       // Exit phase
-      setTimeout(() => {
+      const exitTimer = setTimeout(() => {
         setIsVisible(false);
-        onComplete?.();
-      }, 2800);
+        onComplete();
+      }, 2000);
+
+      return () => {
+        clearTimeout(enterTimer);
+        clearTimeout(floatTimer);
+        clearTimeout(exitTimer);
+      };
     }
   }, [trigger, amount, onComplete]);
 
-  if (!isVisible) return null;
+  if (!isVisible || amount <= 0) return null;
+
+  const positionClasses = {
+    'top-right': 'top-4 right-4',
+    'center': 'top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2',
+    'top-left': 'top-4 left-4'
+  };
+
+  const typeColors = {
+    quest: 'from-amber-400 to-yellow-500',
+    level_up: 'from-purple-400 to-pink-500',
+    bonus: 'from-green-400 to-emerald-500'
+  };
+
+  const animationClasses = {
+    enter: 'scale-0 opacity-0 translate-y-4',
+    float: 'scale-100 opacity-100 translate-y-0',
+    exit: 'scale-110 opacity-0 -translate-y-8'
+  };
 
   return (
-    <div className={`${positionStyles[position]} pointer-events-none`}>
+    <div className={`fixed ${positionClasses[position]} z-50 pointer-events-none`}>
       <div className={`
-        bg-gradient-to-r ${style.bg} text-white p-4 rounded-xl shadow-2xl
-        border-4 ${style.border} transform transition-all duration-300
-        ${animationPhase === 'enter' ? 'scale-0 rotate-180 opacity-0' : ''}
-        ${animationPhase === 'float' ? 'scale-100 rotate-0 opacity-100 animate-bounce' : ''}
-        ${animationPhase === 'exit' ? 'scale-110 opacity-0 translate-y-8' : ''}
+        transform transition-all duration-500 ease-out
+        ${animationClasses[animationPhase]}
       `}>
-        <div className="flex items-center space-x-3">
-          <div className="relative">
-            {style.icon}
-            <div className="absolute -top-1 -right-1">
-              <Sparkles size={12} className="text-yellow-300 animate-ping" />
-            </div>
-          </div>
+        <div className={`
+          bg-gradient-to-r ${typeColors[type]} 
+          text-white px-4 py-2 rounded-full shadow-lg
+          flex items-center space-x-2 font-cinzel font-bold
+          border-2 border-white/20 magical-glow
+        `}>
+          <Plus size={16} className="animate-pulse" />
+          <Coins size={18} className="animate-bounce" />
+          <span className="text-lg">{amount}</span>
           
-          <div>
-            <div className="font-cinzel font-bold text-lg">
-              {style.text}
-            </div>
-            <div className="font-cinzel text-2xl font-bold flex items-center">
-              <Plus size={16} className="mr-1" />
-              {amount} Coins
-            </div>
+          {/* Sparkle effects */}
+          <div className="absolute inset-0 pointer-events-none">
+            {[...Array(6)].map((_, i) => (
+              <div
+                key={i}
+                className="absolute w-1 h-1 bg-white rounded-full animate-ping"
+                style={{
+                  top: `${20 + Math.random() * 60}%`,
+                  left: `${20 + Math.random() * 60}%`,
+                  animationDelay: `${i * 100}ms`,
+                  animationDuration: '1s'
+                }}
+              />
+            ))}
           </div>
         </div>
 
-        {/* Floating coin particles */}
-        <div className="absolute inset-0 pointer-events-none">
-          {[...Array(5)].map((_, i) => (
-            <div
-              key={i}
-              className={`absolute w-3 h-3 bg-yellow-400 rounded-full animate-ping`}
-              style={{
-                left: `${20 + i * 15}%`,
-                top: `${10 + i * 10}%`,
-                animationDelay: `${i * 0.2}s`,
-                animationDuration: '1s'
-              }}
-            />
-          ))}
-        </div>
+        {/* Floating coins effect */}
+        {animationPhase === 'float' && (
+          <div className="absolute inset-0 pointer-events-none">
+            {[...Array(3)].map((_, i) => (
+              <div
+                key={i}
+                className={`
+                  absolute animate-bounce
+                  ${i === 0 ? '-top-2 -left-2' : i === 1 ? '-top-2 -right-2' : '-bottom-2 left-1/2'}
+                `}
+                style={{
+                  animationDelay: `${i * 200}ms`,
+                  animationDuration: '1.5s'
+                }}
+              >
+                <Coins size={12} className="text-yellow-300 drop-shadow-lg" />
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
