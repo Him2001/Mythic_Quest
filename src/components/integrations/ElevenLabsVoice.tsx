@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 interface ElevenLabsVoiceProps {
   text: string;
@@ -9,56 +9,37 @@ interface ElevenLabsVoiceProps {
 
 const ElevenLabsVoice: React.FC<ElevenLabsVoiceProps> = ({
   text,
-  voiceId = "MezYwaNLTOfydzsFJwwt", // Eldrin the Mage voice
+  voiceId = 'MezYwaNLTOfydzsFJwwt', // Eldrin the Mage
   onComplete,
   onError
 }) => {
-  const audioRef = useRef<HTMLAudioElement>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>('');
+  const [audioUrl, setAudioUrl] = useState<string>('');
 
-  // ElevenLabs API configuration
-  const ELEVENLABS_API_KEY = import.meta.env.VITE_ELEVENLABS_API_KEY;
-  const ELEVENLABS_API_URL = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`;
+  // Use the provided API key directly
+  const API_KEY = 'sk_2373d20772128d71bfc6997232f631eed0f769241a18c032';
 
   useEffect(() => {
-    if (!text || !text.trim()) {
-      return;
-    }
+    if (!text || !text.trim()) return;
 
     const generateSpeech = async () => {
-      // Check if API key is available
-      if (!ELEVENLABS_API_KEY) {
-        console.log('🎵 ElevenLabs API Key Status: NOT CONFIGURED');
-        console.log('🔑 Voice ID Available:', voiceId);
-        console.log('📝 Text to Speak:', text.substring(0, 100) + '...');
-        console.log('⚠️ ElevenLabs voice will not play - API key missing');
-        
-        // Call onComplete immediately since we can't play audio
-        if (onComplete) {
-          setTimeout(onComplete, 1000); // Simulate brief delay
-        }
-        return;
-      }
-
-      console.log('🎵 ElevenLabs API Key Status: CONFIGURED ✅');
-      console.log('🔑 Voice ID:', voiceId);
-      console.log('📝 Text to Speak:', text.substring(0, 100) + '...');
-
       setIsLoading(true);
       setError('');
 
       try {
-        const response = await fetch(ELEVENLABS_API_URL, {
+        console.log('🎵 Generating ElevenLabs voice for:', text.substring(0, 50) + '...');
+        
+        const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
           method: 'POST',
           headers: {
             'Accept': 'audio/mpeg',
             'Content-Type': 'application/json',
-            'xi-api-key': ELEVENLABS_API_KEY
+            'xi-api-key': API_KEY
           },
           body: JSON.stringify({
             text: text,
-            model_id: "eleven_monolingual_v1",
+            model_id: 'eleven_monolingual_v1',
             voice_settings: {
               stability: 0.5,
               similarity_boost: 0.75,
@@ -69,80 +50,77 @@ const ElevenLabsVoice: React.FC<ElevenLabsVoiceProps> = ({
         });
 
         if (!response.ok) {
-          throw new Error(`ElevenLabs API error: ${response.status} ${response.statusText}`);
+          const errorText = await response.text();
+          throw new Error(`ElevenLabs API error: ${response.status} - ${errorText}`);
         }
 
         const audioBlob = await response.blob();
         const audioUrl = URL.createObjectURL(audioBlob);
+        setAudioUrl(audioUrl);
 
-        if (audioRef.current) {
-          audioRef.current.src = audioUrl;
-          audioRef.current.play().catch(playError => {
-            console.error('Audio playback failed:', playError);
-            if (onError) {
-              onError(`Audio playback failed: ${playError.message}`);
-            }
+        // Create and play audio
+        const audio = new Audio(audioUrl);
+        
+        audio.onloadeddata = () => {
+          console.log('🎵 Audio loaded, playing voice...');
+          audio.play().catch(playError => {
+            console.error('Audio play error:', playError);
+            if (onError) onError(`Failed to play audio: ${playError.message}`);
           });
-        }
+        };
 
-        console.log('🎵 ElevenLabs voice generation successful!');
+        audio.onended = () => {
+          console.log('🎵 Voice playback completed');
+          URL.revokeObjectURL(audioUrl);
+          if (onComplete) onComplete();
+        };
+
+        audio.onerror = (audioError) => {
+          console.error('Audio error:', audioError);
+          URL.revokeObjectURL(audioUrl);
+          if (onError) onError('Audio playback failed');
+        };
 
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
-        console.error('ElevenLabs API error:', errorMessage);
+        console.error('ElevenLabs error:', errorMessage);
         setError(errorMessage);
-        
-        if (onError) {
-          onError(errorMessage);
-        }
+        if (onError) onError(errorMessage);
       } finally {
         setIsLoading(false);
       }
     };
 
     generateSpeech();
-  }, [text, voiceId, ELEVENLABS_API_KEY, onComplete, onError]);
 
-  const handleAudioEnd = () => {
-    console.log('🎵 Voice playback completed');
-    if (onComplete) {
-      onComplete();
-    }
-  };
+    // Cleanup function
+    return () => {
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+      }
+    };
+  }, [text, voiceId, API_KEY, onComplete, onError]);
 
-  const handleAudioError = (e: React.SyntheticEvent<HTMLAudioElement, Event>) => {
-    const errorMsg = 'Audio playback error occurred';
-    console.error('Audio element error:', e);
-    setError(errorMsg);
-    
-    if (onError) {
-      onError(errorMsg);
-    }
-  };
+  // Debug panel (only in development)
+  if (process.env.NODE_ENV === 'development') {
+    return (
+      <div className="fixed bottom-4 left-4 bg-black/80 text-white p-3 rounded-lg text-xs font-mono max-w-xs z-50">
+        <div className="text-green-400 font-bold mb-1">🎵 ElevenLabs Voice Debug</div>
+        <div>API Key: ✅ Configured</div>
+        <div>Voice ID: {voiceId}</div>
+        <div>Status: {isLoading ? '🔄 Generating...' : error ? '❌ Error' : '✅ Ready'}</div>
+        {error && <div className="text-red-400 mt-1">Error: {error}</div>}
+        {text && (
+          <div className="mt-2 p-2 bg-gray-800 rounded">
+            <div className="text-yellow-400 text-xs">Current Text:</div>
+            <div className="text-gray-300 text-xs">{text.substring(0, 100)}...</div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
-  return (
-    <>
-      <audio
-        ref={audioRef}
-        onEnded={handleAudioEnd}
-        onError={handleAudioError}
-        style={{ display: 'none' }}
-        preload="none"
-      />
-      
-      {/* Debug info - only show in development */}
-      {import.meta.env.DEV && (
-        <div className="fixed bottom-4 left-4 bg-black/80 text-white p-2 rounded text-xs max-w-xs z-50">
-          <div>🎵 ElevenLabs Status:</div>
-          <div>API Key: {ELEVENLABS_API_KEY ? '✅ Configured' : '❌ Missing'}</div>
-          <div>Voice ID: {voiceId}</div>
-          {isLoading && <div>🔄 Generating speech...</div>}
-          {error && <div className="text-red-400">❌ {error}</div>}
-          {text && <div>📝 "{text.substring(0, 50)}..."</div>}
-        </div>
-      )}
-    </>
-  );
+  return null;
 };
 
 export default ElevenLabsVoice;
