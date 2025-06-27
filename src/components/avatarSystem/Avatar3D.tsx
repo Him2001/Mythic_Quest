@@ -9,8 +9,13 @@ interface Avatar3DModelProps {
 }
 
 function Avatar3DModel({ url }: Avatar3DModelProps) {
-  const { scene } = useGLTF(url);
+  const { scene, error } = useGLTF(url);
   const meshRef = useRef<THREE.Group>(null);
+
+  // Handle loading errors
+  if (error) {
+    throw error;
+  }
 
   // Auto-rotate the model slowly
   useFrame((state, delta) => {
@@ -30,6 +35,53 @@ function Avatar3DModel({ url }: Avatar3DModelProps) {
   return <primitive ref={meshRef} object={scene} />;
 }
 
+// Fallback 3D Avatar component
+function FallbackAvatar() {
+  const meshRef = useRef<THREE.Mesh>(null);
+
+  useFrame((state, delta) => {
+    if (meshRef.current) {
+      meshRef.current.rotation.y += delta * 0.3;
+      meshRef.current.rotation.x = Math.sin(state.clock.elapsedTime) * 0.1;
+    }
+  });
+
+  return (
+    <mesh ref={meshRef} position={[0, 0, 0]}>
+      <boxGeometry args={[1.5, 2, 0.8]} />
+      <meshStandardMaterial color="#8B4513" />
+      {/* Head */}
+      <mesh position={[0, 1.2, 0]}>
+        <sphereGeometry args={[0.4, 16, 16]} />
+        <meshStandardMaterial color="#FDBCB4" />
+      </mesh>
+      {/* Helmet/Crown */}
+      <mesh position={[0, 1.5, 0]}>
+        <cylinderGeometry args={[0.45, 0.35, 0.3, 8]} />
+        <meshStandardMaterial color="#FFD700" />
+      </mesh>
+      {/* Arms */}
+      <mesh position={[-0.9, 0.3, 0]}>
+        <boxGeometry args={[0.3, 1.2, 0.3]} />
+        <meshStandardMaterial color="#8B4513" />
+      </mesh>
+      <mesh position={[0.9, 0.3, 0]}>
+        <boxGeometry args={[0.3, 1.2, 0.3]} />
+        <meshStandardMaterial color="#8B4513" />
+      </mesh>
+      {/* Legs */}
+      <mesh position={[-0.4, -1.5, 0]}>
+        <boxGeometry args={[0.3, 1.5, 0.3]} />
+        <meshStandardMaterial color="#654321" />
+      </mesh>
+      <mesh position={[0.4, -1.5, 0]}>
+        <boxGeometry args={[0.3, 1.5, 0.3]} />
+        <meshStandardMaterial color="#654321" />
+      </mesh>
+    </mesh>
+  );
+}
+
 interface Avatar3DProps {
   className?: string;
 }
@@ -38,6 +90,7 @@ const Avatar3D: React.FC<Avatar3DProps> = ({ className = '' }) => {
   const [modelUrl, setModelUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [usesFallback, setUsesFallback] = useState(false);
 
   useEffect(() => {
     const loadModel = async () => {
@@ -46,19 +99,26 @@ const Avatar3D: React.FC<Avatar3DProps> = ({ className = '' }) => {
           throw new Error('Supabase not configured');
         }
 
-        // Get the public URL for the 3D model
+        // Try to get the public URL for the 3D model
         const { data } = supabase.storage
           .from('idle')
           .getPublicUrl('Warrior idle.glb');
 
         if (data?.publicUrl) {
-          setModelUrl(data.publicUrl);
+          // Test if the URL is actually accessible
+          const response = await fetch(data.publicUrl, { method: 'HEAD' });
+          if (response.ok) {
+            setModelUrl(data.publicUrl);
+          } else {
+            throw new Error('Model file not accessible');
+          }
         } else {
           throw new Error('Failed to get model URL');
         }
       } catch (err) {
-        console.error('Error loading 3D model:', err);
+        console.warn('3D model not available, using fallback avatar:', err);
         setError(err instanceof Error ? err.message : 'Failed to load 3D model');
+        setUsesFallback(true);
       } finally {
         setLoading(false);
       }
@@ -75,27 +135,30 @@ const Avatar3D: React.FC<Avatar3DProps> = ({ className = '' }) => {
     );
   }
 
-  if (error || !modelUrl) {
-    return (
-      <div className={`w-48 h-48 sm:w-56 sm:h-56 flex items-center justify-center bg-gray-100 rounded-full ${className}`}>
-        <div className="text-center text-gray-500">
-          <div className="text-2xl mb-2">⚔️</div>
-          <div className="text-sm">3D Model Unavailable</div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className={`w-48 h-48 sm:w-56 sm:h-56 ${className}`}>
       <Canvas
         camera={{ position: [0, 0, 5], fov: 50 }}
         style={{ width: '100%', height: '100%' }}
+        onError={(error) => {
+          console.warn('Canvas error, switching to fallback:', error);
+          setUsesFallback(true);
+        }}
       >
-        <ambientLight intensity={0.5} />
+        <ambientLight intensity={0.6} />
         <directionalLight position={[10, 10, 5]} intensity={1} />
-        <pointLight position={[-10, -10, -5]} intensity={0.3} />
-        <Avatar3DModel url={modelUrl} />
+        <pointLight position={[-10, -10, -5]} intensity={0.4} />
+        
+        <React.Suspense fallback={null}>
+          {!usesFallback && modelUrl ? (
+            <ErrorBoundary onError={() => setUsesFallback(true)}>
+              <Avatar3DModel url={modelUrl} />
+            </ErrorBoundary>
+          ) : (
+            <FallbackAvatar />
+          )}
+        </React.Suspense>
+        
         <OrbitControls
           enableZoom={false}
           enablePan={false}
@@ -107,5 +170,35 @@ const Avatar3D: React.FC<Avatar3DProps> = ({ className = '' }) => {
     </div>
   );
 };
+
+// Simple Error Boundary component
+interface ErrorBoundaryProps {
+  children: React.ReactNode;
+  onError: () => void;
+}
+
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, { hasError: boolean }> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.warn('Avatar3D Error Boundary caught an error:', error, errorInfo);
+    this.props.onError();
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return null;
+    }
+
+    return this.props.children;
+  }
+}
 
 export default Avatar3D;
