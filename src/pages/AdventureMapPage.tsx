@@ -31,6 +31,7 @@ const AdventureMapPage: React.FC<AdventureMapPageProps> = ({
   const [wellnessLocations, setWellnessLocations] = useState<WellnessLocation[]>([]);
   const [completedQuests, setCompletedQuests] = useState<Set<string>>(new Set());
   const [totalXPEarned, setTotalXPEarned] = useState(0);
+  const [mapRef, setMapRef] = useState<any>(null);
 
   const handleLocationUpdate = (locations: WellnessLocation[]) => {
     setWellnessLocations(locations);
@@ -84,6 +85,13 @@ const AdventureMapPage: React.FC<AdventureMapPageProps> = ({
     }
   };
 
+  const handleMarkPath = (location: WellnessLocation) => {
+    if (mapRef && userLocation) {
+      // Call the map's method to mark path to location
+      mapRef.markPathToLocation(location, userLocation);
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 py-6">
       {/* Header */}
@@ -128,6 +136,7 @@ const AdventureMapPage: React.FC<AdventureMapPageProps> = ({
         <LiveAdventureMap
           onQuestComplete={handleQuestComplete}
           onLocationUpdate={handleLocationUpdate}
+          ref={setMapRef}
         />
       </div>
 
@@ -144,6 +153,7 @@ const AdventureMapPage: React.FC<AdventureMapPageProps> = ({
           userLocation={userLocation}
           completedQuests={completedQuests}
           onNavigateToLocation={handleNavigateToLocation}
+          onMarkPath={handleMarkPath}
         />
       </div>
     </div>
