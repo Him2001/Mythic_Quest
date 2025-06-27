@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { User, FriendRequest } from '../../types';
 import { SocialService } from '../../utils/socialService';
 import { SupabaseService } from '../../utils/supabaseService';
-import { supabase } from '../../utils/supabaseClient';
 import Avatar from '../ui/Avatar';
 import Button from '../ui/Button';
 import Badge from '../ui/Badge';
@@ -36,22 +35,12 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
 
   const loadFriends = async () => {
     try {
-      // Check if Supabase is configured
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
-      if (supabaseUrl && supabaseKey) {
-        const friendships = await SupabaseService.getFriends(currentUser.id);
-        const friendUsers = friendships.map(friendship => {
-          // Get the other user in the friendship
-          return friendship.user1_id === currentUser.id ? friendship.user2 : friendship.user1;
-        });
-        setFriends(friendUsers);
-      } else {
-        // Fallback to local service
-        const friendIds = SocialService.getFriends(currentUser.id);
-        setFriends(friendIds.map(id => ({ id, username: `User ${id.slice(0, 8)}`, email: `user${id.slice(0, 4)}@example.com` })));
-      }
+      const friendships = await SupabaseService.getFriends(currentUser.id);
+      const friendUsers = friendships.map(friendship => {
+        // Get the other user in the friendship
+        return friendship.user1_id === currentUser.id ? friendship.user2 : friendship.user1;
+      });
+      setFriends(friendUsers);
     } catch (error) {
       console.error('Failed to load friends:', error);
     }
@@ -59,23 +48,13 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
 
   const loadFriendRequests = async () => {
     try {
-      // Check if Supabase is configured
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const requests = await SupabaseService.getFriendRequests(currentUser.id);
       
-      if (supabaseUrl && supabaseKey) {
-        const requests = await SupabaseService.getFriendRequests(currentUser.id);
-        
-        // Separate sent and received requests
-        const sent = requests.filter(req => req.sender_id === currentUser.id);
-        const received = requests.filter(req => req.receiver_id === currentUser.id);
-        
-        setFriendRequests({ sent, received });
-      } else {
-        // Fallback to local service
-        const requests = SocialService.getFriendRequests(currentUser.id);
-        setFriendRequests(requests);
-      }
+      // Separate sent and received requests
+      const sent = requests.filter(req => req.sender_id === currentUser.id);
+      const received = requests.filter(req => req.receiver_id === currentUser.id);
+      
+      setFriendRequests({ sent, received });
     } catch (error) {
       console.error('Failed to load friend requests:', error);
     }
@@ -89,18 +68,8 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
 
     setIsSearching(true);
     try {
-      // Check if Supabase is configured
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
-      if (supabaseUrl && supabaseKey) {
-        const results = await SupabaseService.searchUsers(searchQuery, currentUser.id);
-        setSearchResults(results);
-      } else {
-        // Fallback to local service
-        const results = SocialService.searchUsers(searchQuery, currentUser.id);
-        setSearchResults(results);
-      }
+      const results = await SupabaseService.searchUsers(searchQuery, currentUser.id);
+      setSearchResults(results);
     } catch (error) {
       console.error('Search failed:', error);
     } finally {
@@ -110,23 +79,11 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
 
   const handleSendFriendRequest = async (userId: string) => {
     try {
-      // Check if Supabase is configured
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
-      if (supabaseUrl && supabaseKey) {
-        const success = await SupabaseService.sendFriendRequest(currentUser.id, userId);
-        if (success) {
-          loadFriendRequests();
-          handleSearch();
-        }
-      } else {
-        // Fallback to local service
-        const success = SocialService.sendFriendRequest(currentUser.id, userId);
-        if (success) {
-          loadFriendRequests();
-          handleSearch();
-        }
+      const success = await SupabaseService.sendFriendRequest(currentUser.id, userId);
+      if (success) {
+        loadFriendRequests();
+        // Update search results to reflect new status
+        handleSearch();
       }
     } catch (error) {
       console.error('Failed to send friend request:', error);
@@ -135,23 +92,10 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
 
   const handleAcceptRequest = async (requestId: string) => {
     try {
-      // Check if Supabase is configured
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
-      if (supabaseUrl && supabaseKey) {
-        const success = await SupabaseService.acceptFriendRequest(requestId);
-        if (success) {
-          loadFriends();
-          loadFriendRequests();
-        }
-      } else {
-        // Fallback to local service
-        const success = SocialService.acceptFriendRequest(requestId);
-        if (success) {
-          loadFriends();
-          loadFriendRequests();
-        }
+      const success = await SupabaseService.acceptFriendRequest(requestId);
+      if (success) {
+        loadFriends();
+        loadFriendRequests();
       }
     } catch (error) {
       console.error('Failed to accept friend request:', error);
@@ -160,25 +104,13 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
 
   const handleRejectRequest = async (requestId: string) => {
     try {
-      // Check if Supabase is configured
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
-      if (supabaseUrl && supabaseKey) {
-        const { error } = await supabase
-          .from('friend_requests')
-          .update({ status: 'rejected' })
-          .eq('id', requestId);
+      const { error } = await supabase
+        .from('friend_requests')
+        .update({ status: 'rejected' })
+        .eq('id', requestId);
 
-        if (!error) {
-          loadFriendRequests();
-        }
-      } else {
-        // Fallback to local service
-        const success = SocialService.rejectFriendRequest(requestId);
-        if (success) {
-          loadFriendRequests();
-        }
+      if (!error) {
+        loadFriendRequests();
       }
     } catch (error) {
       console.error('Failed to reject friend request:', error);
@@ -187,25 +119,14 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
 
   const handleRemoveFriend = async (userId: string) => {
     try {
-      // Check if Supabase is configured
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
-      if (supabaseUrl && supabaseKey) {
-        const { error } = await supabase
-          .from('friendships')
-          .delete()
-          .or(`and(user1_id.eq.${currentUser.id},user2_id.eq.${userId}),and(user1_id.eq.${userId},user2_id.eq.${currentUser.id})`);
+      // Remove friendship from database
+      const { error } = await supabase
+        .from('friendships')
+        .delete()
+        .or(`and(user1_id.eq.${currentUser.id},user2_id.eq.${userId}),and(user1_id.eq.${userId},user2_id.eq.${currentUser.id})`);
 
-        if (!error) {
-          loadFriends();
-        }
-      } else {
-        // Fallback to local service
-        const success = SocialService.removeFriend(currentUser.id, userId);
-        if (success) {
-          loadFriends();
-        }
+      if (!error) {
+        loadFriends();
       }
     } catch (error) {
       console.error('Failed to remove friend:', error);
@@ -218,10 +139,10 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
     if (isFriend) return 'friends';
 
     // Check for pending requests
-    const sentRequest = friendRequests.sent.find(req => req.receiver_id === userId || req.receiverId === userId);
+    const sentRequest = friendRequests.sent.find(req => req.receiver_id === userId);
     if (sentRequest) return 'pending_sent';
 
-    const receivedRequest = friendRequests.received.find(req => req.sender_id === userId || req.senderId === userId);
+    const receivedRequest = friendRequests.received.find(req => req.sender_id === userId);
     if (receivedRequest) return 'pending_received';
 
     return 'none';
@@ -269,7 +190,7 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
               <div className="flex items-center mt-2 space-x-4 text-xs text-gray-500">
                 <span>{user.total_quests_completed || 0} quests</span>
                 <span>{user.coins || 0} coins</span>
-                <span>Joined {new Date(user.created_at || user.date_created || Date.now()).toLocaleDateString()}</span>
+                <span>Joined {new Date(user.created_at || user.date_created).toLocaleDateString()}</span>
               </div>
             </div>
           </div>
@@ -348,7 +269,7 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
               <h3 className="font-cinzel font-bold text-gray-800">{otherUser.username}</h3>
               <p className="text-sm text-gray-600 font-merriweather">{otherUser.email}</p>
               <p className="text-xs text-gray-500 font-merriweather">
-                {type === 'sent' ? 'Request sent' : 'Request received'} {SocialService.formatTimeAgo(request.created_at || request.createdAt)}
+                {type === 'sent' ? 'Request sent' : 'Request received'} {SocialService.formatTimeAgo(request.created_at)}
               </p>
             </div>
           </div>
