@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { User } from '../../types';
 import { SupabaseAuthService } from '../../utils/supabaseAuthService';
-import { mockUser } from '../../data/mockData';
+import { User } from '../../types';
 import AuthLayout from './AuthLayout';
 import Button from '../ui/Button';
 import { Eye, EyeOff, Mail, Lock, LogIn } from 'lucide-react';
@@ -12,12 +11,28 @@ interface SignInFormProps {
   onForgotPassword: () => void;
 }
 
-const SignInForm: React.FC<SignInFormProps> = ({ onSignIn, onSwitchToSignUp, onForgotPassword }) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+const SignInForm: React.FC<SignInFormProps> = ({
+  onSignIn,
+  onSwitchToSignUp,
+  onForgotPassword
+}) => {
+  const [formData, setFormData] = useState({
+    email: '',
+    password: ''
+  });
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    // Clear error when user starts typing
+    if (error) setError('');
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,55 +40,27 @@ const SignInForm: React.FC<SignInFormProps> = ({ onSignIn, onSwitchToSignUp, onF
     setError('');
 
     try {
-      // Check for admin credentials
-      if (email === 'admin@123' && password === 'admin@123') {
-        const adminUser: User = {
-          ...mockUser,
-          id: 'admin-user-id',
-          email: 'admin@123',
-          name: 'Administrator',
-          isAdmin: true
-        };
-        onSignIn(adminUser);
-        return;
-      }
-
-      // Check if Supabase is configured
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-      if (!supabaseUrl || !supabaseKey) {
-        // Demo mode - accept any credentials
-        console.log('Demo mode: Using mock authentication');
-        const demoUser: User = {
-          ...mockUser,
-          email: email,
-          name: email.split('@')[0]
-        };
-        onSignIn(demoUser);
-        return;
-      }
-
-      // Try Supabase authentication
-      const { user, error: authError } = await SupabaseAuthService.signIn(email, password);
+      const { user, error: authError } = await SupabaseAuthService.signIn(
+        formData.email,
+        formData.password
+      );
 
       if (authError) {
         setError(authError);
-        return;
-      }
-
-      if (user) {
+      } else if (user) {
         onSignIn(user);
       } else {
         setError('Sign in failed. Please try again.');
       }
-    } catch (error) {
-      console.error('Sign in error:', error);
+    } catch (err) {
       setError('An unexpected error occurred. Please try again.');
+      console.error('Sign in error:', err);
     } finally {
       setIsLoading(false);
     }
   };
+
+  const isFormValid = formData.email.trim() && formData.password.trim();
 
   return (
     <AuthLayout
@@ -83,33 +70,38 @@ const SignInForm: React.FC<SignInFormProps> = ({ onSignIn, onSwitchToSignUp, onF
       <form onSubmit={handleSubmit} className="space-y-6">
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-red-700 text-sm font-merriweather">{error}</p>
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-red-800 font-merriweather">{error}</p>
+              </div>
+            </div>
           </div>
         )}
-
-        {/* Demo Notice */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h4 className="text-blue-800 font-cinzel font-bold text-sm mb-2">Demo Access</h4>
-          <div className="text-blue-700 text-sm font-merriweather space-y-1">
-            <p><strong>Admin:</strong> admin@123 / admin@123</p>
-            <p><strong>Demo:</strong> Any email/password works</p>
-          </div>
-        </div>
 
         <div>
           <label htmlFor="email" className="block text-sm font-cinzel font-bold text-gray-700 mb-2">
             Email Address
           </label>
           <div className="relative">
-            <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Mail className="h-5 w-5 text-gray-400" />
+            </div>
             <input
-              type="email"
               id="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 border-2 border-amber-200 rounded-lg focus:border-amber-500 focus:outline-none font-merriweather bg-white/80 backdrop-blur-sm"
-              placeholder="Enter your email"
+              name="email"
+              type="email"
+              autoComplete="email"
               required
+              value={formData.email}
+              onChange={handleInputChange}
+              className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 font-merriweather bg-white/80 backdrop-blur-sm"
+              placeholder="Enter your email"
+              disabled={isLoading}
             />
           </div>
         </div>
@@ -119,63 +111,77 @@ const SignInForm: React.FC<SignInFormProps> = ({ onSignIn, onSwitchToSignUp, onF
             Password
           </label>
           <div className="relative">
-            <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Lock className="h-5 w-5 text-gray-400" />
+            </div>
             <input
-              type={showPassword ? 'text' : 'password'}
               id="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full pl-10 pr-12 py-3 border-2 border-amber-200 rounded-lg focus:border-amber-500 focus:outline-none font-merriweather bg-white/80 backdrop-blur-sm"
-              placeholder="Enter your password"
+              name="password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
               required
+              value={formData.password}
+              onChange={handleInputChange}
+              className="block w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 font-merriweather bg-white/80 backdrop-blur-sm"
+              placeholder="Enter your password"
+              disabled={isLoading}
             />
             <button
               type="button"
+              className="absolute inset-y-0 right-0 pr-3 flex items-center"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              disabled={isLoading}
             >
-              {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              {showPassword ? (
+                <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+              ) : (
+                <Eye className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+              )}
             </button>
           </div>
         </div>
 
         <div className="flex items-center justify-between">
-          <label className="flex items-center">
-            <input
-              type="checkbox"
-              className="rounded border-amber-300 text-amber-600 focus:ring-amber-500"
-            />
-            <span className="ml-2 text-sm text-gray-600 font-merriweather">Remember me</span>
-          </label>
-          <button
-            type="button"
-            onClick={onForgotPassword}
-            className="text-sm text-amber-600 hover:text-amber-700 font-cinzel font-bold"
-          >
-            Forgot password?
-          </button>
+          <div className="text-sm">
+            <button
+              type="button"
+              onClick={onForgotPassword}
+              className="font-cinzel text-amber-600 hover:text-amber-500 transition-colors duration-200"
+              disabled={isLoading}
+            >
+              Forgot your password?
+            </button>
+          </div>
         </div>
 
         <Button
           type="submit"
           variant="primary"
           fullWidth
-          disabled={isLoading}
-          icon={<LogIn size={20} />}
+          disabled={!isFormValid || isLoading}
+          icon={isLoading ? undefined : <LogIn size={20} />}
           className="magical-glow"
         >
-          {isLoading ? 'Signing In...' : 'Enter the Realm'}
+          {isLoading ? (
+            <div className="flex items-center justify-center">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+              Signing In...
+            </div>
+          ) : (
+            'Sign In to Eldoria'
+          )}
         </Button>
 
         <div className="text-center">
-          <p className="text-gray-600 font-merriweather">
-            New to Eldoria?{' '}
+          <p className="text-sm text-gray-600 font-merriweather">
+            New to the realm?{' '}
             <button
               type="button"
               onClick={onSwitchToSignUp}
-              className="text-amber-600 hover:text-amber-700 font-cinzel font-bold"
+              className="font-cinzel font-bold text-amber-600 hover:text-amber-500 transition-colors duration-200"
+              disabled={isLoading}
             >
-              Begin Your Journey
+              Create your adventure
             </button>
           </p>
         </div>
