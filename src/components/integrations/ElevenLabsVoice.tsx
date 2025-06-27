@@ -1,44 +1,27 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 
 interface ElevenLabsVoiceProps {
   text: string;
-  voiceId: string;
-  isServiceInCooldown?: boolean;
+  voiceId?: string;
   onComplete?: () => void;
-  onError?: () => void;
-  onRateLimitExceeded?: () => void;
 }
 
 const ElevenLabsVoice: React.FC<ElevenLabsVoiceProps> = ({ 
   text, 
-  voiceId,
-  isServiceInCooldown = false,
-  onComplete, 
-  onError,
-  onRateLimitExceeded 
+  voiceId = 'MezYwaNLTOfydzsFJwwt',
+  onComplete 
 }) => {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const isPlayingRef = useRef(false);
 
   useEffect(() => {
-    // Don't proceed if service is in cooldown or no text provided
-    if (!text || text.trim() === '' || isServiceInCooldown) {
-      if (isServiceInCooldown) {
-        console.log('ElevenLabs service is in cooldown, skipping voice synthesis');
-        // Call onComplete to allow queue processing to continue
-        if (onComplete) {
-          onComplete();
-        }
-      }
-      return;
-    }
+    if (!text || text.trim() === '' || isPlayingRef.current) return;
 
-    const playVoice = async () => {
+    const generateAndPlayAudio = async () => {
       try {
-        setIsPlaying(true);
-        console.log('Starting voice synthesis for:', text.substring(0, 50) + '...');
-
-        const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+        isPlayingRef.current = true;
+        
+        const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/' + voiceId, {
           method: 'POST',
           headers: {
             'Accept': 'audio/mpeg',
@@ -50,83 +33,58 @@ const ElevenLabsVoice: React.FC<ElevenLabsVoiceProps> = ({
             model_id: 'eleven_monolingual_v1',
             voice_settings: {
               stability: 0.5,
-              similarity_boost: 0.5
+              similarity_boost: 0.5,
+              style: 0.5,
+              use_speaker_boost: true
             }
           })
         });
 
         if (!response.ok) {
-          if (response.status === 429) {
-            console.error('ElevenLabs rate limit exceeded');
-            if (onRateLimitExceeded) {
-              onRateLimitExceeded();
-            }
-            return;
-          }
           throw new Error(`ElevenLabs API error: ${response.status}`);
         }
 
         const audioBlob = await response.blob();
         const audioUrl = URL.createObjectURL(audioBlob);
-        const audio = new Audio(audioUrl);
         
-        setCurrentAudio(audio);
-
-        audio.onended = () => {
-          console.log('Voice playback completed successfully');
-          URL.revokeObjectURL(audioUrl);
-          setIsPlaying(false);
-          setCurrentAudio(null);
-          if (onComplete) {
-            onComplete();
-          }
-        };
-
-        audio.onerror = (error) => {
-          console.error('Audio playback error:', error);
-          URL.revokeObjectURL(audioUrl);
-          setIsPlaying(false);
-          setCurrentAudio(null);
-          if (onError) {
-            onError();
-          }
-        };
-
-        await audio.play();
-        console.log('Voice playback started');
-
-      } catch (error) {
-        console.error('ElevenLabs voice synthesis error:', error);
-        setIsPlaying(false);
-        setCurrentAudio(null);
-        if (onError) {
-          onError();
+        if (audioRef.current) {
+          audioRef.current.pause();
         }
+        
+        const audio = new Audio(audioUrl);
+        audioRef.current = audio;
+        
+        audio.onended = () => {
+          URL.revokeObjectURL(audioUrl);
+          isPlayingRef.current = false;
+          if (onComplete) onComplete();
+        };
+        
+        audio.onerror = () => {
+          URL.revokeObjectURL(audioUrl);
+          isPlayingRef.current = false;
+          console.warn('Audio playback failed');
+        };
+        
+        await audio.play();
+        
+      } catch (error) {
+        console.warn('ElevenLabs TTS failed:', error);
+        isPlayingRef.current = false;
+        if (onComplete) onComplete();
       }
     };
 
-    playVoice();
+    generateAndPlayAudio();
 
-    // Cleanup function
     return () => {
-      if (currentAudio) {
-        currentAudio.pause();
-        currentAudio.currentTime = 0;
-        setCurrentAudio(null);
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
       }
-      setIsPlaying(false);
+      isPlayingRef.current = false;
     };
-  }, [text, voiceId, isServiceInCooldown, onComplete, onError, onRateLimitExceeded]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (currentAudio) {
-        currentAudio.pause();
-        currentAudio.currentTime = 0;
-      }
-    };
-  }, [currentAudio]);
+  }, [text, voiceId, onComplete]);
 
   return null; // This component doesn't render anything visible
 };

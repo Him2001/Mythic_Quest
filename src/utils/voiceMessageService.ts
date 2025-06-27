@@ -1,28 +1,8 @@
 import { User, Quest } from '../types';
 
-interface QueuedMessage {
-  text: string;
-  priority: number;
-  id: string;
-  timestamp: number;
-}
-
 export class VoiceMessageService {
-  private static messageQueue: QueuedMessage[] = [];
+  private static messageQueue: string[] = [];
   private static isPlaying = false;
-  private static currentMessageId: string | null = null;
-  private static rateLimitCooldownUntil: number = 0;
-  private static readonly COOLDOWN_DURATION = 60000; // 1 minute cooldown
-  private static processingTimeout: NodeJS.Timeout | null = null;
-
-  // Priority constants for easy reference
-  static readonly PRIORITY = {
-    WELCOME: 1,
-    QUEST_COMPLETION: 2,
-    LEVEL_UP: 3,
-    FRIEND_MESSAGE: 4,
-    COIN_MILESTONE: 5
-  } as const;
 
   // Welcome messages based on quest count
   static getWelcomeMessage(user: User, activeQuestCount: number): string {
@@ -115,115 +95,52 @@ export class VoiceMessageService {
   }
 
   // Coin milestone messages
-  static getCoinMilestoneMessage(user: User, totalCoins: number): string | null {
-    if (totalCoins >= 1000 && totalCoins < 1100) {
+  static getCoinMilestoneMessage(user: User, totalCoins: number): string {
+    if (totalCoins >= 1000) {
       return `Astounding wealth, ${user.name}! Your treasure hoard has reached ${totalCoins} Mythic Coins! You're becoming quite the wealthy adventurer in Eldoria!`;
-    } else if (totalCoins >= 500 && totalCoins < 550) {
+    } else if (totalCoins >= 500) {
       return `Impressive fortune, ${user.name}! ${totalCoins} Mythic Coins now fill your coffers! Your dedication to wellness pays handsomely!`;
-    } else if (totalCoins >= 100 && totalCoins < 150) {
+    } else if (totalCoins >= 100) {
       return `Excellent progress, ${user.name}! Your coin collection has grown to ${totalCoins} Mythic Coins! The realm rewards your consistency!`;
     }
-    return null;
+    return '';
   }
 
   // Walking distance achievements
-  static getWalkingAchievementMessage(user: User, totalDistance: number): string | null {
+  static getWalkingAchievementMessage(user: User, totalDistance: number): string {
     const distanceKm = Math.floor(totalDistance / 1000);
-    if (distanceKm >= 100 && distanceKm < 105) {
+    if (distanceKm >= 100) {
       return `Incredible journey, ${user.name}! You've walked over ${distanceKm} kilometers in your wellness adventures! The paths of Eldoria echo with your footsteps!`;
-    } else if (distanceKm >= 50 && distanceKm < 55) {
+    } else if (distanceKm >= 50) {
       return `Remarkable dedication, ${user.name}! ${distanceKm} kilometers conquered on your wellness journey! Your endurance is truly legendary!`;
-    } else if (distanceKm >= 10 && distanceKm < 15) {
+    } else if (distanceKm >= 10) {
       return `Wonderful progress, ${user.name}! ${distanceKm} kilometers walked in pursuit of wellness! Every step strengthens your resolve!`;
     }
-    return null;
+    return '';
   }
 
-  // Handle rate limit error by setting cooldown
-  static handleRateLimitError() {
-    this.rateLimitCooldownUntil = Date.now() + this.COOLDOWN_DURATION;
-    console.warn(`ElevenLabs rate limit hit. Voice messages disabled until ${new Date(this.rateLimitCooldownUntil).toLocaleTimeString()}`);
-    
-    // Clear the current queue to prevent further rate limit hits
-    this.clearQueue();
-    this.setPlaying(false);
-  }
-
-  // Check if we're still in cooldown period
-  static isInCooldown(): boolean {
-    return Date.now() < this.rateLimitCooldownUntil;
-  }
-
-  // Get remaining cooldown time in seconds
-  static getRemainingCooldownTime(): number {
-    if (!this.isInCooldown()) return 0;
-    return Math.ceil((this.rateLimitCooldownUntil - Date.now()) / 1000);
-  }
-
-  // Queue management with strict prioritization and deduplication
-  static queueMessage(message: string, priority: number = 5) {
+  // Queue management for prioritized messages
+  static queueMessage(message: string, priority: number = 0) {
     if (!message || message.trim() === '') return;
     
-    // Don't queue messages if we're in cooldown
-    if (this.isInCooldown()) {
-      console.warn(`Voice message queuing disabled due to rate limit cooldown. ${this.getRemainingCooldownTime()}s remaining.`);
-      return;
+    // Insert message based on priority (lower number = higher priority)
+    const messageWithPriority = { text: message, priority };
+    
+    if (this.messageQueue.length === 0) {
+      this.messageQueue.push(message);
+    } else {
+      // Find insertion point based on priority
+      let insertIndex = this.messageQueue.length;
+      this.messageQueue.push(message); // For now, just add to end
     }
-    
-    // Remove any existing messages with the same priority to prevent duplicates
-    this.messageQueue = this.messageQueue.filter(msg => msg.priority !== priority);
-    
-    const queuedMessage: QueuedMessage = {
-      text: message,
-      priority,
-      id: crypto.randomUUID(),
-      timestamp: Date.now()
-    };
-    
-    // Insert message in priority order (lower number = higher priority)
-    let insertIndex = this.messageQueue.length;
-    for (let i = 0; i < this.messageQueue.length; i++) {
-      if (this.messageQueue[i].priority > priority) {
-        insertIndex = i;
-        break;
-      }
-    }
-    
-    this.messageQueue.splice(insertIndex, 0, queuedMessage);
-    
-    console.log(`Queued message with priority ${priority}:`, message.substring(0, 50) + '...');
-    console.log('Current queue:', this.messageQueue.map(m => `P${m.priority}: ${m.text.substring(0, 30)}...`));
   }
 
   static getNextMessage(): string | null {
-    // Don't return messages if we're in cooldown
-    if (this.isInCooldown()) {
-      console.warn(`Voice messages disabled due to rate limit cooldown. ${this.getRemainingCooldownTime()}s remaining.`);
-      return null;
-    }
-    
-    if (this.messageQueue.length === 0) return null;
-    
-    const nextMessage = this.messageQueue.shift();
-    if (nextMessage) {
-      this.currentMessageId = nextMessage.id;
-      console.log(`Playing message with priority ${nextMessage.priority}:`, nextMessage.text.substring(0, 50) + '...');
-      console.log('Remaining queue length:', this.messageQueue.length);
-      return nextMessage.text;
-    }
-    
-    return null;
+    return this.messageQueue.shift() || null;
   }
 
   static clearQueue() {
-    console.log('Clearing voice message queue');
     this.messageQueue = [];
-    this.currentMessageId = null;
-    
-    if (this.processingTimeout) {
-      clearTimeout(this.processingTimeout);
-      this.processingTimeout = null;
-    }
   }
 
   static hasQueuedMessages(): boolean {
@@ -231,29 +148,10 @@ export class VoiceMessageService {
   }
 
   static setPlaying(playing: boolean) {
-    console.log(`Voice playing status changed to: ${playing}`);
     this.isPlaying = playing;
-    
-    if (!playing) {
-      this.currentMessageId = null;
-    }
   }
 
   static getIsPlaying(): boolean {
     return this.isPlaying;
-  }
-
-  static getCurrentMessageId(): string | null {
-    return this.currentMessageId;
-  }
-
-  // Get queue status for debugging
-  static getQueueStatus(): { length: number; isPlaying: boolean; currentMessage: string | null; queue: string[] } {
-    return {
-      length: this.messageQueue.length,
-      isPlaying: this.isPlaying,
-      currentMessage: this.currentMessageId,
-      queue: this.messageQueue.map(m => `P${m.priority}: ${m.text.substring(0, 30)}...`)
-    };
   }
 }

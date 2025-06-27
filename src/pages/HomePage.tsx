@@ -36,7 +36,6 @@ const HomePage: React.FC<HomePageProps> = ({
   const [lastLevel, setLastLevel] = useState<number>(user.level);
   const [lastQuestCount, setLastQuestCount] = useState<number>(user.questsCompleted);
   const [hasInitialized, setHasInitialized] = useState<boolean>(false);
-  const [isProcessingQueue, setIsProcessingQueue] = useState<boolean>(false);
   
   // Get active quests
   const activeQuests = quests.filter(quest => !quest.completed).slice(0, 3);
@@ -61,17 +60,35 @@ const HomePage: React.FC<HomePageProps> = ({
       
       setAvatarMessage(welcomeMessage);
       
-      // Queue welcome message with highest priority
-      VoiceMessageService.queueMessage(welcomeMessage, VoiceMessageService.PRIORITY.WELCOME);
+      // Queue welcome message for voice (priority 1 - highest)
+      VoiceMessageService.queueMessage(welcomeMessage, 1);
+      
+      // After 8 seconds, remind about quests and coins (only if there are active quests)
+      const timer = setTimeout(() => {
+        if (activeQuestCount > 0) {
+          const reminderMessage = `You have ${activeQuestCount} quest${activeQuestCount > 1 ? 's' : ''} awaiting your attention. Each completed quest brings both XP and precious Mythic Coins to your treasury.`;
+          setAvatarMessage(reminderMessage);
+        }
+      }, 8000);
       
       setHasInitialized(true);
+      return () => clearTimeout(timer);
     }
   }, [user.name, activeQuests.length, hasInitialized]);
 
-  // Check for quest completions FIRST (priority 2)
+  // Check for level ups
+  useEffect(() => {
+    if (hasInitialized && user.level > lastLevel) {
+      const levelUpMessage = VoiceMessageService.getLevelUpMessage(user, user.level, 100); // Assuming 100 coins for level up
+      VoiceMessageService.queueMessage(levelUpMessage, 2); // Priority 2
+      setLastLevel(user.level);
+    }
+  }, [user.level, lastLevel, hasInitialized, user]);
+
+  // Check for quest completions
   useEffect(() => {
     if (hasInitialized && user.questsCompleted > lastQuestCount) {
-      // Find the most recently completed quest
+      // Find the most recently completed quest (this is a simplified approach)
       const completedQuest = quests.find(q => q.completed);
       if (completedQuest) {
         const questMessage = VoiceMessageService.getQuestCompletionMessage(
@@ -80,48 +97,36 @@ const HomePage: React.FC<HomePageProps> = ({
           completedQuest.type, 
           CoinSystem.calculateQuestReward(completedQuest.type, completedQuest.difficulty)
         );
-        VoiceMessageService.queueMessage(questMessage, VoiceMessageService.PRIORITY.QUEST_COMPLETION);
+        VoiceMessageService.queueMessage(questMessage, 3); // Priority 3
       }
       setLastQuestCount(user.questsCompleted);
     }
   }, [user.questsCompleted, lastQuestCount, hasInitialized, quests, user]);
 
-  // Check for level ups SECOND (priority 3)
-  useEffect(() => {
-    if (hasInitialized && user.level > lastLevel) {
-      const levelUpMessage = VoiceMessageService.getLevelUpMessage(user, user.level, 100);
-      VoiceMessageService.queueMessage(levelUpMessage, VoiceMessageService.PRIORITY.LEVEL_UP);
-      setLastLevel(user.level);
-    }
-  }, [user.level, lastLevel, hasInitialized, user]);
-
-  // Check for coin milestones LAST (priority 5)
+  // Check for coin milestones
   useEffect(() => {
     if (hasInitialized && user.mythicCoins > lastCoinCount) {
       const coinMilestone = VoiceMessageService.getCoinMilestoneMessage(user, user.mythicCoins);
       if (coinMilestone) {
-        VoiceMessageService.queueMessage(coinMilestone, VoiceMessageService.PRIORITY.COIN_MILESTONE);
+        VoiceMessageService.queueMessage(coinMilestone, 4); // Priority 4
       }
       
       // Check walking achievements
       const walkingAchievement = VoiceMessageService.getWalkingAchievementMessage(user, user.totalWalkingDistance);
       if (walkingAchievement) {
-        VoiceMessageService.queueMessage(walkingAchievement, VoiceMessageService.PRIORITY.COIN_MILESTONE);
+        VoiceMessageService.queueMessage(walkingAchievement, 5); // Priority 5
       }
       
       setLastCoinCount(user.mythicCoins);
     }
   }, [user.mythicCoins, lastCoinCount, hasInitialized, user]);
 
-  // Voice message queue processor - strict sequential processing
+  // Voice message queue processor
   useEffect(() => {
     const processVoiceQueue = () => {
-      // Only process if not currently playing and not already processing
-      if (!VoiceMessageService.getIsPlaying() && !isProcessingQueue && VoiceMessageService.hasQueuedMessages()) {
+      if (!VoiceMessageService.getIsPlaying() && VoiceMessageService.hasQueuedMessages()) {
         const nextMessage = VoiceMessageService.getNextMessage();
         if (nextMessage) {
-          console.log('Processing next voice message from queue');
-          setIsProcessingQueue(true);
           setVoiceText(nextMessage);
           VoiceMessageService.setPlaying(true);
         }
@@ -130,32 +135,11 @@ const HomePage: React.FC<HomePageProps> = ({
 
     const interval = setInterval(processVoiceQueue, 1000); // Check every second
     return () => clearInterval(interval);
-  }, [isProcessingQueue]);
+  }, []);
 
   const handleVoiceComplete = () => {
-    console.log('Voice playback completed, waiting before next message');
     VoiceMessageService.setPlaying(false);
-    setVoiceText('');
-    setIsProcessingQueue(false);
-    
-    // Wait 1 second before allowing next message to process
-    setTimeout(() => {
-      console.log('Ready for next voice message');
-    }, 1000);
-  };
-
-  const handleVoiceError = () => {
-    console.log('Voice playback error, continuing to next message');
-    VoiceMessageService.setPlaying(false);
-    setVoiceText('');
-    setIsProcessingQueue(false);
-  };
-
-  const handleRateLimitExceeded = () => {
-    console.log('ElevenLabs rate limit exceeded, implementing cooldown');
-    VoiceMessageService.handleRateLimitError();
-    setVoiceText('');
-    setIsProcessingQueue(false);
+    setVoiceText(''); // Clear the current voice text
   };
   
   return (
@@ -332,15 +316,12 @@ const HomePage: React.FC<HomePageProps> = ({
         </a>
       </div>
       
-      {/* Voice integration - only render when there's text to speak */}
+      {/* Voice integration */}
       {voiceText && (
         <ElevenLabsVoice 
           text={voiceText} 
           voiceId="MezYwaNLTOfydzsFJwwt"
-          isServiceInCooldown={VoiceMessageService.isInCooldown()}
           onComplete={handleVoiceComplete}
-          onError={handleVoiceError}
-          onRateLimitExceeded={handleRateLimitExceeded}
         />
       )}
     </div>
