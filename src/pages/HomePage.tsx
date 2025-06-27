@@ -36,6 +36,7 @@ const HomePage: React.FC<HomePageProps> = ({
   const [lastLevel, setLastLevel] = useState<number>(user.level);
   const [lastWalkingDistance, setLastWalkingDistance] = useState<number>(user.totalWalkingDistance);
   const [hasInitialized, setHasInitialized] = useState<boolean>(false);
+  const [isAudioMuted, setIsAudioMuted] = useState(true);
   
   // Get active quests
   const activeQuests = quests.filter(quest => !quest.completed).slice(0, 3);
@@ -46,6 +47,24 @@ const HomePage: React.FC<HomePageProps> = ({
     }
     return `${Math.round(meters)} m`;
   };
+
+  // Listen for audio state changes
+  useEffect(() => {
+    const handleAudioStateChange = (event: CustomEvent) => {
+      setIsAudioMuted(event.detail.muted);
+    };
+
+    // Get initial state
+    const saved = localStorage.getItem('mythic_audio_muted');
+    setIsAudioMuted(saved ? JSON.parse(saved) : true);
+
+    // Listen for changes
+    window.addEventListener('audioStateChanged', handleAudioStateChange as EventListener);
+
+    return () => {
+      window.removeEventListener('audioStateChanged', handleAudioStateChange as EventListener);
+    };
+  }, []);
 
   // Calculate coin statistics
   const totalPossibleCoins = quests.length * 20; // Assuming 20 coins per quest
@@ -125,10 +144,10 @@ const HomePage: React.FC<HomePageProps> = ({
     }
   }, [user.totalWalkingDistance, lastWalkingDistance, hasInitialized, user]);
 
-  // Voice message queue processor
+  // Voice message queue processor - only process when audio is unmuted
   useEffect(() => {
     const processVoiceQueue = () => {
-      if (!VoiceMessageService.getIsPlaying() && VoiceMessageService.hasQueuedMessages()) {
+      if (!isAudioMuted && !VoiceMessageService.getIsPlaying() && VoiceMessageService.hasQueuedMessages()) {
         const nextMessage = VoiceMessageService.getNextMessage();
         if (nextMessage) {
           setVoiceText(nextMessage);
@@ -139,11 +158,30 @@ const HomePage: React.FC<HomePageProps> = ({
 
     const interval = setInterval(processVoiceQueue, 1000); // Check every second
     return () => clearInterval(interval);
-  }, []);
+  }, [isAudioMuted]);
 
   const handleVoiceComplete = () => {
     VoiceMessageService.setPlaying(false);
     setVoiceText(''); // Clear the current voice text
+  };
+
+  const handleVoiceError = (error: string) => {
+    console.warn('Voice playback error:', error);
+    VoiceMessageService.setPlaying(false);
+    setVoiceText('');
+  };
+
+  // Handle quest completion with voice feedback
+  const handleQuestComplete = (questId: string, distanceWalked?: number) => {
+    const completedQuest = quests.find(q => q.id === questId);
+    if (completedQuest && !completedQuest.completed) {
+      // Queue quest completion message for voice
+      const questMessage = `Excellent work! You've completed "${completedQuest.title}"! Your dedication earns you ${completedQuest.xpReward} XP and ${CoinSystem.calculateQuestReward(completedQuest.type, completedQuest.difficulty)} Mythic Coins!`;
+      VoiceMessageService.queueMessage(questMessage, 2); // Priority 2
+    }
+    
+    // Call the original handler
+    onCompleteQuest(questId, distanceWalked);
   };
   
   return (
@@ -293,7 +331,7 @@ const HomePage: React.FC<HomePageProps> = ({
                   <QuestCard
                     key={quest.id}
                     quest={quest}
-                    onComplete={onCompleteQuest}
+                    onComplete={handleQuestComplete}
                     onStart={() => {}}
                     onUpdateProgress={onUpdateProgress}
                   />
@@ -320,12 +358,13 @@ const HomePage: React.FC<HomePageProps> = ({
         </a>
       </div>
       
-      {/* Voice integration */}
-      {voiceText && (
+      {/* Voice integration - only plays when audio is unmuted */}
+      {voiceText && !isAudioMuted && (
         <ElevenLabsVoice 
           text={voiceText} 
           voiceId="MezYwaNLTOfydzsFJwwt"
           onComplete={handleVoiceComplete}
+          onError={handleVoiceError}
         />
       )}
     </div>

@@ -7,6 +7,7 @@ import ProgressBar from '../ui/ProgressBar';
 import { CheckCircle, Clock, Award, Scroll, Coins, Plus } from 'lucide-react';
 import WalkingQuestCard from './WalkingQuestCard';
 import { CoinSystem } from '../../utils/coinSystem';
+import { VoiceMessageService } from '../../utils/voiceMessageService';
 
 interface QuestCardProps {
   quest: Quest;
@@ -54,6 +55,15 @@ const QuestCard: React.FC<QuestCardProps> = ({ quest, onComplete, onStart, onUpd
 
   // Calculate coin reward
   const coinReward = quest.coinReward || CoinSystem.calculateQuestReward(quest.type, quest.difficulty);
+
+  const handleQuestComplete = () => {
+    // Queue voice message for quest completion
+    const questMessage = `Excellent work! You've completed "${quest.title}"! Your dedication earns you ${quest.xpReward} XP and ${coinReward} Mythic Coins!`;
+    VoiceMessageService.queueMessage(questMessage, 2); // Priority 2
+    
+    // Call the original completion handler
+    onComplete(quest.id);
+  };
   
   return (
     <Card 
@@ -137,7 +147,7 @@ const QuestCard: React.FC<QuestCardProps> = ({ quest, onComplete, onStart, onUpd
             <Button 
               variant="primary" 
               fullWidth
-              onClick={() => onComplete(quest.id)}
+              onClick={handleQuestComplete}
               className="font-cinzel magical-glow"
             >
               <div className="flex items-center justify-center">
