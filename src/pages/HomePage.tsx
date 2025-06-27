@@ -32,9 +32,7 @@ const HomePage: React.FC<HomePageProps> = ({
 }) => {
   const [avatarMessage, setAvatarMessage] = useState<string>('');
   const [voiceText, setVoiceText] = useState<string>('');
-  const [lastCoinCount, setLastCoinCount] = useState<number>(user.mythicCoins);
   const [lastLevel, setLastLevel] = useState<number>(user.level);
-  const [lastQuestCount, setLastQuestCount] = useState<number>(user.questsCompleted);
   const [hasInitialized, setHasInitialized] = useState<boolean>(false);
   
   // Get active quests
@@ -84,42 +82,6 @@ const HomePage: React.FC<HomePageProps> = ({
       setLastLevel(user.level);
     }
   }, [user.level, lastLevel, hasInitialized, user]);
-
-  // Check for quest completions
-  useEffect(() => {
-    if (hasInitialized && user.questsCompleted > lastQuestCount) {
-      // Find the most recently completed quest (this is a simplified approach)
-      const completedQuest = quests.find(q => q.completed);
-      if (completedQuest) {
-        const questMessage = VoiceMessageService.getQuestCompletionMessage(
-          user, 
-          completedQuest.title, 
-          completedQuest.type, 
-          CoinSystem.calculateQuestReward(completedQuest.type, completedQuest.difficulty)
-        );
-        VoiceMessageService.queueMessage(questMessage, 3); // Priority 3
-      }
-      setLastQuestCount(user.questsCompleted);
-    }
-  }, [user.questsCompleted, lastQuestCount, hasInitialized, quests, user]);
-
-  // Check for coin milestones
-  useEffect(() => {
-    if (hasInitialized && user.mythicCoins > lastCoinCount) {
-      const coinMilestone = VoiceMessageService.getCoinMilestoneMessage(user, user.mythicCoins);
-      if (coinMilestone) {
-        VoiceMessageService.queueMessage(coinMilestone, 4); // Priority 4
-      }
-      
-      // Check walking achievements
-      const walkingAchievement = VoiceMessageService.getWalkingAchievementMessage(user, user.totalWalkingDistance);
-      if (walkingAchievement) {
-        VoiceMessageService.queueMessage(walkingAchievement, 5); // Priority 5
-      }
-      
-      setLastCoinCount(user.mythicCoins);
-    }
-  }, [user.mythicCoins, lastCoinCount, hasInitialized, user]);
 
   // Voice message queue processor
   useEffect(() => {
