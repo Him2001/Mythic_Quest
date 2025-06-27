@@ -25,7 +25,13 @@ export class SupabaseAuthService {
         await new Promise(resolve => setTimeout(resolve, 1000));
         
         // Fetch the created profile
-        const profile = await SupabaseService.getUserProfile(data.user.id);
+        let profile = await SupabaseService.getUserProfile(data.user.id);
+        
+        // If profile doesn't exist, create it manually
+        if (!profile) {
+          profile = await SupabaseService.createProfile(data.user.id, username, email);
+        }
+        
         if (profile) {
           const user = this.convertProfileToUser(profile, data.user.email!);
           return { user, error: null };
