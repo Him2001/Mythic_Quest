@@ -36,6 +36,7 @@ const HomePage: React.FC<HomePageProps> = ({
   const [lastLevel, setLastLevel] = useState<number>(user.level);
   const [lastQuestCount, setLastQuestCount] = useState<number>(user.questsCompleted);
   const [hasInitialized, setHasInitialized] = useState<boolean>(false);
+  const [isProcessingQueue, setIsProcessingQueue] = useState<boolean>(false);
   
   // Get active quests
   const activeQuests = quests.filter(quest => !quest.completed).slice(0, 3);
@@ -112,49 +113,49 @@ const HomePage: React.FC<HomePageProps> = ({
     }
   }, [user.mythicCoins, lastCoinCount, hasInitialized, user]);
 
-  // Voice message queue processor - only process when not playing
+  // Voice message queue processor - strict sequential processing
   useEffect(() => {
     const processVoiceQueue = () => {
-      if (!VoiceMessageService.getIsPlaying() && VoiceMessageService.hasQueuedMessages()) {
+      // Only process if not currently playing and not already processing
+      if (!VoiceMessageService.getIsPlaying() && !isProcessingQueue && VoiceMessageService.hasQueuedMessages()) {
         const nextMessage = VoiceMessageService.getNextMessage();
         if (nextMessage) {
+          console.log('Processing next voice message from queue');
+          setIsProcessingQueue(true);
           setVoiceText(nextMessage);
           VoiceMessageService.setPlaying(true);
         }
       }
     };
 
-    const interval = setInterval(processVoiceQueue, 500); // Check every 500ms
+    const interval = setInterval(processVoiceQueue, 1000); // Check every second
     return () => clearInterval(interval);
-  }, []);
+  }, [isProcessingQueue]);
 
   const handleVoiceComplete = () => {
-    console.log('Voice playback completed');
+    console.log('Voice playback completed, waiting before next message');
     VoiceMessageService.setPlaying(false);
-    setVoiceText(''); // Clear the current voice text
+    setVoiceText('');
+    setIsProcessingQueue(false);
     
-    // Small delay before processing next message to prevent overlap
+    // Wait 1 second before allowing next message to process
     setTimeout(() => {
-      if (VoiceMessageService.hasQueuedMessages()) {
-        const nextMessage = VoiceMessageService.getNextMessage();
-        if (nextMessage) {
-          setVoiceText(nextMessage);
-          VoiceMessageService.setPlaying(true);
-        }
-      }
-    }, 500);
+      console.log('Ready for next voice message');
+    }, 1000);
   };
 
   const handleVoiceError = () => {
     console.log('Voice playback error, continuing to next message');
     VoiceMessageService.setPlaying(false);
     setVoiceText('');
+    setIsProcessingQueue(false);
   };
 
   const handleRateLimitExceeded = () => {
     console.log('ElevenLabs rate limit exceeded, implementing cooldown');
     VoiceMessageService.handleRateLimitError();
-    setVoiceText(''); // Clear current voice text
+    setVoiceText('');
+    setIsProcessingQueue(false);
   };
   
   return (
@@ -331,7 +332,7 @@ const HomePage: React.FC<HomePageProps> = ({
         </a>
       </div>
       
-      {/* Voice integration */}
+      {/* Voice integration - only render when there's text to speak */}
       {voiceText && (
         <ElevenLabsVoice 
           text={voiceText} 

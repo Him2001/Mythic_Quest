@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 
 interface ElevenLabsVoiceProps {
   text: string;
@@ -8,22 +8,22 @@ interface ElevenLabsVoiceProps {
   onRateLimitExceeded?: () => void;
 }
 
-const ElevenLabsVoice: React.FC<ElevenLabsVoiceProps> = ({
-  text,
-  voiceId,
-  onComplete,
+const ElevenLabsVoice: React.FC<ElevenLabsVoiceProps> = ({ 
+  text, 
+  voiceId, 
+  onComplete, 
   onError,
-  onRateLimitExceeded
+  onRateLimitExceeded 
 }) => {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const isPlayingRef = useRef(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    if (!text || isPlayingRef.current) return;
+    if (!text || text.trim() === '') return;
 
     const playVoice = async () => {
       try {
-        isPlayingRef.current = true;
+        setIsPlaying(true);
         console.log('Starting voice synthesis for:', text.substring(0, 50) + '...');
 
         const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
@@ -38,18 +38,14 @@ const ElevenLabsVoice: React.FC<ElevenLabsVoiceProps> = ({
             model_id: 'eleven_monolingual_v1',
             voice_settings: {
               stability: 0.5,
-              similarity_boost: 0.5,
-              style: 0.0,
-              use_speaker_boost: true
+              similarity_boost: 0.5
             }
           })
         });
 
         if (!response.ok) {
-          // Check specifically for rate limit error (429)
           if (response.status === 429) {
-            console.warn('ElevenLabs API rate limit exceeded (429). Implementing cooldown...');
-            isPlayingRef.current = false;
+            console.error('ElevenLabs rate limit exceeded');
             if (onRateLimitExceeded) {
               onRateLimitExceeded();
             }
@@ -60,32 +56,40 @@ const ElevenLabsVoice: React.FC<ElevenLabsVoiceProps> = ({
 
         const audioBlob = await response.blob();
         const audioUrl = URL.createObjectURL(audioBlob);
-        
-        // Create and play audio
         const audio = new Audio(audioUrl);
-        audioRef.current = audio;
         
+        setCurrentAudio(audio);
+
         audio.onended = () => {
-          console.log('Voice playback completed');
-          isPlayingRef.current = false;
+          console.log('Voice playback completed successfully');
           URL.revokeObjectURL(audioUrl);
-          if (onComplete) onComplete();
+          setIsPlaying(false);
+          setCurrentAudio(null);
+          if (onComplete) {
+            onComplete();
+          }
         };
-        
-        audio.onerror = () => {
-          console.error('Audio playback error');
-          isPlayingRef.current = false;
+
+        audio.onerror = (error) => {
+          console.error('Audio playback error:', error);
           URL.revokeObjectURL(audioUrl);
-          if (onError) onError();
+          setIsPlaying(false);
+          setCurrentAudio(null);
+          if (onError) {
+            onError();
+          }
         };
-        
+
         await audio.play();
         console.log('Voice playback started');
-        
+
       } catch (error) {
         console.error('ElevenLabs voice synthesis error:', error);
-        isPlayingRef.current = false;
-        if (onError) onError();
+        setIsPlaying(false);
+        setCurrentAudio(null);
+        if (onError) {
+          onError();
+        }
       }
     };
 
@@ -93,24 +97,24 @@ const ElevenLabsVoice: React.FC<ElevenLabsVoiceProps> = ({
 
     // Cleanup function
     return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+        setCurrentAudio(null);
       }
-      isPlayingRef.current = false;
+      setIsPlaying(false);
     };
   }, [text, voiceId, onComplete, onError, onRateLimitExceeded]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
       }
-      isPlayingRef.current = false;
     };
-  }, []);
+  }, [currentAudio]);
 
   return null; // This component doesn't render anything visible
 };

@@ -4,6 +4,7 @@ interface QueuedMessage {
   text: string;
   priority: number;
   id: string;
+  timestamp: number;
 }
 
 export class VoiceMessageService {
@@ -12,6 +13,16 @@ export class VoiceMessageService {
   private static currentMessageId: string | null = null;
   private static rateLimitCooldownUntil: number = 0;
   private static readonly COOLDOWN_DURATION = 60000; // 1 minute cooldown
+  private static processingTimeout: NodeJS.Timeout | null = null;
+
+  // Priority constants for easy reference
+  static readonly PRIORITY = {
+    WELCOME: 1,
+    QUEST_COMPLETION: 2,
+    LEVEL_UP: 3,
+    FRIEND_MESSAGE: 4,
+    COIN_MILESTONE: 5
+  } as const;
 
   // Welcome messages based on quest count
   static getWelcomeMessage(user: User, activeQuestCount: number): string {
@@ -149,7 +160,7 @@ export class VoiceMessageService {
     return Math.ceil((this.rateLimitCooldownUntil - Date.now()) / 1000);
   }
 
-  // Queue management with strict prioritization
+  // Queue management with strict prioritization and deduplication
   static queueMessage(message: string, priority: number = 5) {
     if (!message || message.trim() === '') return;
     
@@ -159,13 +170,14 @@ export class VoiceMessageService {
       return;
     }
     
-    // Clear any existing messages with the same priority to prevent duplicates
+    // Remove any existing messages with the same priority to prevent duplicates
     this.messageQueue = this.messageQueue.filter(msg => msg.priority !== priority);
     
     const queuedMessage: QueuedMessage = {
       text: message,
       priority,
-      id: crypto.randomUUID()
+      id: crypto.randomUUID(),
+      timestamp: Date.now()
     };
     
     // Insert message in priority order (lower number = higher priority)
@@ -180,7 +192,7 @@ export class VoiceMessageService {
     this.messageQueue.splice(insertIndex, 0, queuedMessage);
     
     console.log(`Queued message with priority ${priority}:`, message.substring(0, 50) + '...');
-    console.log('Current queue length:', this.messageQueue.length);
+    console.log('Current queue:', this.messageQueue.map(m => `P${m.priority}: ${m.text.substring(0, 30)}...`));
   }
 
   static getNextMessage(): string | null {
@@ -196,6 +208,7 @@ export class VoiceMessageService {
     if (nextMessage) {
       this.currentMessageId = nextMessage.id;
       console.log(`Playing message with priority ${nextMessage.priority}:`, nextMessage.text.substring(0, 50) + '...');
+      console.log('Remaining queue length:', this.messageQueue.length);
       return nextMessage.text;
     }
     
@@ -206,6 +219,11 @@ export class VoiceMessageService {
     console.log('Clearing voice message queue');
     this.messageQueue = [];
     this.currentMessageId = null;
+    
+    if (this.processingTimeout) {
+      clearTimeout(this.processingTimeout);
+      this.processingTimeout = null;
+    }
   }
 
   static hasQueuedMessages(): boolean {
@@ -229,12 +247,13 @@ export class VoiceMessageService {
     return this.currentMessageId;
   }
 
-  // Priority constants for easy reference
-  static readonly PRIORITY = {
-    WELCOME: 1,
-    QUEST_COMPLETION: 2,
-    LEVEL_UP: 3,
-    FRIEND_MESSAGE: 4,
-    COIN_MILESTONE: 5
-  } as const;
+  // Get queue status for debugging
+  static getQueueStatus(): { length: number; isPlaying: boolean; currentMessage: string | null; queue: string[] } {
+    return {
+      length: this.messageQueue.length,
+      isPlaying: this.isPlaying,
+      currentMessage: this.currentMessageId,
+      queue: this.messageQueue.map(m => `P${m.priority}: ${m.text.substring(0, 30)}...`)
+    };
+  }
 }
