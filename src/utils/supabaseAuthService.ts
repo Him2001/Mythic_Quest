@@ -268,11 +268,13 @@ export class SupabaseAuthService {
     if (!this.isConfigured()) {
       // Return a mock subscription for demo mode
       return {
-        unsubscribe: () => {}
+        data: {
+          unsubscribe: () => {}
+        }
       };
     }
 
-    const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
+    return supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         const profile = await SupabaseService.getUserProfile(session.user.id);
         if (profile) {
@@ -285,7 +287,5 @@ export class SupabaseAuthService {
         callback(null);
       }
     });
-
-    return data;
   }
 }
