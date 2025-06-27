@@ -32,6 +32,62 @@ export class SupabaseService {
     }
   }
 
+  // Admin: Get all user profiles
+  static async getAllUserProfiles() {
+    if (!this.isAvailable()) {
+      return [];
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching all user profiles:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error in getAllUserProfiles:', error);
+      return [];
+    }
+  }
+
+  // Admin: Delete user (cascading delete will handle related data)
+  static async deleteUser(userId: string) {
+    if (!this.isAvailable()) {
+      return true; // Success in demo mode
+    }
+
+    try {
+      // First delete from auth.users (this will cascade to user_profiles)
+      const { error: authError } = await supabase.auth.admin.deleteUser(userId);
+      
+      if (authError) {
+        console.error('Error deleting user from auth:', authError);
+        
+        // If auth deletion fails, try deleting just the profile
+        const { error: profileError } = await supabase
+          .from('user_profiles')
+          .delete()
+          .eq('id', userId);
+
+        if (profileError) {
+          console.error('Error deleting user profile:', profileError);
+          return false;
+        }
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error in deleteUser:', error);
+      return false;
+    }
+  }
+
   static async createProfile(userId: string, username: string, email?: string) {
     if (!this.isAvailable()) {
       return null;
