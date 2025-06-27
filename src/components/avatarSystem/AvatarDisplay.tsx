@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Avatar as AvatarType } from '../../types';
 import Button from '../ui/Button';
-import WarriorModelViewer from '../3d/WarriorModel';
 import { MessageCircle, Volume2, Sparkles } from 'lucide-react';
 
 interface AvatarDisplayProps {
@@ -52,18 +51,22 @@ const AvatarDisplay: React.FC<AvatarDisplayProps> = ({
 
   return (
     <div className={`relative flex flex-col items-center ${className}`}>
-      {/* 3D Warrior Model */}
-      <div className={`relative mb-4 transition-all duration-500 ${isAnimating ? 'scale-105' : 'scale-100'}`}>
-        <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 via-amber-500/20 to-purple-500/20 animate-pulse rounded-lg"></div>
+      {/* Avatar container with magical portal effect */}
+      <div className={`relative rounded-full overflow-hidden mb-4 transition-all duration-500 ${isAnimating ? 'scale-105' : 'scale-100'}`}>
+        <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 via-amber-500/20 to-purple-500/20 animate-pulse rounded-full"></div>
         <div className="absolute inset-0 magical-particles"></div>
-        <div className="relative z-10 border-4 border-amber-500/50 magical-glow rounded-lg overflow-hidden">
-          <WarriorModelViewer className="w-56 h-56 sm:w-64 sm:h-64" />
+        <div className="w-48 h-48 sm:w-56 sm:h-56 relative z-10 p-1 rounded-full overflow-hidden border-4 border-amber-500/50 magical-glow">
+          <img 
+            src={avatar.imageUrl} 
+            alt={avatar.name} 
+            className="w-full h-full object-cover rounded-full"
+          />
           
           {/* Magical overlay */}
-          <div className="absolute inset-0 bg-gradient-to-t from-purple-500/20 to-transparent pointer-events-none"></div>
+          <div className="absolute inset-0 bg-gradient-to-t from-purple-500/20 to-transparent"></div>
           
           {/* Animated runes */}
-          <div className="absolute inset-0 magical-runes pointer-events-none"></div>
+          <div className="absolute inset-0 magical-runes"></div>
         </div>
       </div>
       
