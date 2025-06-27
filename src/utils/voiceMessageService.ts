@@ -45,43 +45,6 @@ export class VoiceMessageService {
     return levelUpMessages[Math.floor(Math.random() * levelUpMessages.length)];
   }
 
-  // Quest completion messages
-  static getQuestCompletionMessage(user: User, questTitle: string, questType: string, coinsEarned: number): string {
-    const questMessages = {
-      walking: [
-        `Excellent work, ${user.name}! You've conquered "${questTitle}" with every step! Your journey rewards you with ${coinsEarned} Mythic Coins. The paths of Eldoria sing of your dedication!`,
-        `Bravo! "${questTitle}" completed, ${user.name}! Your feet have carried you to victory, earning ${coinsEarned} precious Mythic Coins. The walking spirits are most pleased!`,
-        `Outstanding! ${user.name}, "${questTitle}" falls before your determined stride! ${coinsEarned} Mythic Coins now grace your purse as testament to your perseverance!`
-      ],
-      exercise: [
-        `Magnificent! ${user.name}, you've crushed "${questTitle}" with the strength of a true warrior! Your physical prowess earns you ${coinsEarned} Mythic Coins!`,
-        `Incredible! "${questTitle}" conquered through sheer determination, ${user.name}! The Iron Temple blesses you with ${coinsEarned} Mythic Coins for your dedication!`,
-        `Phenomenal! ${user.name}, "${questTitle}" yields to your mighty efforts! ${coinsEarned} Mythic Coins are yours as reward for your physical mastery!`
-      ],
-      meditation: [
-        `Serene and powerful! ${user.name}, you've found inner peace through "${questTitle}"! The mystical energies reward your tranquility with ${coinsEarned} Mythic Coins!`,
-        `Beautifully done! "${questTitle}" completed with perfect mindfulness, ${user.name}! Your centered spirit earns ${coinsEarned} precious Mythic Coins!`,
-        `Wonderfully peaceful! ${user.name}, "${questTitle}" brings you closer to enlightenment and ${coinsEarned} Mythic Coins richer!`
-      ],
-      journaling: [
-        `Thoughtfully executed! ${user.name}, "${questTitle}" captures your wisdom perfectly! Your reflective nature earns you ${coinsEarned} Mythic Coins!`,
-        `Brilliantly written! "${questTitle}" completed, ${user.name}! Your chronicles are rewarded with ${coinsEarned} gleaming Mythic Coins!`,
-        `Masterfully reflected! ${user.name}, "${questTitle}" showcases your inner wisdom, earning ${coinsEarned} valuable Mythic Coins!`
-      ],
-      reading: [
-        `Intellectually stimulating! ${user.name}, you've absorbed the wisdom of "${questTitle}"! Knowledge and ${coinsEarned} Mythic Coins are now yours!`,
-        `Scholarly achievement! "${questTitle}" completed, ${user.name}! Your thirst for knowledge rewards you with ${coinsEarned} precious Mythic Coins!`,
-        `Wisely pursued! ${user.name}, "${questTitle}" expands your mind and your wealth by ${coinsEarned} Mythic Coins!`
-      ]
-    };
-
-    const typeMessages = questMessages[questType as keyof typeof questMessages] || [
-      `Excellently done! ${user.name}, you've completed "${questTitle}" with remarkable skill! Your achievement earns you ${coinsEarned} Mythic Coins!`
-    ];
-
-    return typeMessages[Math.floor(Math.random() * typeMessages.length)];
-  }
-
   // Friend message notifications
   static getFriendMessageNotification(friendName: string): string {
     const messageNotifications = [
@@ -92,31 +55,6 @@ export class VoiceMessageService {
       `Splendid! ${friendName} has shared thoughts from their quest! Their message glows with the warmth of camaraderie.`
     ];
     return messageNotifications[Math.floor(Math.random() * messageNotifications.length)];
-  }
-
-  // Coin milestone messages
-  static getCoinMilestoneMessage(user: User, totalCoins: number): string {
-    if (totalCoins >= 1000) {
-      return `Astounding wealth, ${user.name}! Your treasure hoard has reached ${totalCoins} Mythic Coins! You're becoming quite the wealthy adventurer in Eldoria!`;
-    } else if (totalCoins >= 500) {
-      return `Impressive fortune, ${user.name}! ${totalCoins} Mythic Coins now fill your coffers! Your dedication to wellness pays handsomely!`;
-    } else if (totalCoins >= 100) {
-      return `Excellent progress, ${user.name}! Your coin collection has grown to ${totalCoins} Mythic Coins! The realm rewards your consistency!`;
-    }
-    return '';
-  }
-
-  // Walking distance achievements
-  static getWalkingAchievementMessage(user: User, totalDistance: number): string {
-    const distanceKm = Math.floor(totalDistance / 1000);
-    if (distanceKm >= 100) {
-      return `Incredible journey, ${user.name}! You've walked over ${distanceKm} kilometers in your wellness adventures! The paths of Eldoria echo with your footsteps!`;
-    } else if (distanceKm >= 50) {
-      return `Remarkable dedication, ${user.name}! ${distanceKm} kilometers conquered on your wellness journey! Your endurance is truly legendary!`;
-    } else if (distanceKm >= 10) {
-      return `Wonderful progress, ${user.name}! ${distanceKm} kilometers walked in pursuit of wellness! Every step strengthens your resolve!`;
-    }
-    return '';
   }
 
   // Queue management for prioritized messages
