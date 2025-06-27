@@ -5,12 +5,15 @@ import * as THREE from 'three';
 
 interface Avatar3DModelProps {
   url: string;
+  isSpeaking: boolean;
 }
 
-function Avatar3DModel({ url }: Avatar3DModelProps) {
+function Avatar3DModel({ url, isSpeaking }: Avatar3DModelProps) {
   const { scene, animations, error } = useGLTF(url);
   const meshRef = useRef<THREE.Group>(null);
   const mixerRef = useRef<THREE.AnimationMixer | null>(null);
+  const idleActionRef = useRef<THREE.AnimationAction | null>(null);
+  const talkingActionRef = useRef<THREE.AnimationAction | null>(null);
 
   // Handle loading errors
   if (error) {
@@ -24,17 +27,31 @@ function Avatar3DModel({ url }: Avatar3DModelProps) {
       const mixer = new THREE.AnimationMixer(scene);
       mixerRef.current = mixer;
 
-      // Find and play the idle animation (or first animation)
+      // Find idle animation
       const idleAnimation = animations.find(clip => 
         clip.name.toLowerCase().includes('idle') || 
         clip.name.toLowerCase().includes('animation')
       ) || animations[0];
 
       if (idleAnimation) {
-        const action = mixer.clipAction(idleAnimation);
-        action.setLoop(THREE.LoopRepeat, Infinity);
-        action.play();
-        console.log('Playing animation:', idleAnimation.name);
+        const idleAction = mixer.clipAction(idleAnimation);
+        idleAction.setLoop(THREE.LoopRepeat, Infinity);
+        idleAction.play();
+        idleActionRef.current = idleAction;
+        console.log('Playing idle animation:', idleAnimation.name);
+      }
+
+      // Try to find talking animation
+      const talkingAnimation = animations.find(clip => 
+        clip.name.toLowerCase().includes('talk') || 
+        clip.name.toLowerCase().includes('speak')
+      );
+
+      if (talkingAnimation) {
+        const talkingAction = mixer.clipAction(talkingAnimation);
+        talkingAction.setLoop(THREE.LoopRepeat, Infinity);
+        talkingActionRef.current = talkingAction;
+        console.log('Found talking animation:', talkingAnimation.name);
       }
 
       // Cleanup function
@@ -43,16 +60,47 @@ function Avatar3DModel({ url }: Avatar3DModelProps) {
           mixerRef.current.stopAllAction();
           mixerRef.current = null;
         }
+        idleActionRef.current = null;
+        talkingActionRef.current = null;
       };
     }
   }, [scene, animations]);
 
-  // Update animation mixer only - NO rotation
+  // Switch between idle and talking animations based on speaking state
+  useEffect(() => {
+    if (idleActionRef.current && talkingActionRef.current) {
+      if (isSpeaking) {
+        // Fade to talking animation
+        console.log('🎭 Switching to talking animation');
+        idleActionRef.current.fadeOut(0.5);
+        talkingActionRef.current.reset().fadeIn(0.5).play();
+      } else {
+        // Fade back to idle animation
+        console.log('🎭 Switching to idle animation');
+        if (talkingActionRef.current.isRunning()) {
+          talkingActionRef.current.fadeOut(0.5);
+        }
+        idleActionRef.current.reset().fadeIn(0.5).play();
+      }
+    } else if (idleActionRef.current && isSpeaking) {
+      // If no talking animation, add subtle head movement to idle
+      console.log('🎭 No talking animation found, enhancing idle for speaking');
+    }
+  }, [isSpeaking]);
+
+  // Update animation mixer
   useFrame((state, delta) => {
     if (mixerRef.current) {
       mixerRef.current.update(delta);
     }
-    // Removed rotation - avatar stays facing forward
+
+    // Add subtle head movement when speaking (if no talking animation)
+    if (meshRef.current && isSpeaking && !talkingActionRef.current) {
+      const time = state.clock.elapsedTime;
+      // Subtle head bob and slight rotation when speaking
+      meshRef.current.rotation.y = Math.sin(time * 8) * 0.05;
+      meshRef.current.position.y = Math.sin(time * 12) * 0.02;
+    }
   });
 
   // Scale and position the model
@@ -78,17 +126,32 @@ function Avatar3DModel({ url }: Avatar3DModelProps) {
   return <primitive ref={meshRef} object={scene} />;
 }
 
-// Fallback 3D Avatar component with animation
-function FallbackAvatar() {
+// Fallback 3D Avatar component with speaking animation
+function FallbackAvatar({ isSpeaking }: { isSpeaking: boolean }) {
   const meshRef = useRef<THREE.Mesh>(null);
+  const headRef = useRef<THREE.Mesh>(null);
 
   useFrame((state, delta) => {
     if (meshRef.current) {
-      // Breathing effect only - no rotation
+      // Breathing effect
       const breathe = Math.sin(state.clock.elapsedTime * 2) * 0.05 + 1;
       meshRef.current.scale.setScalar(breathe);
-      // Slight head bob
+      // Slight body bob
       meshRef.current.position.y = Math.sin(state.clock.elapsedTime * 1.5) * 0.1;
+    }
+
+    if (headRef.current && isSpeaking) {
+      // Enhanced head movement when speaking
+      const time = state.clock.elapsedTime;
+      headRef.current.rotation.y = Math.sin(time * 8) * 0.1;
+      headRef.current.rotation.x = Math.sin(time * 6) * 0.05;
+      headRef.current.position.y = 1.4 + Math.sin(time * 10) * 0.05;
+    } else if (headRef.current) {
+      // Gentle idle movement
+      const time = state.clock.elapsedTime;
+      headRef.current.rotation.y = Math.sin(time * 1) * 0.02;
+      headRef.current.rotation.x = 0;
+      headRef.current.position.y = 1.4;
     }
   });
 
@@ -96,8 +159,8 @@ function FallbackAvatar() {
     <mesh ref={meshRef} position={[0, 0, 0]}>
       <boxGeometry args={[1.8, 2.4, 0.9]} />
       <meshStandardMaterial color="#8B4513" />
-      {/* Head */}
-      <mesh position={[0, 1.4, 0]}>
+      {/* Head with speaking animation */}
+      <mesh ref={headRef} position={[0, 1.4, 0]}>
         <sphereGeometry args={[0.5, 16, 16]} />
         <meshStandardMaterial color="#FDBCB4" />
       </mesh>
@@ -130,37 +193,47 @@ function FallbackAvatar() {
 
 interface Avatar3DProps {
   className?: string;
+  isSpeaking?: boolean;
 }
 
-const Avatar3D: React.FC<Avatar3DProps> = ({ className = '' }) => {
+const Avatar3D: React.FC<Avatar3DProps> = ({ className = '', isSpeaking = false }) => {
   const [loading, setLoading] = useState(true);
   const [usesFallback, setUsesFallback] = useState(false);
 
-  // Use the direct public URL you provided
-  const modelUrl = "https://vyyldfxldzgmgbvgynbh.supabase.co/storage/v1/object/public/idle//Warrior%20Idle.glb";
+  // Try multiple model URLs - first the Talking.glb, then fallback to Warrior Idle.glb
+  const modelUrls = [
+    "https://vyyldfxldzgmgbvgynbh.supabase.co/storage/v1/object/public/idle/Talking.glb",
+    "https://vyyldfxldzgmgbvgynbh.supabase.co/storage/v1/object/public/idle/Warrior%20Idle.glb"
+  ];
+  
+  const [currentModelUrl, setCurrentModelUrl] = useState(modelUrls[0]);
 
   useEffect(() => {
-    const testModelUrl = async () => {
-      try {
-        // Test if the URL is accessible
-        const response = await fetch(modelUrl, { method: 'HEAD' });
-        if (response.ok) {
-          console.log('3D model accessible at:', modelUrl);
-          setUsesFallback(false);
-        } else {
-          console.warn('Model file not accessible. Status:', response.status);
-          setUsesFallback(true);
+    const testModelUrls = async () => {
+      for (const url of modelUrls) {
+        try {
+          console.log('🎭 Testing model URL:', url);
+          const response = await fetch(url, { method: 'HEAD' });
+          if (response.ok) {
+            console.log('🎭 Model accessible at:', url);
+            setCurrentModelUrl(url);
+            setUsesFallback(false);
+            setLoading(false);
+            return;
+          }
+        } catch (error) {
+          console.warn('🎭 Failed to access model at:', url, error);
         }
-      } catch (fetchError) {
-        console.warn('Failed to fetch 3D model:', fetchError);
-        setUsesFallback(true);
-      } finally {
-        setLoading(false);
       }
+      
+      // If no models work, use fallback
+      console.warn('🎭 No 3D models accessible, using fallback avatar');
+      setUsesFallback(true);
+      setLoading(false);
     };
 
-    testModelUrl();
-  }, [modelUrl]);
+    testModelUrls();
+  }, []);
 
   if (loading) {
     return (
@@ -177,11 +250,11 @@ const Avatar3D: React.FC<Avatar3DProps> = ({ className = '' }) => {
         style={{ 
           width: '100%', 
           height: '100%',
-          background: 'transparent' // Make canvas background transparent
+          background: 'transparent'
         }}
-        gl={{ alpha: true, antialias: true }} // Enable transparency
+        gl={{ alpha: true, antialias: true }}
         onError={(error) => {
-          console.warn('Canvas error, switching to fallback:', error);
+          console.warn('🎭 Canvas error, switching to fallback:', error);
           setUsesFallback(true);
         }}
       >
@@ -193,13 +266,13 @@ const Avatar3D: React.FC<Avatar3DProps> = ({ className = '' }) => {
         <React.Suspense fallback={null}>
           {!usesFallback ? (
             <ErrorBoundary onError={() => {
-              console.warn('3D model failed to load, switching to fallback avatar');
+              console.warn('🎭 3D model failed to load, switching to fallback avatar');
               setUsesFallback(true);
             }}>
-              <Avatar3DModel url={modelUrl} />
+              <Avatar3DModel url={currentModelUrl} isSpeaking={isSpeaking} />
             </ErrorBoundary>
           ) : (
-            <FallbackAvatar />
+            <FallbackAvatar isSpeaking={isSpeaking} />
           )}
         </React.Suspense>
         
@@ -233,7 +306,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, { hasError: bool
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.warn('Avatar3D Error Boundary caught an error:', error, errorInfo);
+    console.warn('🎭 Avatar3D Error Boundary caught an error:', error, errorInfo);
     this.props.onError();
   }
 

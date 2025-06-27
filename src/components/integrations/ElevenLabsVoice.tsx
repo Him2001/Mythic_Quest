@@ -2,36 +2,36 @@ import React, { useEffect, useRef, useState } from 'react';
 
 interface ElevenLabsVoiceProps {
   text: string;
-  voiceId?: string;
+  voiceId: string;
   onComplete?: () => void;
   onError?: (error: string) => void;
+  onSpeakingChange?: (isSpeaking: boolean) => void;
 }
 
 const ElevenLabsVoice: React.FC<ElevenLabsVoiceProps> = ({
   text,
-  voiceId = "MezYwaNLTOfydzsFJwwt",
+  voiceId,
   onComplete,
-  onError
+  onError,
+  onSpeakingChange
 }) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [hasPlayed, setHasPlayed] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
-
-  // API Key
-  const API_KEY = "sk_2373d20772128d71bfc6997232f631eed0f769241a18c032";
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [hasPlayed, setHasPlayed] = useState(false);
 
   useEffect(() => {
-    // Only play if we have text and haven't played this text yet
-    if (text && text.trim() && !hasPlayed && !isLoading) {
+    // Only play if we have text and haven't played this exact text yet
+    if (text && !hasPlayed) {
       playVoice();
+      setHasPlayed(true);
     }
 
-    // Cleanup function
+    // Cleanup on unmount
     return () => {
       cleanup();
     };
-  }, [text]);
+  }, [text, hasPlayed]);
 
   const cleanup = () => {
     // Abort any ongoing fetch request
@@ -43,43 +43,41 @@ const ElevenLabsVoice: React.FC<ElevenLabsVoiceProps> = ({
     // Stop and cleanup audio
     if (audioRef.current) {
       audioRef.current.pause();
-      audioRef.current.currentTime = 0;
       audioRef.current.removeEventListener('ended', handleAudioEnd);
       audioRef.current.removeEventListener('error', handleAudioError);
+      audioRef.current.removeEventListener('play', handleAudioPlay);
+      audioRef.current.removeEventListener('pause', handleAudioPause);
+      audioRef.current.src = '';
       audioRef.current = null;
     }
 
-    setIsLoading(false);
+    setIsPlaying(false);
+    if (onSpeakingChange) {
+      onSpeakingChange(false);
+    }
   };
 
   const playVoice = async () => {
-    if (!text || !text.trim() || hasPlayed || isLoading) {
-      return;
-    }
-
-    setIsLoading(true);
-    setHasPlayed(true);
-
     try {
+      console.log('🎵 Starting ElevenLabs voice generation for:', text.substring(0, 50) + '...');
+      
       // Create new abort controller for this request
       abortControllerRef.current = new AbortController();
-
-      console.log('🎵 ElevenLabs: Generating voice for:', text.substring(0, 50) + '...');
-
-      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+      
+      const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/' + voiceId, {
         method: 'POST',
         headers: {
           'Accept': 'audio/mpeg',
           'Content-Type': 'application/json',
-          'xi-api-key': API_KEY
+          'xi-api-key': 'sk_2373d20772128d71bfc6997232f631eed0f769241a18c032'
         },
         body: JSON.stringify({
           text: text,
-          model_id: "eleven_monolingual_v1",
+          model_id: 'eleven_monolingual_v1',
           voice_settings: {
-            stability: 0.75,
-            similarity_boost: 0.85,
-            style: 0.2,
+            stability: 0.5,
+            similarity_boost: 0.75,
+            style: 0.0,
             use_speaker_boost: true
           }
         }),
@@ -97,57 +95,98 @@ const ElevenLabsVoice: React.FC<ElevenLabsVoiceProps> = ({
       const audio = new Audio(audioUrl);
       audioRef.current = audio;
 
-      // Set audio properties
-      audio.volume = 0.8;
+      // Set audio properties to continue playing when tab is not active
       audio.preload = 'auto';
-
+      audio.crossOrigin = 'anonymous';
+      
       // Add event listeners
       audio.addEventListener('ended', handleAudioEnd);
       audio.addEventListener('error', handleAudioError);
+      audio.addEventListener('play', handleAudioPlay);
+      audio.addEventListener('pause', handleAudioPause);
+      audio.addEventListener('canplaythrough', () => {
+        console.log('🎵 Audio ready to play');
+      });
 
       // Play the audio
-      console.log('🎵 ElevenLabs: Playing voice...');
-      await audio.play();
+      const playPromise = audio.play();
+      
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            console.log('🎵 Audio playback started successfully');
+            setIsPlaying(true);
+            if (onSpeakingChange) {
+              onSpeakingChange(true);
+            }
+          })
+          .catch((error) => {
+            console.error('🎵 Audio playback failed:', error);
+            handleError('Audio playback failed: ' + error.message);
+          });
+      }
 
     } catch (error: any) {
       if (error.name === 'AbortError') {
-        console.log('🎵 ElevenLabs: Request aborted');
+        console.log('🎵 Voice generation aborted');
         return;
       }
+      
+      console.error('🎵 ElevenLabs voice generation failed:', error);
+      handleError(error.message || 'Voice generation failed');
+    }
+  };
 
-      console.error('🎵 ElevenLabs Error:', error);
-      const errorMessage = error.message || 'Failed to generate voice';
-      
-      if (onError) {
-        onError(errorMessage);
-      }
-      
-      // Call onComplete even on error to prevent hanging
-      if (onComplete) {
-        onComplete();
-      }
-    } finally {
-      setIsLoading(false);
-      abortControllerRef.current = null;
+  const handleAudioPlay = () => {
+    console.log('🎵 Audio started playing');
+    setIsPlaying(true);
+    if (onSpeakingChange) {
+      onSpeakingChange(true);
+    }
+  };
+
+  const handleAudioPause = () => {
+    console.log('🎵 Audio paused');
+    setIsPlaying(false);
+    if (onSpeakingChange) {
+      onSpeakingChange(false);
     }
   };
 
   const handleAudioEnd = () => {
-    console.log('🎵 ElevenLabs: Audio playback completed');
-    cleanup();
+    console.log('🎵 Audio playback completed');
+    setIsPlaying(false);
+    if (onSpeakingChange) {
+      onSpeakingChange(false);
+    }
+    
+    // Clean up the audio URL
+    if (audioRef.current) {
+      URL.revokeObjectURL(audioRef.current.src);
+    }
+    
     if (onComplete) {
       onComplete();
     }
   };
 
   const handleAudioError = (event: Event) => {
-    console.error('🎵 ElevenLabs: Audio playback error:', event);
-    cleanup();
-    if (onError) {
-      onError('Audio playback failed');
+    console.error('🎵 Audio playback error:', event);
+    setIsPlaying(false);
+    if (onSpeakingChange) {
+      onSpeakingChange(false);
     }
-    if (onComplete) {
-      onComplete();
+    handleError('Audio playback error');
+  };
+
+  const handleError = (errorMessage: string) => {
+    console.error('🎵 ElevenLabs error:', errorMessage);
+    setIsPlaying(false);
+    if (onSpeakingChange) {
+      onSpeakingChange(false);
+    }
+    if (onError) {
+      onError(errorMessage);
     }
   };
 
