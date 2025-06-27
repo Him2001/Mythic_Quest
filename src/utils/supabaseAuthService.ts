@@ -44,8 +44,19 @@ export class SupabaseAuthService {
         // Wait for the trigger to create the profile
         await new Promise(resolve => setTimeout(resolve, 2000));
         
-        // Try to fetch the created profile
-        let profile = await SupabaseService.getUserProfile(data.user.id);
+        // Try to fetch the created profile with retries
+        let profile = null;
+        let retries = 3;
+        
+        while (retries > 0 && !profile) {
+          profile = await SupabaseService.getUserProfile(data.user.id);
+          if (!profile) {
+            retries--;
+            if (retries > 0) {
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+          }
+        }
         
         // If profile doesn't exist, create it manually
         if (!profile) {
@@ -115,14 +126,20 @@ export class SupabaseAuthService {
     }
   }
 
-  // Get current session
+  // Get current session with timeout
   static async getCurrentSession(): Promise<{ user: User | null; error: string | null }> {
     if (!this.isAvailable()) {
       return { user: null, error: null };
     }
 
     try {
-      const { data: { session }, error } = await supabase.auth.getSession();
+      // Add timeout to prevent hanging
+      const sessionPromise = supabase.auth.getSession();
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Session check timeout')), 8000)
+      );
+
+      const { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise]) as any;
 
       if (error) {
         return { user: null, error: error.message };
@@ -138,7 +155,8 @@ export class SupabaseAuthService {
 
       return { user: null, error: null };
     } catch (error) {
-      return { user: null, error: error instanceof Error ? error.message : 'Unknown error occurred' };
+      console.warn('Session check failed:', error);
+      return { user: null, error: error instanceof Error ? error.message : 'Session check failed' };
     }
   }
 
@@ -148,8 +166,13 @@ export class SupabaseAuthService {
       return { success: true, error: null }; // Success in demo mode
     }
 
-    const success = await SupabaseService.updateUserProgress(userId, xp, level, coins);
-    return { success, error: success ? null : 'Failed to update user progress' };
+    try {
+      const success = await SupabaseService.updateUserProgress(userId, xp, level, coins);
+      return { success, error: success ? null : 'Failed to update user progress' };
+    } catch (error) {
+      console.warn('Failed to update user progress:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Update failed' };
+    }
   }
 
   // Update user coins
@@ -158,8 +181,13 @@ export class SupabaseAuthService {
       return { success: true, error: null }; // Success in demo mode
     }
 
-    const success = await SupabaseService.updateUserProfile(userId, { coins });
-    return { success, error: success ? null : 'Failed to update user coins' };
+    try {
+      const success = await SupabaseService.updateUserProfile(userId, { coins });
+      return { success, error: success ? null : 'Failed to update user coins' };
+    } catch (error) {
+      console.warn('Failed to update user coins:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Update failed' };
+    }
   }
 
   // Update quests completed
@@ -168,8 +196,13 @@ export class SupabaseAuthService {
       return { success: true, error: null }; // Success in demo mode
     }
 
-    const success = await SupabaseService.updateUserProfile(userId, { total_quests_completed: questsCompleted });
-    return { success, error: success ? null : 'Failed to update quests completed' };
+    try {
+      const success = await SupabaseService.updateUserProfile(userId, { total_quests_completed: questsCompleted });
+      return { success, error: success ? null : 'Failed to update quests completed' };
+    } catch (error) {
+      console.warn('Failed to update quests completed:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Update failed' };
+    }
   }
 
   // Update walking distance
@@ -178,12 +211,17 @@ export class SupabaseAuthService {
       return { success: true, error: null }; // Success in demo mode
     }
 
-    const success = await SupabaseService.updateUserProfile(userId, {
-      daily_walking_distance: dailyDistance,
-      total_walking_distance: totalDistance,
-      last_walking_date: lastWalkingDate
-    });
-    return { success, error: success ? null : 'Failed to update walking distance' };
+    try {
+      const success = await SupabaseService.updateUserProfile(userId, {
+        daily_walking_distance: dailyDistance,
+        total_walking_distance: totalDistance,
+        last_walking_date: lastWalkingDate
+      });
+      return { success, error: success ? null : 'Failed to update walking distance' };
+    } catch (error) {
+      console.warn('Failed to update walking distance:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Update failed' };
+    }
   }
 
   // Record quest completion
@@ -198,8 +236,13 @@ export class SupabaseAuthService {
       return { success: true, error: null }; // Success in demo mode
     }
 
-    const success = await SupabaseService.recordQuestCompletion(userId, questName, questType, xpEarned, coinsEarned);
-    return { success, error: success ? null : 'Failed to record quest completion' };
+    try {
+      const success = await SupabaseService.recordQuestCompletion(userId, questName, questType, xpEarned, coinsEarned);
+      return { success, error: success ? null : 'Failed to record quest completion' };
+    } catch (error) {
+      console.warn('Failed to record quest completion:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Record failed' };
+    }
   }
 
   // Convert Supabase profile to app User type
@@ -261,7 +304,7 @@ export class SupabaseAuthService {
     }
   }
 
-  // Listen to auth state changes
+  // Listen to auth state changes with error handling
   static onAuthStateChange(callback: (user: User | null) => void) {
     if (!this.isAvailable()) {
       // Return a dummy subscription for demo mode
@@ -274,18 +317,34 @@ export class SupabaseAuthService {
       };
     }
 
-    return supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        const profile = await SupabaseService.getUserProfile(session.user.id);
-        if (profile) {
-          const user = this.convertProfileToUser(profile, session.user.email!);
-          callback(user);
-        } else {
+    try {
+      return supabase.auth.onAuthStateChange(async (event, session) => {
+        try {
+          if (session?.user) {
+            const profile = await SupabaseService.getUserProfile(session.user.id);
+            if (profile) {
+              const user = this.convertProfileToUser(profile, session.user.email!);
+              callback(user);
+            } else {
+              callback(null);
+            }
+          } else {
+            callback(null);
+          }
+        } catch (error) {
+          console.warn('Error in auth state change handler:', error);
           callback(null);
         }
-      } else {
-        callback(null);
-      }
-    });
+      });
+    } catch (error) {
+      console.warn('Failed to set up auth state listener:', error);
+      return {
+        data: {
+          subscription: {
+            unsubscribe: () => {}
+          }
+        }
+      };
+    }
   }
 }
