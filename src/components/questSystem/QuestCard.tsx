@@ -7,7 +7,7 @@ import ProgressBar from '../ui/ProgressBar';
 import { CheckCircle, Clock, Award, Scroll, Coins, Plus } from 'lucide-react';
 import WalkingQuestCard from './WalkingQuestCard';
 import { CoinSystem } from '../../utils/coinSystem';
-import { VoiceMessageService } from '../../utils/voiceMessageService';
+import { SoundEffects } from '../../utils/soundEffects';
 
 interface QuestCardProps {
   quest: Quest;
@@ -57,12 +57,22 @@ const QuestCard: React.FC<QuestCardProps> = ({ quest, onComplete, onStart, onUpd
   const coinReward = quest.coinReward || CoinSystem.calculateQuestReward(quest.type, quest.difficulty);
 
   const handleQuestComplete = () => {
-    // Queue voice message for quest completion
-    const questMessage = `Excellent work! You've completed "${quest.title}"! Your dedication earns you ${quest.xpReward} XP and ${coinReward} Mythic Coins!`;
-    VoiceMessageService.queueMessage(questMessage, 2); // Priority 2
+    // Play quest completion sound
+    SoundEffects.playSound('quest-complete');
+    
+    // Play coin sound after a short delay
+    setTimeout(() => {
+      SoundEffects.playSound('coin');
+    }, 500);
     
     // Call the original completion handler
     onComplete(quest.id);
+  };
+
+  const handleQuestStart = () => {
+    // Play magic sound for quest start
+    SoundEffects.playSound('magic');
+    onStart(quest.id);
   };
   
   return (
@@ -149,6 +159,7 @@ const QuestCard: React.FC<QuestCardProps> = ({ quest, onComplete, onStart, onUpd
               fullWidth
               onClick={handleQuestComplete}
               className="font-cinzel magical-glow"
+              soundEffect="quest-complete"
             >
               <div className="flex items-center justify-center">
                 <span>Complete Quest</span>
