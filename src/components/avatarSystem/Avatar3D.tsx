@@ -96,27 +96,78 @@ const Avatar3D: React.FC<Avatar3DProps> = ({ className = '' }) => {
     const loadModel = async () => {
       try {
         if (!supabase) {
-          throw new Error('Supabase not configured');
+          console.warn('Supabase client not configured, using fallback avatar');
+          setUsesFallback(true);
+          setLoading(false);
+          return;
         }
 
-        // Try to get the public URL for the 3D model
+        // Check if the bucket exists first
+        const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
+        
+        if (bucketsError) {
+          console.warn('Failed to list storage buckets:', bucketsError.message);
+          setUsesFallback(true);
+          setLoading(false);
+          return;
+        }
+
+        const idleBucket = buckets?.find(bucket => bucket.name === 'idle');
+        if (!idleBucket) {
+          console.warn('Storage bucket "idle" not found. Available buckets:', buckets?.map(b => b.name));
+          setUsesFallback(true);
+          setLoading(false);
+          return;
+        }
+
+        // Check if the file exists in the bucket
+        const { data: files, error: filesError } = await supabase.storage
+          .from('idle')
+          .list('', { limit: 100 });
+
+        if (filesError) {
+          console.warn('Failed to list files in idle bucket:', filesError.message);
+          setUsesFallback(true);
+          setLoading(false);
+          return;
+        }
+
+        const modelFile = files?.find(file => file.name === 'Warrior idle.glb');
+        if (!modelFile) {
+          console.warn('Model file "Warrior idle.glb" not found in idle bucket. Available files:', files?.map(f => f.name));
+          setUsesFallback(true);
+          setLoading(false);
+          return;
+        }
+
+        // Get the public URL for the 3D model
         const { data } = supabase.storage
           .from('idle')
           .getPublicUrl('Warrior idle.glb');
 
-        if (data?.publicUrl) {
-          // Test if the URL is actually accessible
+        if (!data?.publicUrl) {
+          console.warn('Failed to get public URL for 3D model');
+          setUsesFallback(true);
+          setLoading(false);
+          return;
+        }
+
+        // Test if the URL is actually accessible
+        try {
           const response = await fetch(data.publicUrl, { method: 'HEAD' });
           if (response.ok) {
+            console.log('3D model loaded successfully from:', data.publicUrl);
             setModelUrl(data.publicUrl);
           } else {
-            throw new Error('Model file not accessible');
+            console.warn('Model file not accessible via public URL. Status:', response.status);
+            setUsesFallback(true);
           }
-        } else {
-          throw new Error('Failed to get model URL');
+        } catch (fetchError) {
+          console.warn('Failed to fetch 3D model:', fetchError);
+          setUsesFallback(true);
         }
       } catch (err) {
-        console.warn('3D model not available, using fallback avatar:', err);
+        console.warn('Error loading 3D model, using fallback avatar:', err);
         setError(err instanceof Error ? err.message : 'Failed to load 3D model');
         setUsesFallback(true);
       } finally {
@@ -151,7 +202,10 @@ const Avatar3D: React.FC<Avatar3DProps> = ({ className = '' }) => {
         
         <React.Suspense fallback={null}>
           {!usesFallback && modelUrl ? (
-            <ErrorBoundary onError={() => setUsesFallback(true)}>
+            <ErrorBoundary onError={() => {
+              console.warn('3D model failed to load, switching to fallback avatar');
+              setUsesFallback(true);
+            }}>
               <Avatar3DModel url={modelUrl} />
             </ErrorBoundary>
           ) : (
