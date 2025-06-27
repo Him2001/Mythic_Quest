@@ -37,7 +37,7 @@ const HomePage: React.FC<HomePageProps> = ({
   const [lastLevel, setLastLevel] = useState<number>(user.level);
   const [lastWalkingDistance, setLastWalkingDistance] = useState<number>(user.totalWalkingDistance);
   const [hasInitialized, setHasInitialized] = useState<boolean>(false);
-  const [welcomeMessageId, setWelcomeMessageId] = useState<string>('');
+  const [voiceKey, setVoiceKey] = useState<string>('');
   
   // Get active quests
   const activeQuests = quests.filter(quest => !quest.completed).slice(0, 3);
@@ -58,10 +58,6 @@ const HomePage: React.FC<HomePageProps> = ({
   useEffect(() => {
     if (!hasInitialized) {
       const activeQuestCount = activeQuests.length;
-      
-      // Create unique message ID based on user and timestamp
-      const messageId = `welcome-${user.id}-${Date.now()}`;
-      setWelcomeMessageId(messageId);
       
       // Set screen message based on quest count
       let screenMessage = '';
@@ -95,10 +91,14 @@ const HomePage: React.FC<HomePageProps> = ({
       
       setAvatarMessage(screenMessage);
       
-      // Set voice message for immediate playback
+      // Set voice message with unique key to ensure it plays
+      const uniqueKey = `welcome-${user.id}-${Date.now()}`;
+      setVoiceKey(uniqueKey);
       setVoiceText(voiceMessage);
       
       setHasInitialized(true);
+      
+      console.log('🎵 VOICE PRIORITY: Setting welcome message for', user.name);
     }
   }, [user.name, activeQuests.length, hasInitialized, user.id]);
 
@@ -106,17 +106,25 @@ const HomePage: React.FC<HomePageProps> = ({
   useEffect(() => {
     if (hasInitialized && user.level > lastLevel) {
       const levelUpMessage = `Magnificent! ${user.name}, you have ascended to Level ${user.level}! The mystical energies of Eldoria surge through you, and your coin purse swells with 100 additional Mythic Coins!`;
+      const uniqueKey = `levelup-${user.id}-${user.level}-${Date.now()}`;
+      setVoiceKey(uniqueKey);
       setVoiceText(levelUpMessage);
       setLastLevel(user.level);
+      
+      console.log('🎵 VOICE PRIORITY: Level up message for level', user.level);
     }
-  }, [user.level, lastLevel, hasInitialized, user.name]);
+  }, [user.level, lastLevel, hasInitialized, user.name, user.id]);
 
   // Check for coin milestones (every 250 coins)
   useEffect(() => {
     if (hasInitialized && user.mythicCoins > lastCoinCount) {
       const coinMilestone = VoiceMessageService.getCoinMilestoneMessage(user, user.mythicCoins, lastCoinCount);
       if (coinMilestone) {
+        const uniqueKey = `coins-${user.id}-${user.mythicCoins}-${Date.now()}`;
+        setVoiceKey(uniqueKey);
         setVoiceText(coinMilestone);
+        
+        console.log('🎵 VOICE PRIORITY: Coin milestone message for', user.mythicCoins, 'coins');
       }
       setLastCoinCount(user.mythicCoins);
     }
@@ -127,26 +135,30 @@ const HomePage: React.FC<HomePageProps> = ({
     if (hasInitialized && user.totalWalkingDistance > lastWalkingDistance) {
       const walkingAchievement = VoiceMessageService.getWalkingAchievementMessage(user, user.totalWalkingDistance, lastWalkingDistance);
       if (walkingAchievement) {
+        const uniqueKey = `walking-${user.id}-${user.totalWalkingDistance}-${Date.now()}`;
+        setVoiceKey(uniqueKey);
         setVoiceText(walkingAchievement);
+        
+        console.log('🎵 VOICE PRIORITY: Walking achievement message for', Math.floor(user.totalWalkingDistance / 1000), 'km');
       }
       setLastWalkingDistance(user.totalWalkingDistance);
     }
   }, [user.totalWalkingDistance, lastWalkingDistance, hasInitialized, user]);
 
   const handleVoiceComplete = () => {
-    console.log('🎵 Voice playback completed, clearing voice text');
+    console.log('🎵 VOICE PRIORITY: Voice playback completed, clearing voice text');
     setVoiceText('');
     setIsSpeaking(false);
   };
 
   const handleVoiceError = (error: string) => {
-    console.warn('🎵 Voice playback error:', error);
+    console.warn('🎵 VOICE PRIORITY: Voice playback error:', error);
     setVoiceText('');
     setIsSpeaking(false);
   };
 
   const handleSpeakingChange = (speaking: boolean) => {
-    console.log('🎭 Avatar speaking state changed:', speaking);
+    console.log('🎭 AVATAR ANIMATION: Speaking state changed:', speaking);
     setIsSpeaking(speaking);
   };
 
@@ -156,7 +168,11 @@ const HomePage: React.FC<HomePageProps> = ({
     if (completedQuest && !completedQuest.completed) {
       // Set quest completion message for voice
       const questMessage = `Excellent work! You've completed "${completedQuest.title}"! Your dedication earns you ${completedQuest.xpReward} XP and ${CoinSystem.calculateQuestReward(completedQuest.type, completedQuest.difficulty)} Mythic Coins!`;
+      const uniqueKey = `quest-${questId}-${Date.now()}`;
+      setVoiceKey(uniqueKey);
       setVoiceText(questMessage);
+      
+      console.log('🎵 VOICE PRIORITY: Quest completion message for', completedQuest.title);
     }
     
     // Call the original handler
@@ -338,10 +354,10 @@ const HomePage: React.FC<HomePageProps> = ({
         </a>
       </div>
       
-      {/* Voice integration with speaking state tracking */}
+      {/* VOICE INTEGRATION - HIGHEST PRIORITY */}
       {voiceText && (
         <ElevenLabsVoice 
-          key={`voice-${welcomeMessageId}-${voiceText.substring(0, 20)}`}
+          key={voiceKey}
           text={voiceText} 
           voiceId="MezYwaNLTOfydzsFJwwt"
           onComplete={handleVoiceComplete}
