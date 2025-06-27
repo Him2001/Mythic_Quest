@@ -57,6 +57,51 @@ export class VoiceMessageService {
     return messageNotifications[Math.floor(Math.random() * messageNotifications.length)];
   }
 
+  // Coin milestone messages (every 250 coins)
+  static getCoinMilestoneMessage(user: User, totalCoins: number, previousCoins: number): string | null {
+    const currentMilestone = Math.floor(totalCoins / 250);
+    const previousMilestone = Math.floor(previousCoins / 250);
+    
+    // Only announce if we've crossed a new 250-coin milestone
+    if (currentMilestone > previousMilestone) {
+      const milestoneAmount = currentMilestone * 250;
+      const coinMilestoneMessages = [
+        `Astounding wealth, ${user.name}! Your treasure hoard has reached ${milestoneAmount} Mythic Coins! The realm's merchants whisper of your growing fortune!`,
+        `Impressive fortune, ${user.name}! ${milestoneAmount} Mythic Coins now fill your coffers! Your dedication to wellness pays handsomely indeed!`,
+        `Excellent prosperity, ${user.name}! Your coin collection has grown to ${milestoneAmount} Mythic Coins! The treasury of Eldoria acknowledges your success!`,
+        `Magnificent accumulation, ${user.name}! ${milestoneAmount} Mythic Coins shine in your possession! Your wellness journey brings both health and wealth!`,
+        `Remarkable riches, ${user.name}! ${milestoneAmount} Mythic Coins have gathered to your cause! The ancient spirits smile upon your prosperity!`
+      ];
+      return coinMilestoneMessages[Math.floor(Math.random() * coinMilestoneMessages.length)];
+    }
+    
+    return null;
+  }
+
+  // Walking distance achievements (every 5km)
+  static getWalkingAchievementMessage(user: User, totalDistance: number, previousDistance: number): string | null {
+    const currentKm = Math.floor(totalDistance / 1000);
+    const previousKm = Math.floor(previousDistance / 1000);
+    
+    // Check for 5km milestones
+    const currentMilestone = Math.floor(currentKm / 5);
+    const previousMilestone = Math.floor(previousKm / 5);
+    
+    if (currentMilestone > previousMilestone) {
+      const milestoneKm = currentMilestone * 5;
+      const walkingMessages = [
+        `Incredible journey, ${user.name}! You've walked ${milestoneKm} kilometers in your wellness adventures! The paths of Eldoria echo with your determined footsteps!`,
+        `Remarkable dedication, ${user.name}! ${milestoneKm} kilometers conquered on your wellness journey! Your endurance is truly becoming legendary!`,
+        `Wonderful progress, ${user.name}! ${milestoneKm} kilometers walked in pursuit of wellness! Every step strengthens your resolve and your legend!`,
+        `Outstanding perseverance, ${user.name}! ${milestoneKm} kilometers of mystical paths traversed! The walking spirits celebrate your unwavering commitment!`,
+        `Magnificent endurance, ${user.name}! ${milestoneKm} kilometers of wellness walking achieved! Your footprints mark a trail of inspiration across Eldoria!`
+      ];
+      return walkingMessages[Math.floor(Math.random() * walkingMessages.length)];
+    }
+    
+    return null;
+  }
+
   // Queue management for prioritized messages
   static queueMessage(message: string, priority: number = 0) {
     if (!message || message.trim() === '') return;

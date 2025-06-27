@@ -30,9 +30,10 @@ const HomePage: React.FC<HomePageProps> = ({
   showCoinAnimation = false,
   onCoinAnimationComplete
 }) => {
-  const [avatarMessage, setAvatarMessage] = useState<string>('');
   const [voiceText, setVoiceText] = useState<string>('');
+  const [lastCoinCount, setLastCoinCount] = useState<number>(user.mythicCoins);
   const [lastLevel, setLastLevel] = useState<number>(user.level);
+  const [lastWalkingDistance, setLastWalkingDistance] = useState<number>(user.totalWalkingDistance);
   const [hasInitialized, setHasInitialized] = useState<boolean>(false);
   
   // Get active quests
@@ -50,27 +51,16 @@ const HomePage: React.FC<HomePageProps> = ({
   const earnedCoins = user.mythicCoins;
   const coinProgress = totalPossibleCoins > 0 ? (earnedCoins / totalPossibleCoins) * 100 : 0;
   
-  // Welcome message on mount based on quest count
+  // Welcome message on mount based on quest count (VOICE ONLY)
   useEffect(() => {
     if (!hasInitialized) {
       const activeQuestCount = activeQuests.length;
       const welcomeMessage = VoiceMessageService.getWelcomeMessage(user, activeQuestCount);
       
-      setAvatarMessage(welcomeMessage);
-      
       // Queue welcome message for voice (priority 1 - highest)
       VoiceMessageService.queueMessage(welcomeMessage, 1);
       
-      // After 8 seconds, remind about quests and coins (only if there are active quests)
-      const timer = setTimeout(() => {
-        if (activeQuestCount > 0) {
-          const reminderMessage = `You have ${activeQuestCount} quest${activeQuestCount > 1 ? 's' : ''} awaiting your attention. Each completed quest brings both XP and precious Mythic Coins to your treasury.`;
-          setAvatarMessage(reminderMessage);
-        }
-      }, 8000);
-      
       setHasInitialized(true);
-      return () => clearTimeout(timer);
     }
   }, [user.name, activeQuests.length, hasInitialized]);
 
@@ -82,6 +72,30 @@ const HomePage: React.FC<HomePageProps> = ({
       setLastLevel(user.level);
     }
   }, [user.level, lastLevel, hasInitialized, user]);
+
+  // Check for coin milestones (every 250 coins)
+  useEffect(() => {
+    if (hasInitialized && user.mythicCoins > lastCoinCount) {
+      const coinMilestone = VoiceMessageService.getCoinMilestoneMessage(user, user.mythicCoins, lastCoinCount);
+      if (coinMilestone) {
+        VoiceMessageService.queueMessage(coinMilestone, 3); // Priority 3
+      }
+      
+      setLastCoinCount(user.mythicCoins);
+    }
+  }, [user.mythicCoins, lastCoinCount, hasInitialized, user]);
+
+  // Check for walking achievements (every 5km)
+  useEffect(() => {
+    if (hasInitialized && user.totalWalkingDistance > lastWalkingDistance) {
+      const walkingAchievement = VoiceMessageService.getWalkingAchievementMessage(user, user.totalWalkingDistance, lastWalkingDistance);
+      if (walkingAchievement) {
+        VoiceMessageService.queueMessage(walkingAchievement, 4); // Priority 4
+      }
+      
+      setLastWalkingDistance(user.totalWalkingDistance);
+    }
+  }, [user.totalWalkingDistance, lastWalkingDistance, hasInitialized, user]);
 
   // Voice message queue processor
   useEffect(() => {
@@ -112,7 +126,6 @@ const HomePage: React.FC<HomePageProps> = ({
           <div className="bg-gradient-to-b from-purple-50 to-white rounded-2xl p-6 shadow-md mb-6">
             <AvatarDisplay 
               avatar={avatar} 
-              message={avatarMessage}
             />
           </div>
           
