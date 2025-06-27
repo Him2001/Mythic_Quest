@@ -1,0 +1,37 @@
+# Ignore UI styling and tailwind config
+tailwind.config.js
+postcss.config.js
+index.css
+
+# Ignore mock data
+src/data/*
+
+# Ignore boilerplate configs
+src/vite-env.d.ts
+tsconfig.json
+tsconfig.app.json
+tsconfig.node.json
+eslint.config.js
+
+# Ignore admin pages (optional if unused during development)
+src/components/admin/*
+src/pages/Admin*
+
+# Ignore marketplace components (unless modifying)
+src/components/marketplace/*
+src/utils/marketplaceService.ts
+src/pages/MarketplacePage.tsx
+
+# Ignore map display layer unless editing GPS
+src/components/map/*
+src/utils/gpsTracker.ts
+src/utils/overpassService.ts
+
+# Ignore unchanging UI base components
+src/components/ui/*
+src/components/layout/*
+src/components/integrations/*
+
+# Ignore auth system if not modifying login/signup today
+src/components/auth/*
+src/utils/authService.ts
