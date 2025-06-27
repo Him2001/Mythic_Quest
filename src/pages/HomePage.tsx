@@ -337,6 +337,7 @@ const HomePage: React.FC<HomePageProps> = ({
         <ElevenLabsVoice 
           text={voiceText} 
           voiceId="MezYwaNLTOfydzsFJwwt"
+          isServiceInCooldown={VoiceMessageService.isInCooldown()}
           onComplete={handleVoiceComplete}
           onError={handleVoiceError}
           onRateLimitExceeded={handleRateLimitExceeded}
