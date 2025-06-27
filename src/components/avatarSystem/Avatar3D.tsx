@@ -120,7 +120,7 @@ const Avatar3D: React.FC<Avatar3DProps> = ({ className = '' }) => {
           return;
         }
 
-        // Check if the file exists in the bucket
+        // Check if the file exists in the bucket (using correct filename with capital I)
         const { data: files, error: filesError } = await supabase.storage
           .from('idle')
           .list('', { limit: 100 });
@@ -132,21 +132,22 @@ const Avatar3D: React.FC<Avatar3DProps> = ({ className = '' }) => {
           return;
         }
 
-        const modelFile = files?.find(file => file.name === 'Warrior idle.glb');
+        // Look for the correct filename: "Warrior Idle.glb" (with capital I and space)
+        const modelFile = files?.find(file => file.name === 'Warrior Idle.glb');
         if (!modelFile) {
-          console.warn('Model file "Warrior idle.glb" not found in idle bucket. Available files:', files?.map(f => f.name));
+          console.warn('Model file "Warrior Idle.glb" not found in idle bucket. Available files:', files?.map(f => f.name));
           setUsesFallback(true);
           setLoading(false);
           return;
         }
 
-        // Get the public URL for the 3D model
-        const { data } = supabase.storage
+        // Get a signed URL for the 3D model (more reliable than public URL)
+        const { data, error: signError } = await supabase.storage
           .from('idle')
-          .getPublicUrl('Warrior idle.glb');
+          .createSignedUrl('Warrior Idle.glb', 3600); // 1 hour expiry
 
-        if (!data?.publicUrl) {
-          console.warn('Failed to get public URL for 3D model');
+        if (signError || !data?.signedUrl) {
+          console.warn('Failed to create signed URL for 3D model:', signError?.message);
           setUsesFallback(true);
           setLoading(false);
           return;
@@ -154,12 +155,12 @@ const Avatar3D: React.FC<Avatar3DProps> = ({ className = '' }) => {
 
         // Test if the URL is actually accessible
         try {
-          const response = await fetch(data.publicUrl, { method: 'HEAD' });
+          const response = await fetch(data.signedUrl, { method: 'HEAD' });
           if (response.ok) {
-            console.log('3D model loaded successfully from:', data.publicUrl);
-            setModelUrl(data.publicUrl);
+            console.log('3D model loaded successfully from:', data.signedUrl);
+            setModelUrl(data.signedUrl);
           } else {
-            console.warn('Model file not accessible via public URL. Status:', response.status);
+            console.warn('Model file not accessible via signed URL. Status:', response.status);
             setUsesFallback(true);
           }
         } catch (fetchError) {
