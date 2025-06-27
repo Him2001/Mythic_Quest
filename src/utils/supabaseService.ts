@@ -81,6 +81,33 @@ export class SupabaseService {
     return this.updateUserProfile(userId, { xp, level, coins });
   }
 
+  // User Search Function
+  static async searchUsers(query: string, currentUserId: string) {
+    try {
+      const searchTerm = query.toLowerCase().trim();
+      
+      if (!searchTerm) return [];
+
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .neq('id', currentUserId) // Exclude current user
+        .eq('is_active', true) // Only active users
+        .or(`username.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`)
+        .limit(10);
+
+      if (error) {
+        console.error('Error searching users:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error in searchUsers:', error);
+      return [];
+    }
+  }
+
   // Quest Completion Tracking
   static async recordQuestCompletion(
     userId: string,
