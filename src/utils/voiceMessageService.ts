@@ -16,6 +16,7 @@ export class VoiceMessageService {
   private static isPlaying = false;
   private static currentPlayingId: string | null = null;
   private static playbackTimeout: NodeJS.Timeout | null = null;
+  private static supabasePersistenceEnabled = true;
 
   // Priority levels (lower number = higher priority)
   private static readonly PRIORITIES = {
@@ -28,7 +29,7 @@ export class VoiceMessageService {
 
   // Load queue from Supabase on initialization
   static async initializeQueue(userId: string) {
-    if (!supabase) return;
+    if (!supabase || !this.supabasePersistenceEnabled) return;
 
     try {
       const { data, error } = await supabase
@@ -39,7 +40,17 @@ export class VoiceMessageService {
         .order('priority', { ascending: true })
         .order('timestamp', { ascending: true });
 
-      if (!error && data) {
+      if (error) {
+        // Check if the error is due to missing table
+        if (error.code === '42P01' || error.message?.includes('does not exist')) {
+          console.warn('Voice message queue table does not exist, falling back to local-only mode');
+          this.supabasePersistenceEnabled = false;
+          return;
+        }
+        throw error;
+      }
+
+      if (data) {
         this.messageQueue = data.map(item => ({
           id: item.id,
           text: item.message_text,
@@ -52,12 +63,13 @@ export class VoiceMessageService {
       }
     } catch (error) {
       console.warn('Failed to load voice queue from Supabase:', error);
+      this.supabasePersistenceEnabled = false;
     }
   }
 
   // Save message to Supabase
   private static async saveMessageToSupabase(message: QueuedMessage) {
-    if (!supabase) return;
+    if (!supabase || !this.supabasePersistenceEnabled) return;
 
     try {
       await supabase
@@ -73,12 +85,13 @@ export class VoiceMessageService {
         });
     } catch (error) {
       console.warn('Failed to save voice message to Supabase:', error);
+      this.supabasePersistenceEnabled = false;
     }
   }
 
   // Mark message as played in Supabase
   private static async markMessageAsPlayed(messageId: string) {
-    if (!supabase) return;
+    if (!supabase || !this.supabasePersistenceEnabled) return;
 
     try {
       await supabase
@@ -87,12 +100,13 @@ export class VoiceMessageService {
         .eq('id', messageId);
     } catch (error) {
       console.warn('Failed to mark message as played in Supabase:', error);
+      this.supabasePersistenceEnabled = false;
     }
   }
 
   // Clean up old played messages from Supabase
   private static async cleanupOldMessages(userId: string) {
-    if (!supabase) return;
+    if (!supabase || !this.supabasePersistenceEnabled) return;
 
     try {
       const oneDayAgo = new Date();
@@ -106,6 +120,7 @@ export class VoiceMessageService {
         .lt('timestamp', oneDayAgo.toISOString());
     } catch (error) {
       console.warn('Failed to cleanup old messages:', error);
+      this.supabasePersistenceEnabled = false;
     }
   }
 
@@ -139,8 +154,10 @@ export class VoiceMessageService {
       return a.timestamp.getTime() - b.timestamp.getTime();
     });
 
-    // Save to Supabase
-    await this.saveMessageToSupabase(message);
+    // Save to Supabase only if persistence is enabled
+    if (this.supabasePersistenceEnabled) {
+      await this.saveMessageToSupabase(message);
+    }
 
     // Start processing if not already playing
     if (!this.isPlaying) {
@@ -161,8 +178,10 @@ export class VoiceMessageService {
     // Mark message as played locally
     nextMessage.played = true;
     
-    // Mark as played in Supabase
-    await this.markMessageAsPlayed(nextMessage.id);
+    // Mark as played in Supabase only if persistence is enabled
+    if (this.supabasePersistenceEnabled) {
+      await this.markMessageAsPlayed(nextMessage.id);
+    }
 
     // Remove from local queue
     this.messageQueue = this.messageQueue.filter(msg => msg.id !== nextMessage.id);
@@ -209,7 +228,7 @@ export class VoiceMessageService {
   static async clearAllMessages(userId: string) {
     this.messageQueue = this.messageQueue.filter(msg => msg.userId !== userId);
     
-    if (supabase) {
+    if (supabase && this.supabasePersistenceEnabled) {
       try {
         await supabase
           .from('voice_message_queue')
@@ -217,6 +236,7 @@ export class VoiceMessageService {
           .eq('user_id', userId);
       } catch (error) {
         console.warn('Failed to clear messages from Supabase:', error);
+        this.supabasePersistenceEnabled = false;
       }
     }
   }
@@ -355,6 +375,8 @@ export class VoiceMessageService {
 
   // Cleanup method to be called periodically
   static async performCleanup(userId: string) {
-    await this.cleanupOldMessages(userId);
+    if (this.supabasePersistenceEnabled) {
+      await this.cleanupOldMessages(userId);
+    }
   }
 }
