@@ -1,19 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { User, Quest } from '../../types';
+import { Home, Sparkles, Map, Users, ShoppingCart, ScrollText, Coins, Volume2, VolumeX, LogOut, ChevronDown } from 'lucide-react';
+import NotificationBadge from '../ui/NotificationBadge';
 import { NotificationCountService } from '../../utils/notificationCountService';
-import { 
-  Home, 
-  Sparkles, 
-  Map, 
-  Users, 
-  ShoppingCart, 
-  ScrollText, 
-  Coins,
-  ChevronDown,
-  VolumeX,
-  Volume2,
-  LogOut
-} from 'lucide-react';
 
 interface NavbarProps {
   user: User;
@@ -23,19 +12,14 @@ interface NavbarProps {
   quests: Quest[];
 }
 
-const Navbar: React.FC<NavbarProps> = ({ 
-  user, 
-  activeTab, 
-  onTabChange, 
-  onSignOut,
-  quests 
-}) => {
+const Navbar: React.FC<NavbarProps> = ({ user, activeTab, onTabChange, onSignOut, quests }) => {
+  const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [showDropdown, setShowDropdown] = useState(false);
-  const [audioEnabled, setAudioEnabled] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Get notification counts
+  // Calculate notification counts
   const pendingFriendRequestsCount = NotificationCountService.getPendingFriendRequestsCount(user.id);
+  const activeQuestsCount = NotificationCountService.getActiveQuestsCount(quests);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -46,17 +30,22 @@ const Navbar: React.FC<NavbarProps> = ({
     };
 
     document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleUserClick = () => {
-    setShowDropdown(!showDropdown);
+  const handleTabClick = (tab: string) => {
+    onTabChange(tab);
+    
+    // Update notification counts when tabs are visited
+    if (tab === 'heroes') {
+      NotificationCountService.markHeroesVisited(user.id);
+    } else if (tab === 'quests') {
+      NotificationCountService.markQuestsVisited(user.id);
+    }
   };
 
-  const handleAudioToggle = () => {
-    setAudioEnabled(!audioEnabled);
+  const toggleAudio = () => {
+    setIsAudioEnabled(!isAudioEnabled);
   };
 
   const handleSignOut = () => {
@@ -64,145 +53,120 @@ const Navbar: React.FC<NavbarProps> = ({
     onSignOut();
   };
 
+  const toggleDropdown = () => {
+    setShowDropdown(!showDropdown);
+  };
+
   const navItems = [
     { id: 'home', label: 'HOME', icon: Home },
-    { id: 'quests', label: 'QUESTS', icon: Sparkles, badge: quests.filter(q => !q.completed).length },
-    { id: 'map', label: 'ADVENTURE MAP', icon: Map },
-    { id: 'heroes', label: 'HEROES', icon: Users, badge: pendingFriendRequestsCount },
+    { id: 'quests', label: 'QUESTS', icon: Sparkles, badge: activeQuestsCount },
+    { id: 'map', label: 'ADVENTURE\nMAP', icon: Map },
+    { id: 'heroes', label: 'HEROES\nHALL', icon: Users, badge: pendingFriendRequestsCount },
     { id: 'marketplace', label: 'MARKETPLACE', icon: ShoppingCart },
     { id: 'chronicles', label: 'CHRONICLES', icon: ScrollText }
   ];
 
   return (
-    <nav className="bg-gradient-to-r from-purple-900 via-purple-800 to-orange-600 shadow-lg border-b-4 border-amber-500/30 relative z-50">
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-orange-600 via-orange-500 to-amber-500 shadow-2xl border-b-4 border-amber-600/50">
       <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-20">
-          {/* Logo and Title */}
-          <div className="flex items-center space-x-3 min-w-0 flex-shrink-0">
-            <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full flex items-center justify-center shadow-lg magical-glow border-2 border-amber-300">
-              <Sparkles className="text-amber-100" size={24} />
+        <div className="flex items-center justify-between h-16">
+          {/* Logo Section */}
+          <div className="flex items-center space-x-8">
+            <div className="flex items-center">
+              <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-orange-600 rounded-full flex items-center justify-center mr-3 shadow-lg border-2 border-amber-300">
+                <Sparkles className="text-white" size={20} />
+              </div>
+              <div className="flex flex-col">
+                <h1 className="text-white font-cinzel font-bold text-lg leading-tight tracking-wide">
+                  MYTHIC QUEST
+                </h1>
+                <p className="text-amber-100 font-cinzel text-xs leading-tight whitespace-nowrap">
+                  Wellness Adventure
+                </p>
+              </div>
             </div>
-            <div className="min-w-0">
-              <h1 className="text-amber-100 font-cinzel font-bold text-lg sm:text-xl leading-tight whitespace-nowrap">
-                MYTHIC QUEST
-              </h1>
-              <p className="text-amber-200 text-xs font-merriweather leading-tight whitespace-nowrap">
-                Wellness Adventure
-              </p>
+
+            {/* Navigation Items */}
+            <div className="hidden lg:flex items-center space-x-1">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
+                
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => handleTabClick(item.id)}
+                    className={`relative px-4 py-2 rounded-lg font-cinzel font-bold text-sm transition-all duration-200 flex items-center space-x-2 ${
+                      isActive
+                        ? 'bg-white/20 text-white shadow-lg border border-white/30'
+                        : 'text-amber-100 hover:text-white hover:bg-white/10'
+                    }`}
+                  >
+                    <Icon size={16} />
+                    <span className="whitespace-pre-line text-center leading-tight">
+                      {item.label}
+                    </span>
+                    
+                    {/* Notification Badge */}
+                    {item.badge && item.badge > 0 && (
+                      <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center border-2 border-white shadow-lg">
+                        {item.badge > 99 ? '99+' : item.badge}
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          {/* Navigation Items */}
-          <div className="hidden lg:flex items-center space-x-1 flex-1 justify-center max-w-4xl mx-8">
-            {navItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => onTabChange(item.id)}
-                className={`relative flex items-center space-x-2 px-3 py-2 rounded-lg font-cinzel font-bold text-sm transition-all duration-200 whitespace-nowrap ${
-                  activeTab === item.id
-                    ? 'bg-amber-500 text-white shadow-lg magical-glow'
-                    : 'text-amber-100 hover:bg-white/10 hover:text-white'
-                }`}
-              >
-                <item.icon size={18} />
-                <span>{item.label}</span>
-                {item.badge && item.badge > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold shadow-lg">
-                    {item.badge}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-
-          {/* Right Side - Coins and User */}
-          <div className="flex items-center space-x-4 flex-shrink-0">
+          {/* Right Section */}
+          <div className="flex items-center space-x-4">
             {/* Coins Display */}
-            <div className="flex items-center bg-gradient-to-r from-amber-500 to-yellow-500 text-white px-4 py-2 rounded-full font-cinzel font-bold shadow-lg magical-glow border-2 border-amber-300">
-              <Coins size={18} className="mr-2" />
-              <span className="text-lg">{user.mythicCoins}</span>
+            <div className="hidden sm:flex items-center bg-gradient-to-r from-amber-400 to-yellow-400 text-amber-900 px-4 py-2 rounded-full font-cinzel font-bold shadow-lg border-2 border-amber-300">
+              <Coins size={16} className="mr-2" />
+              <span>{user.mythicCoins || 0}</span>
             </div>
 
             {/* User Profile Dropdown */}
             <div className="relative" ref={dropdownRef}>
               <button
-                onClick={handleUserClick}
-                className="flex items-center space-x-3 bg-gradient-to-r from-amber-500 to-yellow-500 text-white px-4 py-2 rounded-full font-cinzel font-bold shadow-lg hover:shadow-xl transition-all duration-300 magical-glow border-2 border-amber-300"
+                onClick={toggleDropdown}
+                className="flex items-center space-x-3 bg-gradient-to-r from-amber-400 to-yellow-400 text-amber-900 px-4 py-2 rounded-full font-cinzel font-bold shadow-lg border-2 border-amber-300 hover:from-amber-300 hover:to-yellow-300 transition-all duration-200"
               >
-                <img 
-                  src={user.avatarUrl} 
+                <img
+                  src={user.avatarUrl}
                   alt={user.name}
-                  className="w-8 h-8 rounded-full border-2 border-amber-200"
+                  className="w-6 h-6 rounded-full border border-amber-600"
                 />
-                <div className="text-left hidden sm:block">
-                  <div className="text-sm font-bold leading-tight">{user.name.toUpperCase()}</div>
-                  <div className="text-xs text-amber-100 leading-tight">LEVEL {user.level}</div>
-                </div>
-                <ChevronDown size={16} className={`transition-transform duration-200 ${showDropdown ? 'rotate-180' : ''}`} />
+                <span className="hidden sm:block">{user.name.toUpperCase()}</span>
+                <span className="hidden sm:block text-xs opacity-75">LEVEL {user.level}</span>
+                <ChevronDown size={14} className={`transition-transform duration-200 ${showDropdown ? 'rotate-180' : ''}`} />
               </button>
 
               {/* Dropdown Menu */}
               {showDropdown && (
-                <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-2xl border-2 border-amber-200 z-50 overflow-hidden">
-                  {/* User Info Header */}
-                  <div className="bg-gradient-to-r from-amber-50 to-yellow-50 p-4 border-b border-amber-200">
-                    <div className="flex items-center space-x-3">
-                      <img 
-                        src={user.avatarUrl} 
-                        alt={user.name}
-                        className="w-12 h-12 rounded-full border-2 border-amber-300"
-                      />
-                      <div>
-                        <h3 className="font-cinzel font-bold text-amber-800 text-lg">{user.name.toUpperCase()}</h3>
-                        <p className="text-amber-600 text-sm font-merriweather">{user.email}</p>
-                        <div className="flex items-center space-x-4 mt-1">
-                          <span className="bg-amber-500 text-white px-2 py-1 rounded-full text-xs font-cinzel font-bold">
-                            Level {user.level}
-                          </span>
-                          <span className="text-amber-700 text-xs font-cinzel">{user.xp} XP</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Stats */}
-                  <div className="p-4 border-b border-amber-200">
-                    <div className="grid grid-cols-2 gap-4 text-center">
-                      <div>
-                        <div className="text-2xl font-cinzel font-bold text-amber-600">{user.questsCompleted}</div>
-                        <div className="text-xs text-amber-700 font-merriweather">Quests</div>
-                      </div>
-                      <div>
-                        <div className="text-2xl font-cinzel font-bold text-amber-600">{user.mythicCoins}</div>
-                        <div className="text-xs text-amber-700 font-merriweather">Coins</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Menu Items */}
-                  <div className="p-2">
-                    <button
-                      onClick={handleAudioToggle}
-                      className="w-full flex items-center space-x-3 px-3 py-2 text-left hover:bg-amber-50 rounded-lg transition-colors duration-200"
-                    >
-                      {audioEnabled ? (
-                        <Volume2 className="text-green-600" size={18} />
-                      ) : (
-                        <VolumeX className="text-red-600" size={18} />
-                      )}
-                      <span className="font-cinzel text-gray-700">
-                        {audioEnabled ? 'Audio Enabled' : 'Audio Muted (Dev)'}
-                      </span>
-                    </button>
-
-                    <button
-                      onClick={handleSignOut}
-                      className="w-full flex items-center space-x-3 px-3 py-2 text-left hover:bg-red-50 rounded-lg transition-colors duration-200 text-red-600"
-                    >
-                      <LogOut size={18} />
-                      <span className="font-cinzel">Sign Out</span>
-                    </button>
-                  </div>
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border-2 border-amber-200 overflow-hidden z-50">
+                  <button
+                    onClick={toggleAudio}
+                    className="w-full px-4 py-3 text-left hover:bg-amber-50 flex items-center space-x-3 text-gray-700 font-cinzel transition-colors duration-200"
+                  >
+                    {isAudioEnabled ? (
+                      <Volume2 size={16} className="text-green-600" />
+                    ) : (
+                      <VolumeX size={16} className="text-red-600" />
+                    )}
+                    <span>{isAudioEnabled ? 'Audio Enabled' : 'Audio Muted'}</span>
+                  </button>
+                  
+                  <div className="border-t border-amber-200"></div>
+                  
+                  <button
+                    onClick={handleSignOut}
+                    className="w-full px-4 py-3 text-left hover:bg-red-50 flex items-center space-x-3 text-red-600 font-cinzel transition-colors duration-200"
+                  >
+                    <LogOut size={16} />
+                    <span>Sign Out</span>
+                  </button>
                 </div>
               )}
             </div>
@@ -211,26 +175,35 @@ const Navbar: React.FC<NavbarProps> = ({
 
         {/* Mobile Navigation */}
         <div className="lg:hidden pb-4">
-          <div className="grid grid-cols-3 gap-2">
-            {navItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => onTabChange(item.id)}
-                className={`relative flex flex-col items-center space-y-1 p-2 rounded-lg font-cinzel font-bold text-xs transition-all duration-200 ${
-                  activeTab === item.id
-                    ? 'bg-amber-500 text-white shadow-lg magical-glow'
-                    : 'text-amber-100 hover:bg-white/10 hover:text-white'
-                }`}
-              >
-                <item.icon size={16} />
-                <span className="text-center leading-tight">{item.label}</span>
-                {item.badge && item.badge > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center font-bold shadow-lg">
-                    {item.badge}
+          <div className="flex flex-wrap justify-center gap-2">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => handleTabClick(item.id)}
+                  className={`relative px-3 py-2 rounded-lg font-cinzel font-bold text-xs transition-all duration-200 flex items-center space-x-1 ${
+                    isActive
+                      ? 'bg-white/20 text-white shadow-lg border border-white/30'
+                      : 'text-amber-100 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  <Icon size={14} />
+                  <span className="whitespace-pre-line text-center leading-tight">
+                    {item.label}
                   </span>
-                )}
-              </button>
-            ))}
+                  
+                  {/* Notification Badge */}
+                  {item.badge && item.badge > 0 && (
+                    <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center border border-white shadow-lg">
+                      {item.badge > 9 ? '9+' : item.badge}
+                    </div>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
