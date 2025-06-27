@@ -99,16 +99,16 @@ function Avatar3DModel({ url, isSpeaking }: Avatar3DModelProps) {
       const time = state.clock.elapsedTime;
       // Subtle head bob and slight rotation when speaking
       meshRef.current.rotation.y = Math.sin(time * 8) * 0.05;
-      meshRef.current.position.y = Math.sin(time * 12) * 0.02;
+      meshRef.current.position.y = Math.sin(time * 12) * 0.02 - 1.5; // FIXED: Keep centered position
     }
   });
 
-  // Scale and position the model
+  // Scale and position the model - FIXED POSITIONING
   useEffect(() => {
     if (scene) {
       // Scale up the avatar
       scene.scale.setScalar(2.2);
-      scene.position.set(0, -2, 0);
+      scene.position.set(0, -1.5, 0); // FIXED: Moved back to proper center position
       
       // Ensure all materials are properly set up
       scene.traverse((child) => {
@@ -136,8 +136,8 @@ function FallbackAvatar({ isSpeaking }: { isSpeaking: boolean }) {
       // Breathing effect
       const breathe = Math.sin(state.clock.elapsedTime * 2) * 0.05 + 1;
       meshRef.current.scale.setScalar(breathe);
-      // Slight body bob
-      meshRef.current.position.y = Math.sin(state.clock.elapsedTime * 1.5) * 0.1;
+      // Slight body bob - FIXED: Keep centered
+      meshRef.current.position.y = Math.sin(state.clock.elapsedTime * 1.5) * 0.1 - 0.5;
     }
 
     if (headRef.current && isSpeaking) {
@@ -156,7 +156,7 @@ function FallbackAvatar({ isSpeaking }: { isSpeaking: boolean }) {
   });
 
   return (
-    <mesh ref={meshRef} position={[0, 0, 0]}>
+    <mesh ref={meshRef} position={[0, -0.5, 0]}> {/* FIXED: Centered position */}
       <boxGeometry args={[1.8, 2.4, 0.9]} />
       <meshStandardMaterial color="#8B4513" />
       {/* Head with speaking animation */}
