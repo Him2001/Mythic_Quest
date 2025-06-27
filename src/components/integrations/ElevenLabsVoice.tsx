@@ -1,146 +1,154 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 
 interface ElevenLabsVoiceProps {
   text: string;
   voiceId?: string;
   onComplete?: () => void;
+  onError?: (error: string) => void;
 }
 
 const ElevenLabsVoice: React.FC<ElevenLabsVoiceProps> = ({
   text,
-  voiceId = 'MezYwaNLTOfydzsFJwwt', // Default voice ID
-  onComplete
+  voiceId = "MezYwaNLTOfydzsFJwwt", // Default voice ID
+  onComplete,
+  onError
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
-  const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
+  const [isAudioMuted, setIsAudioMuted] = useState(true);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
+  // Listen for audio state changes
   useEffect(() => {
-    // Check if audio is muted
-    const isAudioMuted = localStorage.getItem('mythic_audio_muted');
-    if (isAudioMuted === 'true') {
-      console.log('Audio is muted, skipping ElevenLabs API call');
-      onComplete?.();
+    const handleAudioStateChange = (event: CustomEvent) => {
+      setIsAudioMuted(event.detail.muted);
+    };
+
+    // Get initial state
+    const saved = localStorage.getItem('mythic_audio_muted');
+    setIsAudioMuted(saved ? JSON.parse(saved) : true);
+
+    // Listen for changes
+    window.addEventListener('audioStateChanged', handleAudioStateChange as EventListener);
+
+    return () => {
+      window.removeEventListener('audioStateChanged', handleAudioStateChange as EventListener);
+    };
+  }, []);
+
+  // Generate and play speech when text changes and audio is not muted
+  useEffect(() => {
+    if (!text || text.trim() === '' || isAudioMuted) {
+      if (onComplete) onComplete();
       return;
     }
 
-    if (!text || text.trim() === '') {
-      onComplete?.();
+    generateSpeech();
+
+    return () => {
+      // Cleanup on unmount or text change
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, [text, isAudioMuted]);
+
+  const generateSpeech = async () => {
+    if (isAudioMuted) {
+      if (onComplete) onComplete();
       return;
     }
 
     const apiKey = import.meta.env.VITE_ELEVENLABS_API_KEY;
+    
     if (!apiKey) {
       console.warn('ElevenLabs API key not configured');
-      onComplete?.();
+      if (onComplete) onComplete();
       return;
     }
 
-    const generateSpeech = async () => {
-      try {
-        setIsPlaying(true);
+    try {
+      setIsPlaying(true);
+      
+      // Create new abort controller for this request
+      abortControllerRef.current = new AbortController();
 
-        const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
-          method: 'POST',
-          headers: {
-            'Accept': 'audio/mpeg',
-            'Content-Type': 'application/json',
-            'xi-api-key': apiKey
-          },
-          body: JSON.stringify({
-            text: text,
-            model_id: 'eleven_monolingual_v1',
-            voice_settings: {
-              stability: 0.5,
-              similarity_boost: 0.5
-            }
-          })
-        });
+      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'audio/mpeg',
+          'Content-Type': 'application/json',
+          'xi-api-key': apiKey
+        },
+        body: JSON.stringify({
+          text: text,
+          model_id: 'eleven_monolingual_v1',
+          voice_settings: {
+            stability: 0.5,
+            similarity_boost: 0.75,
+            style: 0.0,
+            use_speaker_boost: true
+          }
+        }),
+        signal: abortControllerRef.current.signal
+      });
 
-        if (!response.ok) {
-          throw new Error(`ElevenLabs API error: ${response.status}`);
-        }
+      if (!response.ok) {
+        throw new Error(`ElevenLabs API error: ${response.status} ${response.statusText}`);
+      }
 
-        const audioBlob = await response.blob();
-        const audioUrl = URL.createObjectURL(audioBlob);
-        
-        const audioElement = new Audio(audioUrl);
-        setAudio(audioElement);
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      
+      // Create and play audio
+      const audio = new Audio(audioUrl);
+      audioRef.current = audio;
+      
+      audio.onended = () => {
+        setIsPlaying(false);
+        URL.revokeObjectURL(audioUrl);
+        if (onComplete) onComplete();
+      };
+      
+      audio.onerror = (error) => {
+        setIsPlaying(false);
+        URL.revokeObjectURL(audioUrl);
+        console.error('Audio playback error:', error);
+        if (onError) onError('Audio playback failed');
+        if (onComplete) onComplete();
+      };
 
-        audioElement.onended = () => {
-          setIsPlaying(false);
-          URL.revokeObjectURL(audioUrl);
-          onComplete?.();
-        };
-
-        audioElement.onerror = () => {
-          setIsPlaying(false);
-          URL.revokeObjectURL(audioUrl);
-          onComplete?.();
-        };
-
-        // Check again if audio is muted before playing (in case it was muted during API call)
-        const currentMuteState = localStorage.getItem('mythic_audio_muted');
-        if (currentMuteState === 'true') {
-          console.log('Audio was muted during API call, not playing');
-          setIsPlaying(false);
-          URL.revokeObjectURL(audioUrl);
-          onComplete?.();
+      // Set volume based on user preference
+      audio.volume = 0.7;
+      
+      await audio.play();
+      
+    } catch (error) {
+      setIsPlaying(false);
+      
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          console.log('Speech generation aborted');
           return;
         }
-
-        await audioElement.play();
-      } catch (error) {
-        console.warn('ElevenLabs speech generation failed:', error);
-        setIsPlaying(false);
-        onComplete?.();
+        
+        console.error('ElevenLabs TTS error:', error.message);
+        if (onError) onError(error.message);
+      } else {
+        console.error('Unknown TTS error:', error);
+        if (onError) onError('Unknown error occurred');
       }
-    };
+      
+      if (onComplete) onComplete();
+    }
+  };
 
-    generateSpeech();
-
-    // Cleanup function
-    return () => {
-      if (audio) {
-        audio.pause();
-        audio.currentTime = 0;
-      }
-    };
-  }, [text, voiceId, onComplete]);
-
-  // Stop audio if muted while playing
-  useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'mythic_audio_muted' && e.newValue === 'true' && audio && isPlaying) {
-        console.log('Audio muted while playing, stopping current audio');
-        audio.pause();
-        audio.currentTime = 0;
-        setIsPlaying(false);
-        onComplete?.();
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, [audio, isPlaying, onComplete]);
-
-  // Manual check for mute state changes (for same-tab changes)
-  useEffect(() => {
-    const checkMuteState = () => {
-      const isAudioMuted = localStorage.getItem('mythic_audio_muted');
-      if (isAudioMuted === 'true' && audio && isPlaying) {
-        console.log('Audio muted, stopping current audio');
-        audio.pause();
-        audio.currentTime = 0;
-        setIsPlaying(false);
-        onComplete?.();
-      }
-    };
-
-    const interval = setInterval(checkMuteState, 500);
-    return () => clearInterval(interval);
-  }, [audio, isPlaying, onComplete]);
-
-  return null; // This component doesn't render anything visible
+  // Don't render anything visible - this is just for audio
+  return null;
 };
 
 export default ElevenLabsVoice;
