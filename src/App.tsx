@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AuthService } from './utils/authService';
+import { SupabaseAuthService } from './utils/supabaseAuthService';
 import { User } from './types';
 
 // Auth Components
@@ -65,12 +65,30 @@ function App() {
 
   // Check authentication on app load
   useEffect(() => {
-    const currentUser = AuthService.getCurrentUser();
-    if (currentUser) {
-      setUser(currentUser);
-      setIsAuthenticated(true);
-    }
-    setIsLoading(false);
+    const checkAuth = async () => {
+      try {
+        const { user } = await SupabaseAuthService.getCurrentSession();
+        if (user) {
+          setUser(user);
+          setIsAuthenticated(true);
+        }
+      } catch (error) {
+        console.error('Error checking auth:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkAuth();
+
+    // Listen for auth state changes
+    const { data: { subscription } } = SupabaseAuthService.onAuthStateChange((user) => {
+      setUser(user);
+      setIsAuthenticated(!!user);
+      setIsLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   // Initialize social posts on first load
@@ -87,56 +105,64 @@ function App() {
   const handleSignIn = (userData: User) => {
     setUser(userData);
     setIsAuthenticated(true);
-    
-    // Update user data in auth service
-    AuthService.updateUser(userData);
   };
 
-  const handleSignOut = () => {
-    AuthService.signOut();
-    setUser(null);
-    setIsAuthenticated(false);
-    setActiveTab('home');
+  const handleSignOut = async () => {
+    try {
+      await SupabaseAuthService.signOut();
+      setUser(null);
+      setIsAuthenticated(false);
+      setActiveTab('home');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
   };
 
-  const updateDailyWalkingDistance = (additionalDistance: number) => {
+  const updateDailyWalkingDistance = async (additionalDistance: number) => {
     if (!user) return;
     
     const today = new Date().toISOString().split('T')[0];
+    const isNewDay = user.lastWalkingDate !== today;
+    const newDailyDistance = isNewDay ? additionalDistance : user.dailyWalkingDistance + additionalDistance;
+    const newTotalDistance = user.totalWalkingDistance + additionalDistance;
     
     setUser(prevUser => {
       if (!prevUser) return prevUser;
       
-      const isNewDay = prevUser.lastWalkingDate !== today;
-      const newDailyDistance = isNewDay ? additionalDistance : prevUser.dailyWalkingDistance + additionalDistance;
-      
-      const updatedUser = {
+      return {
         ...prevUser,
         dailyWalkingDistance: newDailyDistance,
-        totalWalkingDistance: prevUser.totalWalkingDistance + additionalDistance,
+        totalWalkingDistance: newTotalDistance,
         lastWalkingDate: today
       };
-      
-      AuthService.updateUser(updatedUser);
-      return updatedUser;
     });
+
+    // Update in Supabase
+    await SupabaseAuthService.updateWalkingDistance(
+      user.id,
+      newDailyDistance,
+      newTotalDistance,
+      today
+    );
   };
 
-  const awardCoins = (amount: number, type: CoinTransaction['type'], description: string, animationType: 'quest' | 'level_up' | 'bonus' = 'quest') => {
+  const awardCoins = async (amount: number, type: CoinTransaction['type'], description: string, animationType: 'quest' | 'level_up' | 'bonus' = 'quest') => {
     if (!user) return;
+    
+    const newCoinBalance = user.mythicCoins + amount;
     
     // Update user's coin balance
     setUser(prevUser => {
       if (!prevUser) return prevUser;
       
-      const updatedUser = {
+      return {
         ...prevUser,
-        mythicCoins: prevUser.mythicCoins + amount
+        mythicCoins: newCoinBalance
       };
-      
-      AuthService.updateUser(updatedUser);
-      return updatedUser;
     });
+
+    // Update in Supabase
+    await SupabaseAuthService.updateUserCoins(user.id, newCoinBalance);
 
     // Create transaction record
     const transaction = CoinSystem.createTransaction(amount, type, description);
@@ -154,21 +180,23 @@ function App() {
     }, 100);
   };
 
-  const spendCoins = (amount: number, description: string) => {
+  const spendCoins = async (amount: number, description: string) => {
     if (!user) return;
+    
+    const newCoinBalance = user.mythicCoins - amount;
     
     // Update user's coin balance
     setUser(prevUser => {
       if (!prevUser) return prevUser;
       
-      const updatedUser = {
+      return {
         ...prevUser,
-        mythicCoins: prevUser.mythicCoins - amount
+        mythicCoins: newCoinBalance
       };
-      
-      AuthService.updateUser(updatedUser);
-      return updatedUser;
     });
+
+    // Update in Supabase
+    await SupabaseAuthService.updateUserCoins(user.id, newCoinBalance);
 
     // Create transaction record
     const transaction = CoinSystem.createTransaction(-amount, 'purchase', description);
@@ -181,17 +209,14 @@ function App() {
     setUser(prevUser => {
       if (!prevUser) return prevUser;
       
-      const updatedUser = {
+      return {
         ...prevUser,
         inventory: [...prevUser.inventory, item]
       };
-      
-      AuthService.updateUser(updatedUser);
-      return updatedUser;
     });
   };
 
-  const handleCompleteQuest = (questId: string, distanceWalked?: number) => {
+  const handleCompleteQuest = async (questId: string, distanceWalked?: number) => {
     if (!user) return;
     
     setQuests(prevQuests => 
@@ -204,7 +229,7 @@ function App() {
     if (completedQuest && !completedQuest.completed) {
       // Update walking distance if it's a walking quest
       if (completedQuest.type === 'walking' && distanceWalked) {
-        updateDailyWalkingDistance(distanceWalked);
+        await updateDailyWalkingDistance(distanceWalked);
       }
 
       const oldLevel = user.level;
@@ -220,24 +245,27 @@ function App() {
         setTavusText(`Congratulations! You've reached level ${newLevel} in your journey. The realms of Eldoria grow stronger with your dedication.`);
       }
       
+      const newQuestsCompleted = user.questsCompleted + 1;
+      
       setUser(prevUser => {
         if (!prevUser) return prevUser;
         
-        const updatedUser = {
+        return {
           ...prevUser,
           xp: newXP,
           level: newLevel,
           xpToNextLevel: newXpToNextLevel,
-          questsCompleted: prevUser.questsCompleted + 1
+          questsCompleted: newQuestsCompleted
         };
-        
-        AuthService.updateUser(updatedUser);
-        return updatedUser;
       });
+
+      // Update in Supabase
+      await SupabaseAuthService.updateUserProgress(user.id, newXP, newLevel, user.mythicCoins);
+      await SupabaseAuthService.updateQuestsCompleted(user.id, newQuestsCompleted);
 
       // Award coins for quest completion
       const questCoinReward = completedQuest.coinReward || CoinSystem.calculateQuestReward(completedQuest.type, completedQuest.difficulty);
-      awardCoins(
+      await awardCoins(
         questCoinReward,
         'quest_completion',
         `Completed quest: ${completedQuest.title}`,
@@ -255,8 +283,8 @@ function App() {
         setShowLevelUpPopup(true);
 
         // Award level up bonus coins
-        setTimeout(() => {
-          awardCoins(
+        setTimeout(async () => {
+          await awardCoins(
             levelUpRewards.coinsEarned,
             'level_up',
             `Reached level ${newLevel}!`,
@@ -267,7 +295,7 @@ function App() {
     }
   };
 
-  const handleLocationQuestComplete = (questId: string, xpReward: number) => {
+  const handleLocationQuestComplete = async (questId: string, xpReward: number) => {
     if (!user) return;
     
     const oldLevel = user.level;
@@ -283,24 +311,27 @@ function App() {
       setTavusText(`Congratulations! You've discovered a magical location and reached level ${newLevel}! Your wellness journey grows ever stronger.`);
     }
     
+    const newQuestsCompleted = user.questsCompleted + 1;
+    
     setUser(prevUser => {
       if (!prevUser) return prevUser;
       
-      const updatedUser = {
+      return {
         ...prevUser,
         xp: newXP,
         level: newLevel,
         xpToNextLevel: newXpToNextLevel,
-        questsCompleted: prevUser.questsCompleted + 1
+        questsCompleted: newQuestsCompleted
       };
-      
-      AuthService.updateUser(updatedUser);
-      return updatedUser;
     });
+
+    // Update in Supabase
+    await SupabaseAuthService.updateUserProgress(user.id, newXP, newLevel, user.mythicCoins);
+    await SupabaseAuthService.updateQuestsCompleted(user.id, newQuestsCompleted);
 
     // Award coins for location quest completion
     const locationCoinReward = CoinSystem.calculateQuestReward('location', 'medium');
-    awardCoins(
+    await awardCoins(
       locationCoinReward,
       'quest_completion',
       'Completed location-based wellness quest',
@@ -318,8 +349,8 @@ function App() {
       setShowLevelUpPopup(true);
 
       // Award level up bonus coins
-      setTimeout(() => {
-        awardCoins(
+      setTimeout(async () => {
+        await awardCoins(
           levelUpRewards.coinsEarned,
           'level_up',
           `Reached level ${newLevel}!`,
@@ -355,7 +386,6 @@ function App() {
 
   const handleUserUpdate = (updatedUser: User) => {
     setUser(updatedUser);
-    AuthService.updateUser(updatedUser);
   };
 
   const handleShareLevelUpAchievement = () => {
