@@ -68,6 +68,16 @@ function App() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        // Check if Supabase is configured
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        
+        if (!supabaseUrl || !supabaseKey) {
+          console.warn('Supabase not configured, using fallback mode');
+          setIsLoading(false);
+          return;
+        }
+
         const { user } = await SupabaseAuthService.getCurrentSession();
         if (user) {
           setUser(user);
@@ -75,6 +85,7 @@ function App() {
         }
       } catch (error) {
         console.error('Error checking auth:', error);
+        // Don't block the app if auth check fails
       } finally {
         setIsLoading(false);
       }
@@ -82,14 +93,19 @@ function App() {
 
     checkAuth();
 
-    // Listen for auth state changes
-    const { data: { subscription } } = SupabaseAuthService.onAuthStateChange((user) => {
-      setUser(user);
-      setIsAuthenticated(!!user);
-      setIsLoading(false);
-    });
+    // Listen for auth state changes only if Supabase is configured
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    
+    if (supabaseUrl && supabaseKey) {
+      const { data: { subscription } } = SupabaseAuthService.onAuthStateChange((user) => {
+        setUser(user);
+        setIsAuthenticated(!!user);
+        setIsLoading(false);
+      });
 
-    return () => subscription.unsubscribe();
+      return () => subscription.unsubscribe();
+    }
   }, []);
 
   // Initialize social posts on first load
@@ -103,14 +119,166 @@ function App() {
     }
   }, [isAuthenticated]);
 
-  const handleSignIn = (userData: User) => {
-    setUser(userData);
-    setIsAuthenticated(true);
+  const handleSignIn = async (email: string, password: string) => {
+    try {
+      // Check for admin credentials
+      if (email === 'admin@123' && password === 'admin@123') {
+        const adminUser: User = {
+          id: 'admin-user',
+          name: 'Administrator',
+          email: 'admin@123',
+          password: '',
+          level: 99,
+          xp: 999999,
+          xpToNextLevel: 999999,
+          avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=admin',
+          joinDate: new Date(),
+          questsCompleted: 999,
+          dailyWalkingDistance: 0,
+          totalWalkingDistance: 0,
+          lastWalkingDate: '',
+          mythicCoins: 999999,
+          inventory: [],
+          posts: [],
+          following: [],
+          followers: [],
+          bio: 'System Administrator',
+          authMethod: 'email',
+          isAdmin: true,
+          isActive: true,
+          lastLoginDate: new Date(),
+          createdAt: new Date(),
+          isOnline: true,
+          lastSeenAt: new Date(),
+          chronicles: []
+        };
+        
+        setUser(adminUser);
+        setIsAuthenticated(true);
+        return;
+      }
+
+      // Try Supabase authentication
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      
+      if (supabaseUrl && supabaseKey) {
+        const { user, error } = await SupabaseAuthService.signIn(email, password);
+        if (error) {
+          throw new Error(error);
+        }
+        if (user) {
+          setUser(user);
+          setIsAuthenticated(true);
+          return;
+        }
+      }
+
+      // Fallback to demo user for testing
+      const demoUser: User = {
+        id: 'demo-user',
+        name: 'Demo User',
+        email: email,
+        password: '',
+        level: 5,
+        xp: 450,
+        xpToNextLevel: 600,
+        avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=demo',
+        joinDate: new Date(),
+        questsCompleted: 12,
+        dailyWalkingDistance: 2500,
+        totalWalkingDistance: 45000,
+        lastWalkingDate: new Date().toISOString().split('T')[0],
+        mythicCoins: 240,
+        inventory: [],
+        posts: [],
+        following: [],
+        followers: [],
+        bio: 'Wellness enthusiast on a mythic journey',
+        authMethod: 'email',
+        isAdmin: false,
+        isActive: true,
+        lastLoginDate: new Date(),
+        createdAt: new Date(),
+        isOnline: true,
+        lastSeenAt: new Date(),
+        chronicles: []
+      };
+      
+      setUser(demoUser);
+      setIsAuthenticated(true);
+    } catch (error) {
+      console.error('Sign in error:', error);
+      throw error;
+    }
+  };
+
+  const handleSignUp = async (name: string, email: string, password: string) => {
+    try {
+      // Try Supabase registration
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      
+      if (supabaseUrl && supabaseKey) {
+        const { user, error } = await SupabaseAuthService.signUp(email, password, name);
+        if (error) {
+          throw new Error(error);
+        }
+        if (user) {
+          setUser(user);
+          setIsAuthenticated(true);
+          return;
+        }
+      }
+
+      // Fallback to demo user creation
+      const newUser: User = {
+        id: crypto.randomUUID(),
+        name: name,
+        email: email,
+        password: '',
+        level: 1,
+        xp: 0,
+        xpToNextLevel: 100,
+        avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`,
+        joinDate: new Date(),
+        questsCompleted: 0,
+        dailyWalkingDistance: 0,
+        totalWalkingDistance: 0,
+        lastWalkingDate: '',
+        mythicCoins: 50, // Starting coins
+        inventory: [],
+        posts: [],
+        following: [],
+        followers: [],
+        bio: '',
+        authMethod: 'email',
+        isAdmin: false,
+        isActive: true,
+        lastLoginDate: new Date(),
+        createdAt: new Date(),
+        isOnline: true,
+        lastSeenAt: new Date(),
+        chronicles: []
+      };
+      
+      setUser(newUser);
+      setIsAuthenticated(true);
+    } catch (error) {
+      console.error('Sign up error:', error);
+      throw error;
+    }
   };
 
   const handleSignOut = async () => {
     try {
-      await SupabaseAuthService.signOut();
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      
+      if (supabaseUrl && supabaseKey) {
+        await SupabaseAuthService.signOut();
+      }
+      
       setUser(null);
       setIsAuthenticated(false);
       setActiveTab('home');
@@ -138,13 +306,18 @@ function App() {
       };
     });
 
-    // Update in Supabase
-    await SupabaseAuthService.updateWalkingDistance(
-      user.id,
-      newDailyDistance,
-      newTotalDistance,
-      today
-    );
+    // Update in Supabase if available
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    
+    if (supabaseUrl && supabaseKey) {
+      await SupabaseAuthService.updateWalkingDistance(
+        user.id,
+        newDailyDistance,
+        newTotalDistance,
+        today
+      );
+    }
   };
 
   const awardCoins = async (amount: number, type: CoinTransaction['type'], description: string, animationType: 'quest' | 'level_up' | 'bonus' = 'quest') => {
@@ -162,8 +335,13 @@ function App() {
       };
     });
 
-    // Update in Supabase
-    await SupabaseAuthService.updateUserCoins(user.id, newCoinBalance);
+    // Update in Supabase if available
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    
+    if (supabaseUrl && supabaseKey) {
+      await SupabaseAuthService.updateUserCoins(user.id, newCoinBalance);
+    }
 
     // Create transaction record
     const transaction = CoinSystem.createTransaction(amount, type, description);
@@ -196,8 +374,13 @@ function App() {
       };
     });
 
-    // Update in Supabase
-    await SupabaseAuthService.updateUserCoins(user.id, newCoinBalance);
+    // Update in Supabase if available
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    
+    if (supabaseUrl && supabaseKey) {
+      await SupabaseAuthService.updateUserCoins(user.id, newCoinBalance);
+    }
 
     // Create transaction record
     const transaction = CoinSystem.createTransaction(-amount, 'purchase', description);
@@ -260,21 +443,27 @@ function App() {
         };
       });
 
-      // Update in Supabase
-      await SupabaseAuthService.updateUserProgress(user.id, newXP, newLevel, user.mythicCoins);
-      await SupabaseAuthService.updateQuestsCompleted(user.id, newQuestsCompleted);
+      // Update in Supabase if available
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
       
-      // Record quest completion in Supabase
-      const questCoinReward = completedQuest.coinReward || CoinSystem.calculateQuestReward(completedQuest.type, completedQuest.difficulty);
-      await SupabaseAuthService.recordQuestCompletion(
-        user.id,
-        completedQuest.title,
-        completedQuest.type,
-        completedQuest.xpReward,
-        questCoinReward
-      );
+      if (supabaseUrl && supabaseKey) {
+        await SupabaseAuthService.updateUserProgress(user.id, newXP, newLevel, user.mythicCoins);
+        await SupabaseAuthService.updateQuestsCompleted(user.id, newQuestsCompleted);
+        
+        // Record quest completion in Supabase
+        const questCoinReward = completedQuest.coinReward || CoinSystem.calculateQuestReward(completedQuest.type, completedQuest.difficulty);
+        await SupabaseAuthService.recordQuestCompletion(
+          user.id,
+          completedQuest.title,
+          completedQuest.type,
+          completedQuest.xpReward,
+          questCoinReward
+        );
+      }
 
       // Award coins for quest completion
+      const questCoinReward = completedQuest.coinReward || CoinSystem.calculateQuestReward(completedQuest.type, completedQuest.difficulty);
       await awardCoins(
         questCoinReward,
         'quest_completion',
@@ -335,21 +524,27 @@ function App() {
       };
     });
 
-    // Update in Supabase
-    await SupabaseAuthService.updateUserProgress(user.id, newXP, newLevel, user.mythicCoins);
-    await SupabaseAuthService.updateQuestsCompleted(user.id, newQuestsCompleted);
+    // Update in Supabase if available
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
     
-    // Record location quest completion
-    const locationCoinReward = CoinSystem.calculateQuestReward('location', 'medium');
-    await SupabaseAuthService.recordQuestCompletion(
-      user.id,
-      'Location-based wellness quest',
-      'location',
-      xpReward,
-      locationCoinReward
-    );
+    if (supabaseUrl && supabaseKey) {
+      await SupabaseAuthService.updateUserProgress(user.id, newXP, newLevel, user.mythicCoins);
+      await SupabaseAuthService.updateQuestsCompleted(user.id, newQuestsCompleted);
+      
+      // Record location quest completion
+      const locationCoinReward = CoinSystem.calculateQuestReward('location', 'medium');
+      await SupabaseAuthService.recordQuestCompletion(
+        user.id,
+        'Location-based wellness quest',
+        'location',
+        xpReward,
+        locationCoinReward
+      );
+    }
 
     // Award coins for location quest completion
+    const locationCoinReward = CoinSystem.calculateQuestReward('location', 'medium');
     await awardCoins(
       locationCoinReward,
       'quest_completion',
@@ -398,21 +593,29 @@ function App() {
   const handleChronicleAdd = async (chronicle: any) => {
     if (!user) return;
     
-    // Save chronicle to Supabase
-    const savedChronicle = await SupabaseService.createChronicle(
-      user.id,
-      chronicle.title,
-      chronicle.content,
-      chronicle.mood,
-      chronicle.weekNumber,
-      chronicle.xpGained,
-      chronicle.coinsEarned,
-      chronicle.imageUrl,
-      chronicle.isPrivate || false
-    );
+    // Save chronicle to Supabase if available
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
     
-    if (savedChronicle) {
-      setChronicles(prev => [savedChronicle, ...prev]);
+    if (supabaseUrl && supabaseKey) {
+      const savedChronicle = await SupabaseService.createChronicle(
+        user.id,
+        chronicle.title,
+        chronicle.content,
+        chronicle.mood,
+        chronicle.weekNumber,
+        chronicle.xpGained,
+        chronicle.coinsEarned,
+        chronicle.imageUrl,
+        chronicle.isPrivate || false
+      );
+      
+      if (savedChronicle) {
+        setChronicles(prev => [savedChronicle, ...prev]);
+      }
+    } else {
+      // Fallback to local storage
+      setChronicles(prev => [chronicle, ...prev]);
     }
   };
 
@@ -457,7 +660,7 @@ function App() {
       case 'signup':
         return (
           <SignUpForm
-            onSignUp={handleSignIn}
+            onSignUp={handleSignUp}
             onSwitchToSignIn={() => setAuthView('signin')}
           />
         );

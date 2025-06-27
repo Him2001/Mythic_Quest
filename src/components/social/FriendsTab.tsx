@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { User, FriendRequest } from '../../types';
 import { SocialService } from '../../utils/socialService';
-import { AuthService } from '../../utils/authService';
+import { SupabaseService } from '../../utils/supabaseService';
+import { supabase } from '../../utils/supabaseClient';
 import Avatar from '../ui/Avatar';
 import Button from '../ui/Button';
 import Badge from '../ui/Badge';
@@ -15,9 +16,9 @@ interface FriendsTabProps {
 const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversation }) => {
   const [activeTab, setActiveTab] = useState<'friends' | 'requests' | 'search'>('friends');
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<User[]>([]);
-  const [friends, setFriends] = useState<User[]>([]);
-  const [friendRequests, setFriendRequests] = useState<{ sent: FriendRequest[]; received: FriendRequest[] }>({ sent: [], received: [] });
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [friends, setFriends] = useState<any[]>([]);
+  const [friendRequests, setFriendRequests] = useState<{ sent: any[]; received: any[] }>({ sent: [], received: [] });
   const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
@@ -33,17 +34,51 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
     }
   }, [searchQuery, activeTab]);
 
-  const loadFriends = () => {
-    const friendIds = SocialService.getFriends(currentUser.id);
-    const friendUsers = friendIds
-      .map(id => AuthService.getUserById(id))
-      .filter(user => user !== null) as User[];
-    setFriends(friendUsers);
+  const loadFriends = async () => {
+    try {
+      // Check if Supabase is configured
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      
+      if (supabaseUrl && supabaseKey) {
+        const friendships = await SupabaseService.getFriends(currentUser.id);
+        const friendUsers = friendships.map(friendship => {
+          // Get the other user in the friendship
+          return friendship.user1_id === currentUser.id ? friendship.user2 : friendship.user1;
+        });
+        setFriends(friendUsers);
+      } else {
+        // Fallback to local service
+        const friendIds = SocialService.getFriends(currentUser.id);
+        setFriends(friendIds.map(id => ({ id, username: `User ${id.slice(0, 8)}`, email: `user${id.slice(0, 4)}@example.com` })));
+      }
+    } catch (error) {
+      console.error('Failed to load friends:', error);
+    }
   };
 
-  const loadFriendRequests = () => {
-    const requests = SocialService.getFriendRequests(currentUser.id);
-    setFriendRequests(requests);
+  const loadFriendRequests = async () => {
+    try {
+      // Check if Supabase is configured
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      
+      if (supabaseUrl && supabaseKey) {
+        const requests = await SupabaseService.getFriendRequests(currentUser.id);
+        
+        // Separate sent and received requests
+        const sent = requests.filter(req => req.sender_id === currentUser.id);
+        const received = requests.filter(req => req.receiver_id === currentUser.id);
+        
+        setFriendRequests({ sent, received });
+      } else {
+        // Fallback to local service
+        const requests = SocialService.getFriendRequests(currentUser.id);
+        setFriendRequests(requests);
+      }
+    } catch (error) {
+      console.error('Failed to load friend requests:', error);
+    }
   };
 
   const handleSearch = async () => {
@@ -54,8 +89,18 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
 
     setIsSearching(true);
     try {
-      const results = SocialService.searchUsers(searchQuery, currentUser.id);
-      setSearchResults(results);
+      // Check if Supabase is configured
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      
+      if (supabaseUrl && supabaseKey) {
+        const results = await SupabaseService.searchUsers(searchQuery, currentUser.id);
+        setSearchResults(results);
+      } else {
+        // Fallback to local service
+        const results = SocialService.searchUsers(searchQuery, currentUser.id);
+        setSearchResults(results);
+      }
     } catch (error) {
       console.error('Search failed:', error);
     } finally {
@@ -63,45 +108,129 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
     }
   };
 
-  const handleSendFriendRequest = (userId: string) => {
-    const success = SocialService.sendFriendRequest(currentUser.id, userId);
-    if (success) {
-      loadFriendRequests();
-      // Update search results to reflect new status
-      handleSearch();
+  const handleSendFriendRequest = async (userId: string) => {
+    try {
+      // Check if Supabase is configured
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      
+      if (supabaseUrl && supabaseKey) {
+        const success = await SupabaseService.sendFriendRequest(currentUser.id, userId);
+        if (success) {
+          loadFriendRequests();
+          handleSearch();
+        }
+      } else {
+        // Fallback to local service
+        const success = SocialService.sendFriendRequest(currentUser.id, userId);
+        if (success) {
+          loadFriendRequests();
+          handleSearch();
+        }
+      }
+    } catch (error) {
+      console.error('Failed to send friend request:', error);
     }
   };
 
-  const handleAcceptRequest = (requestId: string) => {
-    const success = SocialService.acceptFriendRequest(requestId);
-    if (success) {
-      loadFriends();
-      loadFriendRequests();
+  const handleAcceptRequest = async (requestId: string) => {
+    try {
+      // Check if Supabase is configured
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      
+      if (supabaseUrl && supabaseKey) {
+        const success = await SupabaseService.acceptFriendRequest(requestId);
+        if (success) {
+          loadFriends();
+          loadFriendRequests();
+        }
+      } else {
+        // Fallback to local service
+        const success = SocialService.acceptFriendRequest(requestId);
+        if (success) {
+          loadFriends();
+          loadFriendRequests();
+        }
+      }
+    } catch (error) {
+      console.error('Failed to accept friend request:', error);
     }
   };
 
-  const handleRejectRequest = (requestId: string) => {
-    const success = SocialService.rejectFriendRequest(requestId);
-    if (success) {
-      loadFriendRequests();
+  const handleRejectRequest = async (requestId: string) => {
+    try {
+      // Check if Supabase is configured
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      
+      if (supabaseUrl && supabaseKey) {
+        const { error } = await supabase
+          .from('friend_requests')
+          .update({ status: 'rejected' })
+          .eq('id', requestId);
+
+        if (!error) {
+          loadFriendRequests();
+        }
+      } else {
+        // Fallback to local service
+        const success = SocialService.rejectFriendRequest(requestId);
+        if (success) {
+          loadFriendRequests();
+        }
+      }
+    } catch (error) {
+      console.error('Failed to reject friend request:', error);
     }
   };
 
-  const handleRemoveFriend = (userId: string) => {
-    const success = SocialService.removeFriend(currentUser.id, userId);
-    if (success) {
-      loadFriends();
+  const handleRemoveFriend = async (userId: string) => {
+    try {
+      // Check if Supabase is configured
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      
+      if (supabaseUrl && supabaseKey) {
+        const { error } = await supabase
+          .from('friendships')
+          .delete()
+          .or(`and(user1_id.eq.${currentUser.id},user2_id.eq.${userId}),and(user1_id.eq.${userId},user2_id.eq.${currentUser.id})`);
+
+        if (!error) {
+          loadFriends();
+        }
+      } else {
+        // Fallback to local service
+        const success = SocialService.removeFriend(currentUser.id, userId);
+        if (success) {
+          loadFriends();
+        }
+      }
+    } catch (error) {
+      console.error('Failed to remove friend:', error);
     }
   };
 
   const getFriendStatus = (userId: string) => {
-    return SocialService.getFriendStatus(currentUser.id, userId);
+    // Check if already friends
+    const isFriend = friends.some(friend => friend.id === userId);
+    if (isFriend) return 'friends';
+
+    // Check for pending requests
+    const sentRequest = friendRequests.sent.find(req => req.receiver_id === userId || req.receiverId === userId);
+    if (sentRequest) return 'pending_sent';
+
+    const receivedRequest = friendRequests.received.find(req => req.sender_id === userId || req.senderId === userId);
+    if (receivedRequest) return 'pending_received';
+
+    return 'none';
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'friends':
-        return <Badge color="success\" size="sm">Friends</Badge>;
+        return <Badge color="success" size="sm">Friends</Badge>;
       case 'pending_sent':
         return <Badge color="warning" size="sm">Request Sent</Badge>;
       case 'pending_received':
@@ -111,26 +240,26 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
     }
   };
 
-  const renderUserCard = (user: User, showActions: boolean = true) => {
+  const renderUserCard = (user: any, showActions: boolean = true) => {
     const status = getFriendStatus(user.id);
-    const isOnline = user.isOnline || Math.random() > 0.5; // Mock online status
+    const isOnline = Math.random() > 0.5; // Mock online status
 
     return (
       <div key={user.id} className="bg-white rounded-lg shadow-md p-4 border border-amber-100">
         <div className="flex items-center justify-between">
           <div className="flex items-center">
             <Avatar
-              src={user.avatarUrl}
-              alt={user.name}
+              src={user.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`}
+              alt={user.username}
               size="lg"
               status={isOnline ? 'online' : 'offline'}
               className="mr-4"
             />
             <div>
               <div className="flex items-center mb-1">
-                <h3 className="font-cinzel font-bold text-gray-800">{user.name}</h3>
+                <h3 className="font-cinzel font-bold text-gray-800">{user.username}</h3>
                 <Badge color="accent" size="sm" className="ml-2">
-                  Level {user.level}
+                  Level {user.level || 1}
                 </Badge>
               </div>
               <p className="text-sm text-amber-700 font-merriweather mb-1">{user.email}</p>
@@ -138,9 +267,9 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
                 <p className="text-xs text-gray-600 font-merriweather">{user.bio}</p>
               )}
               <div className="flex items-center mt-2 space-x-4 text-xs text-gray-500">
-                <span>{user.questsCompleted} quests</span>
-                <span>{user.mythicCoins} coins</span>
-                <span>Joined {new Date(user.joinDate).toLocaleDateString()}</span>
+                <span>{user.total_quests_completed || 0} quests</span>
+                <span>{user.coins || 0} coins</span>
+                <span>Joined {new Date(user.created_at || user.date_created || Date.now()).toLocaleDateString()}</span>
               </div>
             </div>
           </div>
@@ -200,27 +329,26 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
     );
   };
 
-  const renderFriendRequestCard = (request: FriendRequest, type: 'sent' | 'received') => {
-    const otherUserId = type === 'sent' ? request.receiverId : request.senderId;
-    const user = AuthService.getUserById(otherUserId);
+  const renderFriendRequestCard = (request: any, type: 'sent' | 'received') => {
+    const otherUser = type === 'sent' ? request.receiver : request.sender;
     
-    if (!user) return null;
+    if (!otherUser) return null;
 
     return (
       <div key={request.id} className="bg-white rounded-lg shadow-md p-4 border border-amber-100">
         <div className="flex items-center justify-between">
           <div className="flex items-center">
             <Avatar
-              src={user.avatarUrl}
-              alt={user.name}
+              src={otherUser.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherUser.username}`}
+              alt={otherUser.username}
               size="md"
               className="mr-3"
             />
             <div>
-              <h3 className="font-cinzel font-bold text-gray-800">{user.name}</h3>
-              <p className="text-sm text-gray-600 font-merriweather">{user.email}</p>
+              <h3 className="font-cinzel font-bold text-gray-800">{otherUser.username}</h3>
+              <p className="text-sm text-gray-600 font-merriweather">{otherUser.email}</p>
               <p className="text-xs text-gray-500 font-merriweather">
-                {type === 'sent' ? 'Request sent' : 'Request received'} {SocialService.formatTimeAgo(request.createdAt)}
+                {type === 'sent' ? 'Request sent' : 'Request received'} {SocialService.formatTimeAgo(request.created_at || request.createdAt)}
               </p>
             </div>
           </div>
@@ -317,7 +445,7 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
           <input
             type="text"
-            placeholder="Search by name or email..."
+            placeholder="Search by username or email..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-3 border-2 border-amber-200 rounded-lg focus:border-amber-500 focus:outline-none font-merriweather bg-white/80 backdrop-blur-sm"
@@ -331,7 +459,7 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
           <>
             {friends.length === 0 ? (
               <div className="text-center py-12 bg-white rounded-lg shadow-md">
-                <Users className="mx-auto mb-4 text-gray-400\" size={48} />
+                <Users className="mx-auto mb-4 text-gray-400" size={48} />
                 <h3 className="text-xl font-cinzel font-bold text-gray-600 mb-2">
                   No Friends Yet
                 </h3>
@@ -399,7 +527,7 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
                   No Users Found
                 </h3>
                 <p className="text-gray-500 font-merriweather">
-                  Try searching with a different name or email address.
+                  Try searching with a different username or email address.
                 </p>
               </div>
             ) : (
@@ -409,7 +537,7 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
                   Find New Friends
                 </h3>
                 <p className="text-gray-500 font-merriweather">
-                  Search for other adventurers by name or email address to send friend requests.
+                  Search for other adventurers by username or email address to send friend requests.
                 </p>
               </div>
             )}
