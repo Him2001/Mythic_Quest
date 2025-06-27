@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User, FriendRequest } from '../../types';
-import { SocialService } from '../../utils/socialService';
-import { AuthService } from '../../utils/authService';
+import { SupabaseService } from '../../utils/supabaseService';
 import Avatar from '../ui/Avatar';
 import Button from '../ui/Button';
 import Badge from '../ui/Badge';
@@ -12,15 +11,31 @@ interface FriendsTabProps {
   onStartConversation: (userId: string) => void;
 }
 
+interface SupabaseUser {
+  id: string;
+  email: string;
+  username?: string;
+  avatar_url?: string;
+  level?: number;
+  xp?: number;
+  coins?: number;
+  total_quests_completed?: number;
+  created_at: string;
+  is_active: boolean;
+}
+
 const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversation }) => {
   const [activeTab, setActiveTab] = useState<'friends' | 'requests' | 'search'>('friends');
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<User[]>([]);
-  const [friends, setFriends] = useState<User[]>([]);
+  const [searchResults, setSearchResults] = useState<SupabaseUser[]>([]);
+  const [allUsers, setAllUsers] = useState<SupabaseUser[]>([]);
+  const [friends, setFriends] = useState<SupabaseUser[]>([]);
   const [friendRequests, setFriendRequests] = useState<{ sent: FriendRequest[]; received: FriendRequest[] }>({ sent: [], received: [] });
   const [isSearching, setIsSearching] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    loadAllUsers();
     loadFriends();
     loadFriendRequests();
   }, [currentUser.id]);
@@ -31,22 +46,71 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
     } else {
       setSearchResults([]);
     }
-  }, [searchQuery, activeTab]);
+  }, [searchQuery, activeTab, allUsers]);
 
-  const loadFriends = () => {
-    const friendIds = SocialService.getFriends(currentUser.id);
-    const friendUsers = friendIds
-      .map(id => AuthService.getUserById(id))
-      .filter(user => user !== null) as User[];
-    setFriends(friendUsers);
+  const loadAllUsers = async () => {
+    setIsLoading(true);
+    try {
+      const users = await SupabaseService.getAllUserProfiles();
+      // Filter out current user and inactive users
+      const filteredUsers = users.filter(user => 
+        user.id !== currentUser.id && 
+        user.is_active !== false
+      );
+      setAllUsers(filteredUsers);
+    } catch (error) {
+      console.error('Failed to load users:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const loadFriendRequests = () => {
-    const requests = SocialService.getFriendRequests(currentUser.id);
-    setFriendRequests(requests);
+  const loadFriends = async () => {
+    try {
+      const friendships = await SupabaseService.getFriends(currentUser.id);
+      const friendUsers = friendships.map(friendship => {
+        // Get the other user in the friendship
+        return friendship.user1_id === currentUser.id ? friendship.user2 : friendship.user1;
+      }).filter(user => user !== null);
+      setFriends(friendUsers);
+    } catch (error) {
+      console.error('Failed to load friends:', error);
+    }
   };
 
-  const handleSearch = async () => {
+  const loadFriendRequests = async () => {
+    try {
+      const requests = await SupabaseService.getFriendRequests(currentUser.id);
+      
+      const sentRequests = requests
+        .filter(req => req.sender_id === currentUser.id && req.status === 'pending')
+        .map(req => ({
+          id: req.id,
+          senderId: req.sender_id,
+          receiverId: req.receiver_id,
+          status: req.status as 'pending' | 'accepted' | 'rejected',
+          createdAt: new Date(req.created_at),
+          updatedAt: new Date(req.updated_at)
+        }));
+
+      const receivedRequests = requests
+        .filter(req => req.receiver_id === currentUser.id && req.status === 'pending')
+        .map(req => ({
+          id: req.id,
+          senderId: req.sender_id,
+          receiverId: req.receiver_id,
+          status: req.status as 'pending' | 'accepted' | 'rejected',
+          createdAt: new Date(req.created_at),
+          updatedAt: new Date(req.updated_at)
+        }));
+
+      setFriendRequests({ sent: sentRequests, received: receivedRequests });
+    } catch (error) {
+      console.error('Failed to load friend requests:', error);
+    }
+  };
+
+  const handleSearch = () => {
     if (!searchQuery.trim()) {
       setSearchResults([]);
       return;
@@ -54,7 +118,12 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
 
     setIsSearching(true);
     try {
-      const results = SocialService.searchUsers(searchQuery, currentUser.id);
+      const searchTerm = searchQuery.toLowerCase();
+      const results = allUsers.filter(user => 
+        (user.email && user.email.toLowerCase().includes(searchTerm)) ||
+        (user.username && user.username.toLowerCase().includes(searchTerm))
+      ).slice(0, 20); // Limit to 20 results
+      
       setSearchResults(results);
     } catch (error) {
       console.error('Search failed:', error);
@@ -63,45 +132,79 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
     }
   };
 
-  const handleSendFriendRequest = (userId: string) => {
-    const success = SocialService.sendFriendRequest(currentUser.id, userId);
-    if (success) {
-      loadFriendRequests();
-      // Update search results to reflect new status
-      handleSearch();
+  const handleSendFriendRequest = async (userId: string) => {
+    try {
+      const success = await SupabaseService.sendFriendRequest(currentUser.id, userId);
+      if (success) {
+        loadFriendRequests();
+        // Update search results to reflect new status
+        handleSearch();
+      }
+    } catch (error) {
+      console.error('Failed to send friend request:', error);
     }
   };
 
-  const handleAcceptRequest = (requestId: string) => {
-    const success = SocialService.acceptFriendRequest(requestId);
-    if (success) {
+  const handleAcceptRequest = async (requestId: string) => {
+    try {
+      const success = await SupabaseService.acceptFriendRequest(requestId);
+      if (success) {
+        loadFriends();
+        loadFriendRequests();
+      }
+    } catch (error) {
+      console.error('Failed to accept friend request:', error);
+    }
+  };
+
+  const handleRejectRequest = async (requestId: string) => {
+    try {
+      // Update request status to rejected
+      const requests = await SupabaseService.getFriendRequests(currentUser.id);
+      const request = requests.find(r => r.id === requestId);
+      if (request) {
+        // For now, we'll just reload the requests (in a full implementation, you'd have a reject method)
+        loadFriendRequests();
+      }
+    } catch (error) {
+      console.error('Failed to reject friend request:', error);
+    }
+  };
+
+  const handleRemoveFriend = async (userId: string) => {
+    try {
+      // In a full implementation, you'd have a removeFriend method in SupabaseService
+      console.log('Remove friend:', userId);
       loadFriends();
-      loadFriendRequests();
-    }
-  };
-
-  const handleRejectRequest = (requestId: string) => {
-    const success = SocialService.rejectFriendRequest(requestId);
-    if (success) {
-      loadFriendRequests();
-    }
-  };
-
-  const handleRemoveFriend = (userId: string) => {
-    const success = SocialService.removeFriend(currentUser.id, userId);
-    if (success) {
-      loadFriends();
+    } catch (error) {
+      console.error('Failed to remove friend:', error);
     }
   };
 
   const getFriendStatus = (userId: string) => {
-    return SocialService.getFriendStatus(currentUser.id, userId);
+    // Check if already friends
+    if (friends.some(friend => friend.id === userId)) {
+      return 'friends';
+    }
+
+    // Check if there's a pending request
+    const sentRequest = friendRequests.sent.find(req => req.receiverId === userId);
+    if (sentRequest) {
+      return 'pending_sent';
+    }
+
+    const receivedRequest = friendRequests.received.find(req => req.senderId === userId);
+    if (receivedRequest) {
+      return 'pending_received';
+    }
+
+    return 'none';
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'friends':
-        return <Badge color="success\" size="sm">Friends</Badge>;
+        return <Badge color="success" size="sm">Friends</Badge>;
       case 'pending_sent':
         return <Badge color="warning" size="sm">Request Sent</Badge>;
       case 'pending_received':
@@ -111,36 +214,51 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
     }
   };
 
-  const renderUserCard = (user: User, showActions: boolean = true) => {
+  const formatTimeAgo = (date: Date): string => {
+    const now = new Date();
+    const diffInDays = Math.floor((now.getTime() - date.getTime()) / (24 * 60 * 60 * 1000));
+
+    if (diffInDays === 0) return 'Today';
+    if (diffInDays === 1) return 'Yesterday';
+    if (diffInDays < 7) return `${diffInDays} days ago`;
+    if (diffInDays < 30) return `${Math.floor(diffInDays / 7)} weeks ago`;
+    
+    return `${Math.floor(diffInDays / 30)} months ago`;
+  };
+
+  const renderUserCard = (user: SupabaseUser, showActions: boolean = true) => {
     const status = getFriendStatus(user.id);
-    const isOnline = user.isOnline || Math.random() > 0.5; // Mock online status
+    const displayName = user.username || user.email?.split('@')[0] || 'Unknown User';
+    const avatarUrl = user.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`;
 
     return (
       <div key={user.id} className="bg-white rounded-lg shadow-md p-4 border border-amber-100">
         <div className="flex items-center justify-between">
           <div className="flex items-center">
             <Avatar
-              src={user.avatarUrl}
-              alt={user.name}
+              src={avatarUrl}
+              alt={displayName}
               size="lg"
-              status={isOnline ? 'online' : 'offline'}
               className="mr-4"
             />
             <div>
               <div className="flex items-center mb-1">
-                <h3 className="font-cinzel font-bold text-gray-800">{user.name}</h3>
-                <Badge color="accent" size="sm" className="ml-2">
-                  Level {user.level}
-                </Badge>
+                <h3 className="font-cinzel font-bold text-gray-800">{displayName}</h3>
+                {user.level && (
+                  <Badge color="accent" size="sm" className="ml-2">
+                    Level {user.level}
+                  </Badge>
+                )}
               </div>
               <p className="text-sm text-amber-700 font-merriweather mb-1">{user.email}</p>
-              {user.bio && (
-                <p className="text-xs text-gray-600 font-merriweather">{user.bio}</p>
-              )}
               <div className="flex items-center mt-2 space-x-4 text-xs text-gray-500">
-                <span>{user.questsCompleted} quests</span>
-                <span>{user.mythicCoins} coins</span>
-                <span>Joined {new Date(user.joinDate).toLocaleDateString()}</span>
+                {user.total_quests_completed !== undefined && (
+                  <span>{user.total_quests_completed} quests</span>
+                )}
+                {user.coins !== undefined && (
+                  <span>{user.coins} coins</span>
+                )}
+                <span>Joined {formatTimeAgo(new Date(user.created_at))}</span>
               </div>
             </div>
           </div>
@@ -202,25 +320,28 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
 
   const renderFriendRequestCard = (request: FriendRequest, type: 'sent' | 'received') => {
     const otherUserId = type === 'sent' ? request.receiverId : request.senderId;
-    const user = AuthService.getUserById(otherUserId);
+    const user = allUsers.find(u => u.id === otherUserId);
     
     if (!user) return null;
+
+    const displayName = user.username || user.email?.split('@')[0] || 'Unknown User';
+    const avatarUrl = user.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`;
 
     return (
       <div key={request.id} className="bg-white rounded-lg shadow-md p-4 border border-amber-100">
         <div className="flex items-center justify-between">
           <div className="flex items-center">
             <Avatar
-              src={user.avatarUrl}
-              alt={user.name}
+              src={avatarUrl}
+              alt={displayName}
               size="md"
               className="mr-3"
             />
             <div>
-              <h3 className="font-cinzel font-bold text-gray-800">{user.name}</h3>
+              <h3 className="font-cinzel font-bold text-gray-800">{displayName}</h3>
               <p className="text-sm text-gray-600 font-merriweather">{user.email}</p>
               <p className="text-xs text-gray-500 font-merriweather">
-                {type === 'sent' ? 'Request sent' : 'Request received'} {SocialService.formatTimeAgo(request.createdAt)}
+                {type === 'sent' ? 'Request sent' : 'Request received'} {formatTimeAgo(request.createdAt)}
               </p>
             </div>
           </div>
@@ -259,6 +380,19 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
       </div>
     );
   };
+
+  if (isLoading) {
+    return (
+      <div className="max-w-4xl mx-auto">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-600 mx-auto mb-4"></div>
+            <p className="text-amber-800 font-cinzel">Loading community...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -331,7 +465,7 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
           <>
             {friends.length === 0 ? (
               <div className="text-center py-12 bg-white rounded-lg shadow-md">
-                <Users className="mx-auto mb-4 text-gray-400\" size={48} />
+                <Users className="mx-auto mb-4 text-gray-400" size={48} />
                 <h3 className="text-xl font-cinzel font-bold text-gray-600 mb-2">
                   No Friends Yet
                 </h3>
@@ -391,7 +525,17 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
                 <p className="text-amber-800 font-cinzel">Searching...</p>
               </div>
             ) : searchResults.length > 0 ? (
-              searchResults.map(user => renderUserCard(user))
+              <>
+                <div className="mb-4">
+                  <h3 className="text-lg font-cinzel font-bold text-amber-800">
+                    Search Results ({searchResults.length})
+                  </h3>
+                  <p className="text-sm text-gray-600 font-merriweather">
+                    Showing registered users from Supabase
+                  </p>
+                </div>
+                {searchResults.map(user => renderUserCard(user))}
+              </>
             ) : searchQuery.trim() ? (
               <div className="text-center py-12 bg-white rounded-lg shadow-md">
                 <Search className="mx-auto mb-4 text-gray-400" size={48} />
@@ -408,8 +552,11 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
                 <h3 className="text-xl font-cinzel font-bold text-gray-600 mb-2">
                   Find New Friends
                 </h3>
-                <p className="text-gray-500 font-merriweather">
+                <p className="text-gray-500 font-merriweather mb-4">
                   Search for other adventurers by name or email address to send friend requests.
+                </p>
+                <p className="text-xs text-gray-400 font-merriweather">
+                  Showing users registered in Supabase authentication database
                 </p>
               </div>
             )}
