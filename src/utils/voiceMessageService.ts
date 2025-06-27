@@ -1,0 +1,157 @@
+import { User, Quest } from '../types';
+
+export class VoiceMessageService {
+  private static messageQueue: string[] = [];
+  private static isPlaying = false;
+
+  // Welcome messages based on quest count
+  static getWelcomeMessage(user: User, activeQuestCount: number): string {
+    if (activeQuestCount === 0) {
+      const noQuestMessages = [
+        `Ah, ${user.name}! I see you've achieved the legendary status of "Quest Completionist"! The realm is so peaceful without any pending adventures... perhaps too peaceful?`,
+        `Greetings, ${user.name}! You've reached the mystical state of having zero quests remaining. The ancient scrolls speak of this as "Peak Productivity" - a rare and wondrous achievement!`,
+        `Well, well, ${user.name}! Look who's conquered every challenge in sight! The quest board stands empty, trembling in awe of your dedication. Time to rest those heroic laurels!`,
+        `Behold, ${user.name}! You've achieved what few dare attempt - a completely clear quest log! The realm celebrates your efficiency while secretly wondering what you'll do with all this free time.`
+      ];
+      return noQuestMessages[Math.floor(Math.random() * noQuestMessages.length)];
+    } else if (activeQuestCount > 5) {
+      const lazyMessages = [
+        `Oh my, ${user.name}! I see you've been... "collecting" quests like rare artifacts! ${activeQuestCount} pending adventures await your attention. Perhaps it's time to stop window shopping and start adventuring?`,
+        `Greetings, ${user.name}! Your quest collection has grown to an impressive ${activeQuestCount} items! At this rate, you'll need a separate realm just to store them all. Shall we perhaps... complete one or two?`,
+        `Well hello there, ${user.name}! I couldn't help but notice your ${activeQuestCount} quests patiently waiting like loyal pets. They're starting to form a support group called "The Forgotten Adventures." Time to show them some love?`,
+        `Ah, ${user.name}! Your ${activeQuestCount} pending quests have been having quite the party in your quest log. They've even elected a spokesperson to ask when you might grace them with your presence!`
+      ];
+      return lazyMessages[Math.floor(Math.random() * lazyMessages.length)];
+    } else {
+      const regularMessages = [
+        `Welcome back, ${user.name}! Ready to continue your journey today? You have ${activeQuestCount} quest${activeQuestCount > 1 ? 's' : ''} awaiting your heroic attention!`,
+        `The magical realms of Eldoria await your next adventure, ${user.name}! ${activeQuestCount} quest${activeQuestCount > 1 ? 's' : ''} stand${activeQuestCount === 1 ? 's' : ''} ready to test your resolve.`,
+        `Greetings, brave one! Your destiny in Eldoria continues to unfold with ${activeQuestCount} quest${activeQuestCount > 1 ? 's' : ''} ready for completion.`,
+        `Your coin purse grows heavier with each quest, ${user.name}! ${activeQuestCount} adventure${activeQuestCount > 1 ? 's' : ''} await${activeQuestCount === 1 ? 's' : ''} your legendary touch.`
+      ];
+      return regularMessages[Math.floor(Math.random() * regularMessages.length)];
+    }
+  }
+
+  // Level up congratulations
+  static getLevelUpMessage(user: User, newLevel: number, coinsEarned: number): string {
+    const levelUpMessages = [
+      `Magnificent! ${user.name}, you have ascended to Level ${newLevel}! The mystical energies of Eldoria surge through you, and your coin purse swells with ${coinsEarned} additional Mythic Coins!`,
+      `Behold! Level ${newLevel} achieved, ${user.name}! The ancient spirits celebrate your dedication, blessing you with ${coinsEarned} precious Mythic Coins as reward for your perseverance!`,
+      `Extraordinary! ${user.name}, your wellness journey has elevated you to Level ${newLevel}! The realm acknowledges your growth with ${coinsEarned} gleaming Mythic Coins!`,
+      `Splendid work, ${user.name}! Level ${newLevel} unlocked! Your commitment to wellness has earned you not just power, but ${coinsEarned} valuable Mythic Coins to aid your future adventures!`,
+      `Remarkable achievement! ${user.name}, you now stand at Level ${newLevel}! The treasury of Eldoria opens to grant you ${coinsEarned} Mythic Coins in recognition of your legendary progress!`
+    ];
+    return levelUpMessages[Math.floor(Math.random() * levelUpMessages.length)];
+  }
+
+  // Quest completion messages
+  static getQuestCompletionMessage(user: User, questTitle: string, questType: string, coinsEarned: number): string {
+    const questMessages = {
+      walking: [
+        `Excellent work, ${user.name}! You've conquered "${questTitle}" with every step! Your journey rewards you with ${coinsEarned} Mythic Coins. The paths of Eldoria sing of your dedication!`,
+        `Bravo! "${questTitle}" completed, ${user.name}! Your feet have carried you to victory, earning ${coinsEarned} precious Mythic Coins. The walking spirits are most pleased!`,
+        `Outstanding! ${user.name}, "${questTitle}" falls before your determined stride! ${coinsEarned} Mythic Coins now grace your purse as testament to your perseverance!`
+      ],
+      exercise: [
+        `Magnificent! ${user.name}, you've crushed "${questTitle}" with the strength of a true warrior! Your physical prowess earns you ${coinsEarned} Mythic Coins!`,
+        `Incredible! "${questTitle}" conquered through sheer determination, ${user.name}! The Iron Temple blesses you with ${coinsEarned} Mythic Coins for your dedication!`,
+        `Phenomenal! ${user.name}, "${questTitle}" yields to your mighty efforts! ${coinsEarned} Mythic Coins are yours as reward for your physical mastery!`
+      ],
+      meditation: [
+        `Serene and powerful! ${user.name}, you've found inner peace through "${questTitle}"! The mystical energies reward your tranquility with ${coinsEarned} Mythic Coins!`,
+        `Beautifully done! "${questTitle}" completed with perfect mindfulness, ${user.name}! Your centered spirit earns ${coinsEarned} precious Mythic Coins!`,
+        `Wonderfully peaceful! ${user.name}, "${questTitle}" brings you closer to enlightenment and ${coinsEarned} Mythic Coins richer!`
+      ],
+      journaling: [
+        `Thoughtfully executed! ${user.name}, "${questTitle}" captures your wisdom perfectly! Your reflective nature earns you ${coinsEarned} Mythic Coins!`,
+        `Brilliantly written! "${questTitle}" completed, ${user.name}! Your chronicles are rewarded with ${coinsEarned} gleaming Mythic Coins!`,
+        `Masterfully reflected! ${user.name}, "${questTitle}" showcases your inner wisdom, earning ${coinsEarned} valuable Mythic Coins!`
+      ],
+      reading: [
+        `Intellectually stimulating! ${user.name}, you've absorbed the wisdom of "${questTitle}"! Knowledge and ${coinsEarned} Mythic Coins are now yours!`,
+        `Scholarly achievement! "${questTitle}" completed, ${user.name}! Your thirst for knowledge rewards you with ${coinsEarned} precious Mythic Coins!`,
+        `Wisely pursued! ${user.name}, "${questTitle}" expands your mind and your wealth by ${coinsEarned} Mythic Coins!`
+      ]
+    };
+
+    const typeMessages = questMessages[questType as keyof typeof questMessages] || [
+      `Excellently done! ${user.name}, you've completed "${questTitle}" with remarkable skill! Your achievement earns you ${coinsEarned} Mythic Coins!`
+    ];
+
+    return typeMessages[Math.floor(Math.random() * typeMessages.length)];
+  }
+
+  // Friend message notifications
+  static getFriendMessageNotification(friendName: string): string {
+    const messageNotifications = [
+      `Ah! A message has arrived from your fellow adventurer, ${friendName}! They seek your attention in the realm of friendship.`,
+      `Wonderful! ${friendName} has sent word from their own wellness journey! A message awaits your reading.`,
+      `Delightful! Your friend ${friendName} has reached out across the mystical networks! Their message sparkles with friendship.`,
+      `Marvelous! ${friendName} sends greetings from their adventures! A friendly message has materialized in your communications.`,
+      `Splendid! ${friendName} has shared thoughts from their quest! Their message glows with the warmth of camaraderie.`
+    ];
+    return messageNotifications[Math.floor(Math.random() * messageNotifications.length)];
+  }
+
+  // Coin milestone messages
+  static getCoinMilestoneMessage(user: User, totalCoins: number): string {
+    if (totalCoins >= 1000) {
+      return `Astounding wealth, ${user.name}! Your treasure hoard has reached ${totalCoins} Mythic Coins! You're becoming quite the wealthy adventurer in Eldoria!`;
+    } else if (totalCoins >= 500) {
+      return `Impressive fortune, ${user.name}! ${totalCoins} Mythic Coins now fill your coffers! Your dedication to wellness pays handsomely!`;
+    } else if (totalCoins >= 100) {
+      return `Excellent progress, ${user.name}! Your coin collection has grown to ${totalCoins} Mythic Coins! The realm rewards your consistency!`;
+    }
+    return '';
+  }
+
+  // Walking distance achievements
+  static getWalkingAchievementMessage(user: User, totalDistance: number): string {
+    const distanceKm = Math.floor(totalDistance / 1000);
+    if (distanceKm >= 100) {
+      return `Incredible journey, ${user.name}! You've walked over ${distanceKm} kilometers in your wellness adventures! The paths of Eldoria echo with your footsteps!`;
+    } else if (distanceKm >= 50) {
+      return `Remarkable dedication, ${user.name}! ${distanceKm} kilometers conquered on your wellness journey! Your endurance is truly legendary!`;
+    } else if (distanceKm >= 10) {
+      return `Wonderful progress, ${user.name}! ${distanceKm} kilometers walked in pursuit of wellness! Every step strengthens your resolve!`;
+    }
+    return '';
+  }
+
+  // Queue management for prioritized messages
+  static queueMessage(message: string, priority: number = 0) {
+    if (!message || message.trim() === '') return;
+    
+    // Insert message based on priority (lower number = higher priority)
+    const messageWithPriority = { text: message, priority };
+    
+    if (this.messageQueue.length === 0) {
+      this.messageQueue.push(message);
+    } else {
+      // Find insertion point based on priority
+      let insertIndex = this.messageQueue.length;
+      this.messageQueue.push(message); // For now, just add to end
+    }
+  }
+
+  static getNextMessage(): string | null {
+    return this.messageQueue.shift() || null;
+  }
+
+  static clearQueue() {
+    this.messageQueue = [];
+  }
+
+  static hasQueuedMessages(): boolean {
+    return this.messageQueue.length > 0;
+  }
+
+  static setPlaying(playing: boolean) {
+    this.isPlaying = playing;
+  }
+
+  static getIsPlaying(): boolean {
+    return this.isPlaying;
+  }
+}

@@ -7,6 +7,7 @@ import Button from '../components/ui/Button';
 import { Sparkles, ArrowRight, MapPin, Coins, TrendingUp } from 'lucide-react';
 import ElevenLabsVoice from '../components/integrations/ElevenLabsVoice';
 import { CoinSystem } from '../utils/coinSystem';
+import { VoiceMessageService } from '../utils/voiceMessageService';
 
 interface HomePageProps {
   user: User;
@@ -31,6 +32,10 @@ const HomePage: React.FC<HomePageProps> = ({
 }) => {
   const [avatarMessage, setAvatarMessage] = useState<string>('');
   const [voiceText, setVoiceText] = useState<string>('');
+  const [lastCoinCount, setLastCoinCount] = useState<number>(user.mythicCoins);
+  const [lastLevel, setLastLevel] = useState<number>(user.level);
+  const [lastQuestCount, setLastQuestCount] = useState<number>(user.questsCompleted);
+  const [hasInitialized, setHasInitialized] = useState<boolean>(false);
   
   // Get active quests
   const activeQuests = quests.filter(quest => !quest.completed).slice(0, 3);
@@ -49,49 +54,93 @@ const HomePage: React.FC<HomePageProps> = ({
   
   // Welcome message on mount based on quest count
   useEffect(() => {
-    const activeQuestCount = activeQuests.length;
-    let welcomeMessage = '';
-    
-    if (activeQuestCount === 0) {
-      // Special message for no quests
-      const noQuestMessages = [
-        `Ah, ${user.name}! I see you've achieved the legendary status of "Quest Completionist"! The realm is so peaceful without any pending adventures... perhaps too peaceful? 🎯`,
-        `Greetings, ${user.name}! You've reached the mystical state of having zero quests remaining. The ancient scrolls speak of this as "Peak Productivity" - a rare and wondrous achievement! ✨`,
-        `Well, well, ${user.name}! Look who's conquered every challenge in sight! The quest board stands empty, trembling in awe of your dedication. Time to rest those heroic laurels! 🏆`,
-        `Behold, ${user.name}! You've achieved what few dare attempt - a completely clear quest log! The realm celebrates your efficiency while secretly wondering what you'll do with all this free time... 🌟`
-      ];
-      welcomeMessage = noQuestMessages[Math.floor(Math.random() * noQuestMessages.length)];
-    } else if (activeQuestCount > 5) {
-      // Witty sarcastic message for more than 5 quests
-      const lazyMessages = [
-        `Oh my, ${user.name}! I see you've been... "collecting" quests like rare artifacts! ${activeQuestCount} pending adventures await your attention. Perhaps it's time to stop window shopping and start adventuring? 😏`,
-        `Greetings, ${user.name}! Your quest collection has grown to an impressive ${activeQuestCount} items! At this rate, you'll need a separate realm just to store them all. Shall we perhaps... complete one or two? 🎭`,
-        `Well hello there, ${user.name}! I couldn't help but notice your ${activeQuestCount} quests patiently waiting like loyal pets. They're starting to form a support group called "The Forgotten Adventures." Time to show them some love? 😅`,
-        `Ah, ${user.name}! Your ${activeQuestCount} pending quests have been having quite the party in your quest log. They've even elected a spokesperson to ask when you might grace them with your presence! 🎪`
-      ];
-      welcomeMessage = lazyMessages[Math.floor(Math.random() * lazyMessages.length)];
-    } else {
-      // Regular messages for 1-5 quests
-      const regularMessages = [
-        `Welcome back, ${user.name}! Ready to continue your journey today? You have ${activeQuestCount} quest${activeQuestCount > 1 ? 's' : ''} awaiting your heroic attention!`,
-        `The magical realms of Eldoria await your next adventure, ${user.name}! ${activeQuestCount} quest${activeQuestCount > 1 ? 's' : ''} stand${activeQuestCount === 1 ? 's' : ''} ready to test your resolve.`,
-        `Greetings, brave one! Your destiny in Eldoria continues to unfold with ${activeQuestCount} quest${activeQuestCount > 1 ? 's' : ''} ready for completion.`,
-        `Your coin purse grows heavier with each quest, ${user.name}! ${activeQuestCount} adventure${activeQuestCount > 1 ? 's' : ''} await${activeQuestCount === 1 ? 's' : ''} your legendary touch.`
-      ];
-      welcomeMessage = regularMessages[Math.floor(Math.random() * regularMessages.length)];
+    if (!hasInitialized) {
+      const activeQuestCount = activeQuests.length;
+      const welcomeMessage = VoiceMessageService.getWelcomeMessage(user, activeQuestCount);
+      
+      setAvatarMessage(welcomeMessage);
+      
+      // Queue welcome message for voice (priority 1 - highest)
+      VoiceMessageService.queueMessage(welcomeMessage, 1);
+      
+      // After 8 seconds, remind about quests and coins (only if there are active quests)
+      const timer = setTimeout(() => {
+        if (activeQuestCount > 0) {
+          const reminderMessage = `You have ${activeQuestCount} quest${activeQuestCount > 1 ? 's' : ''} awaiting your attention. Each completed quest brings both XP and precious Mythic Coins to your treasury.`;
+          setAvatarMessage(reminderMessage);
+        }
+      }, 8000);
+      
+      setHasInitialized(true);
+      return () => clearTimeout(timer);
     }
-    
-    setAvatarMessage(welcomeMessage);
-    
-    // After 8 seconds, remind about quests and coins (only if there are active quests)
-    const timer = setTimeout(() => {
-      if (activeQuestCount > 0) {
-        setAvatarMessage(`You have ${activeQuestCount} quest${activeQuestCount > 1 ? 's' : ''} awaiting your attention. Each completed quest brings both XP and precious Mythic Coins to your treasury.`);
+  }, [user.name, activeQuests.length, hasInitialized]);
+
+  // Check for level ups
+  useEffect(() => {
+    if (hasInitialized && user.level > lastLevel) {
+      const levelUpMessage = VoiceMessageService.getLevelUpMessage(user, user.level, 100); // Assuming 100 coins for level up
+      VoiceMessageService.queueMessage(levelUpMessage, 2); // Priority 2
+      setLastLevel(user.level);
+    }
+  }, [user.level, lastLevel, hasInitialized, user]);
+
+  // Check for quest completions
+  useEffect(() => {
+    if (hasInitialized && user.questsCompleted > lastQuestCount) {
+      // Find the most recently completed quest (this is a simplified approach)
+      const completedQuest = quests.find(q => q.completed);
+      if (completedQuest) {
+        const questMessage = VoiceMessageService.getQuestCompletionMessage(
+          user, 
+          completedQuest.title, 
+          completedQuest.type, 
+          CoinSystem.calculateQuestReward(completedQuest.type, completedQuest.difficulty)
+        );
+        VoiceMessageService.queueMessage(questMessage, 3); // Priority 3
       }
-    }, 8000);
-    
-    return () => clearTimeout(timer);
-  }, [user.name, activeQuests.length]);
+      setLastQuestCount(user.questsCompleted);
+    }
+  }, [user.questsCompleted, lastQuestCount, hasInitialized, quests, user]);
+
+  // Check for coin milestones
+  useEffect(() => {
+    if (hasInitialized && user.mythicCoins > lastCoinCount) {
+      const coinMilestone = VoiceMessageService.getCoinMilestoneMessage(user, user.mythicCoins);
+      if (coinMilestone) {
+        VoiceMessageService.queueMessage(coinMilestone, 4); // Priority 4
+      }
+      
+      // Check walking achievements
+      const walkingAchievement = VoiceMessageService.getWalkingAchievementMessage(user, user.totalWalkingDistance);
+      if (walkingAchievement) {
+        VoiceMessageService.queueMessage(walkingAchievement, 5); // Priority 5
+      }
+      
+      setLastCoinCount(user.mythicCoins);
+    }
+  }, [user.mythicCoins, lastCoinCount, hasInitialized, user]);
+
+  // Voice message queue processor
+  useEffect(() => {
+    const processVoiceQueue = () => {
+      if (!VoiceMessageService.getIsPlaying() && VoiceMessageService.hasQueuedMessages()) {
+        const nextMessage = VoiceMessageService.getNextMessage();
+        if (nextMessage) {
+          setVoiceText(nextMessage);
+          VoiceMessageService.setPlaying(true);
+        }
+      }
+    };
+
+    const interval = setInterval(processVoiceQueue, 1000); // Check every second
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleVoiceComplete = () => {
+    VoiceMessageService.setPlaying(false);
+    setVoiceText(''); // Clear the current voice text
+  };
   
   return (
     <div className="container mx-auto px-4 py-6 relative">
@@ -267,8 +316,14 @@ const HomePage: React.FC<HomePageProps> = ({
         </a>
       </div>
       
-      {/* Voice integration (hidden) */}
-      {voiceText && <ElevenLabsVoice text={voiceText} voiceId={avatar.voiceId} />}
+      {/* Voice integration */}
+      {voiceText && (
+        <ElevenLabsVoice 
+          text={voiceText} 
+          voiceId="MezYwaNLTOfydzsFJwwt"
+          onComplete={handleVoiceComplete}
+        />
+      )}
     </div>
   );
 };
