@@ -1,6 +1,7 @@
 import React from 'react';
-import { MapPin, Navigation, Award, Clock, Route, Target } from 'lucide-react';
 import Button from '../ui/Button';
+import Badge from '../ui/Badge';
+import { MapPin, Navigation, Target, Award, Clock, Route } from 'lucide-react';
 
 interface WellnessLocation {
   id: string;
@@ -53,7 +54,7 @@ const WellnessQuestPanel: React.FC<WellnessQuestPanelProps> = ({
     return `${Math.round(meters)} m`;
   };
 
-  const getLocationIcon = (type: string): string => {
+  const getLocationTypeIcon = (type: string) => {
     const iconMap: Record<string, string> = {
       park: '🌳',
       gym: '💪',
@@ -64,53 +65,26 @@ const WellnessQuestPanel: React.FC<WellnessQuestPanelProps> = ({
     return iconMap[type] || '📍';
   };
 
-  const getQuestTask = (location: WellnessLocation): string => {
-    const questTasks: Record<string, string[]> = {
-      park: [
-        'Practice deep breathing for 5 minutes among the trees',
-        'Take a mindful walk and observe nature for 10 minutes',
-        'Find a peaceful spot for 5 minutes of gratitude meditation',
-        'Do gentle stretching exercises in the fresh air'
-      ],
-      gym: [
-        'Complete a 20-minute strength training session',
-        'Engage in 15 minutes of cardio exercise',
-        'Practice balance and flexibility for 10 minutes',
-        'Join a group fitness class or workout'
-      ],
-      library: [
-        'Read about wellness or personal development for 20 minutes',
-        'Journal about your wellness journey for 15 minutes',
-        'Practice silent meditation for 10 minutes',
-        'Research a new healthy recipe or wellness tip'
-      ],
-      cafe: [
-        'Practice mindful eating or drinking for 10 minutes',
-        'Engage in meaningful conversation for 15 minutes',
-        'Write in your wellness journal while enjoying a healthy beverage',
-        'Practice gratitude while observing the community around you'
-      ],
-      landmark: [
-        'Reflect on your personal journey for 15 minutes',
-        'Practice gratitude meditation at this special place',
-        'Set wellness intentions while taking in the view',
-        'Take photos to document your wellness journey'
-      ]
+  const getLocationTypeColor = (type: string): 'primary' | 'secondary' | 'accent' | 'success' | 'warning' => {
+    const colorMap: Record<string, any> = {
+      park: 'success',
+      gym: 'primary',
+      library: 'accent',
+      cafe: 'warning',
+      landmark: 'secondary'
     };
-
-    const tasks = questTasks[location.type] || ['Complete a wellness activity at this location'];
-    return tasks[Math.floor(Math.random() * tasks.length)];
+    return colorMap[type] || 'primary';
   };
 
   if (locations.length === 0) {
     return (
-      <div className="bg-white rounded-lg shadow-md p-6 text-center">
-        <MapPin className="mx-auto mb-3 text-gray-400" size={32} />
-        <h3 className="text-lg font-cinzel font-bold text-gray-600 mb-2">
-          Discovering Wellness Locations...
+      <div className="text-center py-8 bg-white rounded-lg shadow-md">
+        <MapPin className="mx-auto mb-4 text-gray-400" size={48} />
+        <h3 className="text-xl font-cinzel font-bold text-gray-600 mb-2">
+          No Wellness Locations Found
         </h3>
         <p className="text-gray-500 font-merriweather">
-          We're scanning the mystical realm for wellness opportunities near you.
+          We're searching for wellness locations in your area. Please ensure location services are enabled.
         </p>
       </div>
     );
@@ -119,6 +93,7 @@ const WellnessQuestPanel: React.FC<WellnessQuestPanelProps> = ({
   return (
     <div className="space-y-4">
       {locations.map(location => {
+        const isCompleted = completedQuests.has(location.id) || location.discovered;
         const distance = userLocation 
           ? calculateDistance(
               userLocation.latitude,
@@ -126,25 +101,25 @@ const WellnessQuestPanel: React.FC<WellnessQuestPanelProps> = ({
               location.latitude,
               location.longitude
             )
-          : 0;
-
-        const isCompleted = completedQuests.has(location.id) || location.discovered;
-        const questTask = getQuestTask(location);
+          : null;
 
         return (
           <div
             key={location.id}
-            className={`bg-white rounded-lg shadow-md border-l-4 p-5 transition-all duration-200 hover:shadow-lg ${
+            className={`bg-white rounded-xl shadow-lg border-2 p-6 transition-all duration-300 hover:shadow-xl ${
               isCompleted 
-                ? 'border-l-green-500 bg-green-50' 
-                : 'border-l-amber-500 hover:border-l-amber-600'
+                ? 'border-green-300 bg-green-50' 
+                : 'border-amber-200 hover:border-amber-300'
             }`}
           >
-            <div className="flex items-start justify-between mb-3">
+            {/* Header */}
+            <div className="flex items-start justify-between mb-4">
               <div className="flex items-center">
-                <span className="text-2xl mr-3">{getLocationIcon(location.type)}</span>
+                <div className="text-2xl mr-3">
+                  {getLocationTypeIcon(location.type)}
+                </div>
                 <div>
-                  <h3 className="font-cinzel font-bold text-amber-800 text-lg">
+                  <h3 className="text-lg font-cinzel font-bold text-amber-800 mb-1">
                     {location.magicalName}
                   </h3>
                   <p className="text-sm text-gray-600 font-merriweather">
@@ -153,73 +128,86 @@ const WellnessQuestPanel: React.FC<WellnessQuestPanelProps> = ({
                 </div>
               </div>
               
-              {isCompleted && (
-                <div className="flex items-center text-green-600">
-                  <Target size={16} className="mr-1" />
-                  <span className="text-sm font-cinzel">Discovered</span>
-                </div>
-              )}
-            </div>
-
-            <p className="text-gray-700 font-merriweather mb-4 leading-relaxed">
-              {location.description}
-            </p>
-
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
-              <h4 className="font-cinzel font-bold text-amber-800 mb-2 flex items-center">
-                <Clock size={14} className="mr-1" />
-                Wellness Quest
-              </h4>
-              <p className="text-sm text-amber-700 font-merriweather">
-                {questTask}
-              </p>
-            </div>
-
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-4">
-                <div className="flex items-center text-amber-700">
-                  <Award size={16} className="mr-1" />
-                  <span className="text-sm font-cinzel font-bold">{location.questReward} XP</span>
-                </div>
+              <div className="flex flex-col items-end space-y-2">
+                <Badge 
+                  color={getLocationTypeColor(location.type)} 
+                  className="magical-glow"
+                >
+                  {location.type.charAt(0).toUpperCase() + location.type.slice(1)}
+                </Badge>
                 
-                {userLocation && (
-                  <div className="flex items-center text-blue-600">
-                    <MapPin size={14} className="mr-1" />
-                    <span className="text-sm font-merriweather">{formatDistance(distance)}</span>
-                  </div>
-                )}
-
-                {location.visitCount > 0 && (
-                  <div className="flex items-center text-green-600">
-                    <Target size={14} className="mr-1" />
-                    <span className="text-sm font-cinzel">
-                      Visited {location.visitCount} time{location.visitCount !== 1 ? 's' : ''}
-                    </span>
+                {distance && (
+                  <div className="flex items-center text-xs text-gray-500">
+                    <Target size={12} className="mr-1" />
+                    <span className="font-merriweather">{formatDistance(distance)}</span>
                   </div>
                 )}
               </div>
             </div>
 
-            <div className="flex space-x-3">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onMarkPath(location)}
-                icon={<Route size={16} />}
-                className="flex-1 font-cinzel"
-              >
-                Mark Path
-              </Button>
+            {/* Quest Description */}
+            <div className="mb-4 p-3 bg-amber-50 rounded-lg border border-amber-200">
+              <h4 className="font-cinzel font-bold text-amber-800 mb-2 flex items-center">
+                <Clock size={16} className="mr-2" />
+                Wellness Quest
+              </h4>
+              <p className="text-sm text-amber-700 font-merriweather">
+                {location.questTask}
+              </p>
+            </div>
+
+            {/* Rewards and Status */}
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center text-amber-700">
+                  <Award size={16} className="mr-1 magical-glow" />
+                  <span className="text-sm font-cinzel font-bold">{location.questReward} XP</span>
+                </div>
+                
+                {location.visitCount > 0 && (
+                  <div className="flex items-center text-purple-600">
+                    <span className="text-sm font-cinzel">
+                      Visited {location.visitCount} time{location.visitCount > 1 ? 's' : ''}
+                    </span>
+                  </div>
+                )}
+              </div>
               
+              {isCompleted && (
+                <Badge color="success" className="magical-glow">
+                  ✅ Completed
+                </Badge>
+              )}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex space-x-3">
               <Button
                 variant="primary"
                 size="sm"
                 onClick={() => onNavigateToLocation(location)}
                 icon={<Navigation size={16} />}
-                className="flex-1 font-cinzel magical-glow"
+                className="flex-1 magical-glow"
               >
                 Navigate to Location
               </Button>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onMarkPath(location)}
+                icon={<Route size={16} />}
+                className="flex-1"
+              >
+                Mark Path
+              </Button>
+            </div>
+
+            {/* Location Description */}
+            <div className="mt-4 pt-3 border-t border-gray-200">
+              <p className="text-xs text-gray-600 font-merriweather italic">
+                {location.description}
+              </p>
             </div>
           </div>
         );
