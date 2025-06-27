@@ -34,6 +34,7 @@ function App() {
   const [authView, setAuthView] = useState<'signin' | 'signup' | 'forgot'>('signin');
   const [isLoading, setIsLoading] = useState(true);
   const [hasSupabase, setHasSupabase] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
 
   // App state
   const [activeTab, setActiveTab] = useState('home');
@@ -69,26 +70,55 @@ function App() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        setConnectionError(null);
+        
         // Check if Supabase is configured
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
         const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
         
         if (supabaseUrl && supabaseKey) {
+          console.log('Supabase configured, attempting connection...');
           setHasSupabase(true);
-          const { user } = await SupabaseAuthService.getCurrentSession();
-          if (user) {
-            setUser(user);
+          
+          // Set a timeout for the auth check
+          const authCheckPromise = SupabaseAuthService.getCurrentSession();
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Connection timeout')), 10000)
+          );
+          
+          try {
+            const { user, error } = await Promise.race([authCheckPromise, timeoutPromise]) as any;
+            
+            if (error) {
+              throw new Error(error);
+            }
+            
+            if (user) {
+              console.log('User authenticated:', user.name);
+              setUser(user);
+              setIsAuthenticated(true);
+            } else {
+              console.log('No authenticated user found');
+            }
+          } catch (authError) {
+            console.warn('Supabase auth check failed:', authError);
+            setConnectionError('Failed to connect to Supabase. Using demo mode.');
+            
+            // Fallback to demo mode
+            setHasSupabase(false);
+            setUser(mockUser);
             setIsAuthenticated(true);
           }
         } else {
-          // Fallback to demo mode with mock user
           console.log('Supabase not configured, using demo mode');
           setHasSupabase(false);
           setUser(mockUser);
           setIsAuthenticated(true);
         }
       } catch (error) {
-        console.error('Error checking auth:', error);
+        console.error('Error during app initialization:', error);
+        setConnectionError('Application initialization failed. Using demo mode.');
+        
         // Fallback to demo mode
         setHasSupabase(false);
         setUser(mockUser);
@@ -99,18 +129,32 @@ function App() {
     };
 
     checkAuth();
+  }, []);
 
-    // Only listen for auth state changes if Supabase is available
-    if (hasSupabase) {
-      const { data: { subscription } } = SupabaseAuthService.onAuthStateChange((user) => {
+  // Set up auth state listener only after initial check
+  useEffect(() => {
+    if (!hasSupabase || !isAuthenticated) return;
+
+    let subscription: any = null;
+    
+    try {
+      const { data } = SupabaseAuthService.onAuthStateChange((user) => {
+        console.log('Auth state changed:', user ? user.name : 'signed out');
         setUser(user);
         setIsAuthenticated(!!user);
-        setIsLoading(false);
       });
-
-      return () => subscription.unsubscribe();
+      
+      subscription = data?.subscription;
+    } catch (error) {
+      console.warn('Failed to set up auth state listener:', error);
     }
-  }, [hasSupabase]);
+
+    return () => {
+      if (subscription?.unsubscribe) {
+        subscription.unsubscribe();
+      }
+    };
+  }, [hasSupabase, isAuthenticated]);
 
   // Initialize social posts on first load
   useEffect(() => {
@@ -126,6 +170,7 @@ function App() {
   const handleSignIn = async (userData: User) => {
     setUser(userData);
     setIsAuthenticated(true);
+    setConnectionError(null);
   };
 
   const handleSignOut = async () => {
@@ -136,8 +181,13 @@ function App() {
       setUser(null);
       setIsAuthenticated(false);
       setActiveTab('home');
+      setConnectionError(null);
     } catch (error) {
       console.error('Error signing out:', error);
+      // Force sign out even if there's an error
+      setUser(null);
+      setIsAuthenticated(false);
+      setActiveTab('home');
     }
   };
 
@@ -162,12 +212,16 @@ function App() {
 
     // Update in Supabase if available
     if (hasSupabase) {
-      await SupabaseAuthService.updateWalkingDistance(
-        user.id,
-        newDailyDistance,
-        newTotalDistance,
-        today
-      );
+      try {
+        await SupabaseAuthService.updateWalkingDistance(
+          user.id,
+          newDailyDistance,
+          newTotalDistance,
+          today
+        );
+      } catch (error) {
+        console.warn('Failed to update walking distance in Supabase:', error);
+      }
     }
   };
 
@@ -188,7 +242,11 @@ function App() {
 
     // Update in Supabase if available
     if (hasSupabase) {
-      await SupabaseAuthService.updateUserCoins(user.id, newCoinBalance);
+      try {
+        await SupabaseAuthService.updateUserCoins(user.id, newCoinBalance);
+      } catch (error) {
+        console.warn('Failed to update coins in Supabase:', error);
+      }
     }
 
     // Create transaction record
@@ -224,7 +282,11 @@ function App() {
 
     // Update in Supabase if available
     if (hasSupabase) {
-      await SupabaseAuthService.updateUserCoins(user.id, newCoinBalance);
+      try {
+        await SupabaseAuthService.updateUserCoins(user.id, newCoinBalance);
+      } catch (error) {
+        console.warn('Failed to update coins in Supabase:', error);
+      }
     }
 
     // Create transaction record
@@ -290,18 +352,22 @@ function App() {
 
       // Update in Supabase if available
       if (hasSupabase) {
-        await SupabaseAuthService.updateUserProgress(user.id, newXP, newLevel, user.mythicCoins);
-        await SupabaseAuthService.updateQuestsCompleted(user.id, newQuestsCompleted);
-        
-        // Record quest completion in Supabase
-        const questCoinReward = completedQuest.coinReward || CoinSystem.calculateQuestReward(completedQuest.type, completedQuest.difficulty);
-        await SupabaseAuthService.recordQuestCompletion(
-          user.id,
-          completedQuest.title,
-          completedQuest.type,
-          completedQuest.xpReward,
-          questCoinReward
-        );
+        try {
+          await SupabaseAuthService.updateUserProgress(user.id, newXP, newLevel, user.mythicCoins);
+          await SupabaseAuthService.updateQuestsCompleted(user.id, newQuestsCompleted);
+          
+          // Record quest completion in Supabase
+          const questCoinReward = completedQuest.coinReward || CoinSystem.calculateQuestReward(completedQuest.type, completedQuest.difficulty);
+          await SupabaseAuthService.recordQuestCompletion(
+            user.id,
+            completedQuest.title,
+            completedQuest.type,
+            completedQuest.xpReward,
+            questCoinReward
+          );
+        } catch (error) {
+          console.warn('Failed to update progress in Supabase:', error);
+        }
       }
 
       // Award coins for quest completion
@@ -368,18 +434,22 @@ function App() {
 
     // Update in Supabase if available
     if (hasSupabase) {
-      await SupabaseAuthService.updateUserProgress(user.id, newXP, newLevel, user.mythicCoins);
-      await SupabaseAuthService.updateQuestsCompleted(user.id, newQuestsCompleted);
-      
-      // Record location quest completion
-      const locationCoinReward = CoinSystem.calculateQuestReward('location', 'medium');
-      await SupabaseAuthService.recordQuestCompletion(
-        user.id,
-        'Location-based wellness quest',
-        'location',
-        xpReward,
-        locationCoinReward
-      );
+      try {
+        await SupabaseAuthService.updateUserProgress(user.id, newXP, newLevel, user.mythicCoins);
+        await SupabaseAuthService.updateQuestsCompleted(user.id, newQuestsCompleted);
+        
+        // Record location quest completion
+        const locationCoinReward = CoinSystem.calculateQuestReward('location', 'medium');
+        await SupabaseAuthService.recordQuestCompletion(
+          user.id,
+          'Location-based wellness quest',
+          'location',
+          xpReward,
+          locationCoinReward
+        );
+      } catch (error) {
+        console.warn('Failed to update progress in Supabase:', error);
+      }
     }
 
     // Award coins for location quest completion
@@ -434,20 +504,26 @@ function App() {
     
     // Save chronicle to Supabase if available
     if (hasSupabase) {
-      const savedChronicle = await SupabaseService.createChronicle(
-        user.id,
-        chronicle.title,
-        chronicle.content,
-        chronicle.mood,
-        chronicle.weekNumber,
-        chronicle.xpGained,
-        chronicle.coinsEarned,
-        chronicle.imageUrl,
-        chronicle.isPrivate || false
-      );
-      
-      if (savedChronicle) {
-        setChronicles(prev => [savedChronicle, ...prev]);
+      try {
+        const savedChronicle = await SupabaseService.createChronicle(
+          user.id,
+          chronicle.title,
+          chronicle.content,
+          chronicle.mood,
+          chronicle.weekNumber,
+          chronicle.xpGained,
+          chronicle.coinsEarned,
+          chronicle.imageUrl,
+          chronicle.isPrivate || false
+        );
+        
+        if (savedChronicle) {
+          setChronicles(prev => [savedChronicle, ...prev]);
+        }
+      } catch (error) {
+        console.warn('Failed to save chronicle to Supabase:', error);
+        // Fallback to local storage
+        setChronicles(prev => [chronicle, ...prev]);
       }
     } else {
       // Local storage fallback
@@ -485,11 +561,9 @@ function App() {
         <div className="relative z-10 text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-amber-500 mx-auto mb-4"></div>
           <p className="text-amber-100 font-cinzel text-xl">Loading Mythic Quest...</p>
-          {!hasSupabase && (
-            <p className="text-amber-200 font-merriweather text-sm mt-2">
-              Running in demo mode - Supabase not configured
-            </p>
-          )}
+          <p className="text-amber-200 font-merriweather text-sm mt-2">
+            Connecting to your wellness realm...
+          </p>
         </div>
       </div>
     );
@@ -596,8 +670,17 @@ function App() {
       {/* Background overlay */}
       <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-black/40 pointer-events-none" />
       
+      {/* Connection status banner */}
+      {connectionError && (
+        <div className="fixed top-0 left-0 right-0 bg-orange-600 text-white text-center py-2 z-50">
+          <p className="text-sm font-cinzel">
+            ⚠️ {connectionError}
+          </p>
+        </div>
+      )}
+      
       {/* Demo mode banner */}
-      {!hasSupabase && (
+      {!hasSupabase && !connectionError && (
         <div className="fixed top-0 left-0 right-0 bg-amber-600 text-white text-center py-2 z-50">
           <p className="text-sm font-cinzel">
             🎮 Demo Mode - Experience the full Mythic Quest adventure! 
@@ -614,7 +697,7 @@ function App() {
         quests={quests}
       />
       
-      <main className={`relative ${!hasSupabase ? 'pt-28' : 'pt-20'} pb-6`}>
+      <main className={`relative ${(!hasSupabase || connectionError) ? 'pt-28' : 'pt-20'} pb-6`}>
         <div className="container mx-auto px-4">
           <div className="relative backdrop-blur-sm bg-white/80 rounded-2xl shadow-xl border border-amber-100/20 overflow-hidden">
             <div className="absolute inset-0 border-4 border-amber-500/10 rounded-2xl pointer-events-none" />

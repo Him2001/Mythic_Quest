@@ -17,15 +17,15 @@ export class SupabaseService {
       const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
-        .eq('id', userId);
+        .eq('id', userId)
+        .single();
 
       if (error) {
         console.error('Error fetching user profile:', error);
         return null;
       }
 
-      // Return the first profile if it exists, otherwise null
-      return data && data.length > 0 ? data[0] : null;
+      return data;
     } catch (error) {
       console.error('Error in getUserProfile:', error);
       return null;
@@ -793,21 +793,26 @@ export class SupabaseService {
     }
   }
 
-  // Real-time subscriptions
+  // Real-time subscriptions with error handling
   static subscribeToUserUpdates(userId: string, callback: (payload: any) => void) {
     if (!this.isAvailable()) {
       return { unsubscribe: () => {} }; // Mock subscription in demo mode
     }
 
-    return supabase
-      .channel(`user_${userId}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'user_profiles',
-        filter: `id=eq.${userId}`
-      }, callback)
-      .subscribe();
+    try {
+      return supabase
+        .channel(`user_${userId}`)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'user_profiles',
+          filter: `id=eq.${userId}`
+        }, callback)
+        .subscribe();
+    } catch (error) {
+      console.warn('Failed to subscribe to user updates:', error);
+      return { unsubscribe: () => {} };
+    }
   }
 
   static subscribeToConversation(conversationId: string, callback: (payload: any) => void) {
@@ -815,15 +820,20 @@ export class SupabaseService {
       return { unsubscribe: () => {} }; // Mock subscription in demo mode
     }
 
-    return supabase
-      .channel(`conversation_${conversationId}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'messages',
-        filter: `conversation_id=eq.${conversationId}`
-      }, callback)
-      .subscribe();
+    try {
+      return supabase
+        .channel(`conversation_${conversationId}`)
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation_id=eq.${conversationId}`
+        }, callback)
+        .subscribe();
+    } catch (error) {
+      console.warn('Failed to subscribe to conversation:', error);
+      return { unsubscribe: () => {} };
+    }
   }
 
   static subscribeToFeedUpdates(callback: (payload: any) => void) {
@@ -831,14 +841,19 @@ export class SupabaseService {
       return { unsubscribe: () => {} }; // Mock subscription in demo mode
     }
 
-    return supabase
-      .channel('feed_updates')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'posts'
-      }, callback)
-      .subscribe();
+    try {
+      return supabase
+        .channel('feed_updates')
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'posts'
+        }, callback)
+        .subscribe();
+    } catch (error) {
+      console.warn('Failed to subscribe to feed updates:', error);
+      return { unsubscribe: () => {} };
+    }
   }
 
   // Analytics and Stats
