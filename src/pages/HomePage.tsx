@@ -30,6 +30,7 @@ const HomePage: React.FC<HomePageProps> = ({
   showCoinAnimation = false,
   onCoinAnimationComplete
 }) => {
+  const [avatarMessage, setAvatarMessage] = useState<string>('');
   const [voiceText, setVoiceText] = useState<string>('');
   const [lastCoinCount, setLastCoinCount] = useState<number>(user.mythicCoins);
   const [lastLevel, setLastLevel] = useState<number>(user.level);
@@ -51,14 +52,41 @@ const HomePage: React.FC<HomePageProps> = ({
   const earnedCoins = user.mythicCoins;
   const coinProgress = totalPossibleCoins > 0 ? (earnedCoins / totalPossibleCoins) * 100 : 0;
   
-  // Welcome message on mount based on quest count (VOICE ONLY)
+  // Welcome message on mount based on quest count
   useEffect(() => {
     if (!hasInitialized) {
       const activeQuestCount = activeQuests.length;
-      const welcomeMessage = VoiceMessageService.getWelcomeMessage(user, activeQuestCount);
       
-      // Queue welcome message for voice (priority 1 - highest)
-      VoiceMessageService.queueMessage(welcomeMessage, 1);
+      // Set screen message based on quest count
+      let screenMessage = '';
+      if (activeQuestCount === 0) {
+        const noQuestMessages = [
+          "Behold! You have achieved the legendary status of 'Quest Master' - all adventures completed! The realm celebrates your dedication.",
+          "Magnificent! Your quest log stands empty, a testament to your unwavering commitment to wellness. What new challenges shall we discover?",
+          "Extraordinary! You've conquered every quest in sight. The mystical realm awaits your next great adventure!"
+        ];
+        screenMessage = noQuestMessages[Math.floor(Math.random() * noQuestMessages.length)];
+      } else if (activeQuestCount > 5) {
+        const lazyMessages = [
+          `Oh my! ${activeQuestCount} quests await your attention. Perhaps it's time to transform intention into action, brave adventurer?`,
+          `I see ${activeQuestCount} quests have gathered in your log like eager students. Shall we begin the lessons of completion?`,
+          `Your quest collection has grown to ${activeQuestCount} items! Time to turn this impressive library into legendary achievements.`
+        ];
+        screenMessage = lazyMessages[Math.floor(Math.random() * lazyMessages.length)];
+      } else {
+        const regularMessages = [
+          `You have ${activeQuestCount} quest${activeQuestCount > 1 ? 's' : ''} awaiting your attention. Each completed quest brings both XP and precious Mythic Coins to your treasury.`,
+          `${activeQuestCount} adventure${activeQuestCount > 1 ? 's' : ''} stand${activeQuestCount === 1 ? 's' : ''} ready for your heroic touch. Your wellness journey continues to unfold!`,
+          `The realm presents ${activeQuestCount} quest${activeQuestCount > 1 ? 's' : ''} for your consideration. Each victory strengthens both body and spirit.`
+        ];
+        screenMessage = regularMessages[Math.floor(Math.random() * regularMessages.length)];
+      }
+      
+      setAvatarMessage(screenMessage);
+      
+      // Queue DIFFERENT welcome message for voice (priority 1 - highest)
+      const voiceWelcomeMessage = VoiceMessageService.getWelcomeMessage(user, activeQuestCount);
+      VoiceMessageService.queueMessage(voiceWelcomeMessage, 1);
       
       setHasInitialized(true);
     }
@@ -126,6 +154,7 @@ const HomePage: React.FC<HomePageProps> = ({
           <div className="bg-gradient-to-b from-purple-50 to-white rounded-2xl p-6 shadow-md mb-6">
             <AvatarDisplay 
               avatar={avatar} 
+              message={avatarMessage}
             />
           </div>
           
