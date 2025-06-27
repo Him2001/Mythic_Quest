@@ -1,49 +1,70 @@
 /*
-  # Complete Mythic Quest Backend Schema
+  # Fix Policy Conflicts - Complete Database Setup
 
-  1. New Tables
-    - `user_profiles` - Enhanced user data with wellness tracking
-    - `quests_completed` - Track every completed quest with rewards
-    - `posts` - Social feed posts with media support
-    - `messages` - Chat messages between users
-    - `conversations` - Conversation metadata and management
-    - `chronicles` - Weekly story entries and achievements
-    - `friendships` - User friendship connections
-    - `friend_requests` - Pending friend requests
-
-  2. Security
-    - Enable RLS on all tables
-    - Users can only access their own data
-    - Appropriate policies for social features
-    - Secure foreign key relationships
-
-  3. Real-time Features
-    - Automatic profile creation on signup
-    - Timestamp management
-    - Data integrity constraints
+  1. Drop all existing policies safely
+  2. Recreate all tables and policies
+  3. Ensure proper RLS and security
+  4. Handle all edge cases for existing objects
 */
 
--- Drop existing policies to avoid conflicts
+-- Drop all existing policies comprehensively
 DO $$ 
+DECLARE
+    r RECORD;
 BEGIN
-  -- Drop existing policies if they exist
-  DROP POLICY IF EXISTS "Users can read and update own profile" ON user_profiles;
-  DROP POLICY IF EXISTS "Users can read other profiles" ON user_profiles;
-  DROP POLICY IF EXISTS "Users can manage own quests" ON quests_completed;
-  DROP POLICY IF EXISTS "Users can manage own posts" ON posts;
-  DROP POLICY IF EXISTS "Users can read friends' posts" ON posts;
-  DROP POLICY IF EXISTS "Users can manage own likes" ON post_likes;
-  DROP POLICY IF EXISTS "Users can read all likes" ON post_likes;
-  DROP POLICY IF EXISTS "Users can manage own comments" ON post_comments;
-  DROP POLICY IF EXISTS "Users can read all comments" ON post_comments;
-  DROP POLICY IF EXISTS "Users can access own conversations" ON conversations;
-  DROP POLICY IF EXISTS "Users can access own messages" ON messages;
-  DROP POLICY IF EXISTS "Users can manage own chronicles" ON chronicles;
-  DROP POLICY IF EXISTS "Users can read friends' public chronicles" ON chronicles;
-  DROP POLICY IF EXISTS "Users can manage own friend requests" ON friend_requests;
-  DROP POLICY IF EXISTS "Users can access own friendships" ON friendships;
+    -- Drop all policies on user_profiles
+    FOR r IN (SELECT policyname FROM pg_policies WHERE tablename = 'user_profiles') LOOP
+        EXECUTE 'DROP POLICY IF EXISTS "' || r.policyname || '" ON user_profiles';
+    END LOOP;
+    
+    -- Drop all policies on quests_completed
+    FOR r IN (SELECT policyname FROM pg_policies WHERE tablename = 'quests_completed') LOOP
+        EXECUTE 'DROP POLICY IF EXISTS "' || r.policyname || '" ON quests_completed';
+    END LOOP;
+    
+    -- Drop all policies on posts
+    FOR r IN (SELECT policyname FROM pg_policies WHERE tablename = 'posts') LOOP
+        EXECUTE 'DROP POLICY IF EXISTS "' || r.policyname || '" ON posts';
+    END LOOP;
+    
+    -- Drop all policies on post_likes
+    FOR r IN (SELECT policyname FROM pg_policies WHERE tablename = 'post_likes') LOOP
+        EXECUTE 'DROP POLICY IF EXISTS "' || r.policyname || '" ON post_likes';
+    END LOOP;
+    
+    -- Drop all policies on post_comments
+    FOR r IN (SELECT policyname FROM pg_policies WHERE tablename = 'post_comments') LOOP
+        EXECUTE 'DROP POLICY IF EXISTS "' || r.policyname || '" ON post_comments';
+    END LOOP;
+    
+    -- Drop all policies on conversations
+    FOR r IN (SELECT policyname FROM pg_policies WHERE tablename = 'conversations') LOOP
+        EXECUTE 'DROP POLICY IF EXISTS "' || r.policyname || '" ON conversations';
+    END LOOP;
+    
+    -- Drop all policies on messages
+    FOR r IN (SELECT policyname FROM pg_policies WHERE tablename = 'messages') LOOP
+        EXECUTE 'DROP POLICY IF EXISTS "' || r.policyname || '" ON messages';
+    END LOOP;
+    
+    -- Drop all policies on chronicles
+    FOR r IN (SELECT policyname FROM pg_policies WHERE tablename = 'chronicles') LOOP
+        EXECUTE 'DROP POLICY IF EXISTS "' || r.policyname || '" ON chronicles';
+    END LOOP;
+    
+    -- Drop all policies on friend_requests
+    FOR r IN (SELECT policyname FROM pg_policies WHERE tablename = 'friend_requests') LOOP
+        EXECUTE 'DROP POLICY IF EXISTS "' || r.policyname || '" ON friend_requests';
+    END LOOP;
+    
+    -- Drop all policies on friendships
+    FOR r IN (SELECT policyname FROM pg_policies WHERE tablename = 'friendships') LOOP
+        EXECUTE 'DROP POLICY IF EXISTS "' || r.policyname || '" ON friendships';
+    END LOOP;
 EXCEPTION
-  WHEN undefined_object THEN NULL;
+    WHEN OTHERS THEN
+        -- Continue if any errors occur
+        NULL;
 END $$;
 
 -- Enhanced user profiles table (extend existing if needed)
@@ -75,7 +96,7 @@ BEGIN
   END IF;
 END $$;
 
--- Quests completed tracking
+-- Create all tables with IF NOT EXISTS
 CREATE TABLE IF NOT EXISTS quests_completed (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid REFERENCES user_profiles(id) ON DELETE CASCADE NOT NULL,
@@ -86,7 +107,6 @@ CREATE TABLE IF NOT EXISTS quests_completed (
   date_completed timestamptz DEFAULT now() NOT NULL
 );
 
--- Social posts
 CREATE TABLE IF NOT EXISTS posts (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid REFERENCES user_profiles(id) ON DELETE CASCADE NOT NULL,
@@ -105,7 +125,6 @@ CREATE TABLE IF NOT EXISTS posts (
   updated_at timestamptz DEFAULT now() NOT NULL
 );
 
--- Post likes
 CREATE TABLE IF NOT EXISTS post_likes (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   post_id uuid REFERENCES posts(id) ON DELETE CASCADE NOT NULL,
@@ -114,7 +133,6 @@ CREATE TABLE IF NOT EXISTS post_likes (
   UNIQUE(post_id, user_id)
 );
 
--- Post comments
 CREATE TABLE IF NOT EXISTS post_comments (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   post_id uuid REFERENCES posts(id) ON DELETE CASCADE NOT NULL,
@@ -123,7 +141,6 @@ CREATE TABLE IF NOT EXISTS post_comments (
   created_at timestamptz DEFAULT now() NOT NULL
 );
 
--- Conversations
 CREATE TABLE IF NOT EXISTS conversations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user1_id uuid REFERENCES user_profiles(id) ON DELETE CASCADE NOT NULL,
@@ -135,7 +152,6 @@ CREATE TABLE IF NOT EXISTS conversations (
   CHECK (user1_id != user2_id)
 );
 
--- Messages
 CREATE TABLE IF NOT EXISTS messages (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   conversation_id uuid REFERENCES conversations(id) ON DELETE CASCADE NOT NULL,
@@ -148,7 +164,6 @@ CREATE TABLE IF NOT EXISTS messages (
   timestamp timestamptz DEFAULT now() NOT NULL
 );
 
--- Chronicles (weekly story entries)
 CREATE TABLE IF NOT EXISTS chronicles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid REFERENCES user_profiles(id) ON DELETE CASCADE NOT NULL,
@@ -163,7 +178,6 @@ CREATE TABLE IF NOT EXISTS chronicles (
   date_created timestamptz DEFAULT now() NOT NULL
 );
 
--- Friend requests
 CREATE TABLE IF NOT EXISTS friend_requests (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   sender_id uuid REFERENCES user_profiles(id) ON DELETE CASCADE NOT NULL,
@@ -175,7 +189,6 @@ CREATE TABLE IF NOT EXISTS friend_requests (
   CHECK (sender_id != receiver_id)
 );
 
--- Friendships
 CREATE TABLE IF NOT EXISTS friendships (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user1_id uuid REFERENCES user_profiles(id) ON DELETE CASCADE NOT NULL,
@@ -197,37 +210,35 @@ ALTER TABLE chronicles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE friend_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE friendships ENABLE ROW LEVEL SECURITY;
 
--- User Profiles Policies
-CREATE POLICY "Users can read and update own profile"
+-- Create all policies with unique names to avoid conflicts
+CREATE POLICY "profile_own_access"
   ON user_profiles
   FOR ALL
   TO authenticated
   USING (auth.uid() = id)
   WITH CHECK (auth.uid() = id);
 
-CREATE POLICY "Users can read other profiles"
+CREATE POLICY "profile_read_others"
   ON user_profiles
   FOR SELECT
   TO authenticated
   USING (true);
 
--- Quests Completed Policies
-CREATE POLICY "Users can manage own quests"
+CREATE POLICY "quest_own_management"
   ON quests_completed
   FOR ALL
   TO authenticated
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
 
--- Posts Policies
-CREATE POLICY "Users can manage own posts"
+CREATE POLICY "post_own_management"
   ON posts
   FOR ALL
   TO authenticated
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY "Users can read friends posts"
+CREATE POLICY "post_friend_read_access"
   ON posts
   FOR SELECT
   TO authenticated
@@ -240,59 +251,54 @@ CREATE POLICY "Users can read friends posts"
     )
   );
 
--- Post Likes Policies
-CREATE POLICY "Users can manage own likes"
+CREATE POLICY "like_own_management"
   ON post_likes
   FOR ALL
   TO authenticated
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY "Users can read all likes"
+CREATE POLICY "like_read_all"
   ON post_likes
   FOR SELECT
   TO authenticated
   USING (true);
 
--- Post Comments Policies
-CREATE POLICY "Users can manage own comments"
+CREATE POLICY "comment_own_management"
   ON post_comments
   FOR ALL
   TO authenticated
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY "Users can read all comments"
+CREATE POLICY "comment_read_all"
   ON post_comments
   FOR SELECT
   TO authenticated
   USING (true);
 
--- Conversations Policies
-CREATE POLICY "Users can access own conversations"
+CREATE POLICY "conversation_participant_access"
   ON conversations
   FOR ALL
   TO authenticated
   USING (auth.uid() = user1_id OR auth.uid() = user2_id)
   WITH CHECK (auth.uid() = user1_id OR auth.uid() = user2_id);
 
--- Messages Policies
-CREATE POLICY "Users can access own messages"
+CREATE POLICY "message_participant_access"
   ON messages
   FOR ALL
   TO authenticated
   USING (auth.uid() = sender_id OR auth.uid() = receiver_id)
   WITH CHECK (auth.uid() = sender_id OR auth.uid() = receiver_id);
 
--- Chronicles Policies
-CREATE POLICY "Users can manage own chronicles"
+CREATE POLICY "chronicle_own_management"
   ON chronicles
   FOR ALL
   TO authenticated
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY "Users can read friends public chronicles"
+CREATE POLICY "chronicle_friend_read_public"
   ON chronicles
   FOR SELECT
   TO authenticated
@@ -305,16 +311,14 @@ CREATE POLICY "Users can read friends public chronicles"
     ))
   );
 
--- Friend Requests Policies
-CREATE POLICY "Users can manage own friend requests"
+CREATE POLICY "friend_request_participant_access"
   ON friend_requests
   FOR ALL
   TO authenticated
   USING (auth.uid() = sender_id OR auth.uid() = receiver_id)
   WITH CHECK (auth.uid() = sender_id OR auth.uid() = receiver_id);
 
--- Friendships Policies
-CREATE POLICY "Users can access own friendships"
+CREATE POLICY "friendship_participant_access"
   ON friendships
   FOR ALL
   TO authenticated
@@ -322,8 +326,6 @@ CREATE POLICY "Users can access own friendships"
   WITH CHECK (auth.uid() = user1_id OR auth.uid() = user2_id);
 
 -- Functions and Triggers
-
--- Function to automatically create user profile on signup
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger AS $$
 BEGIN
@@ -339,13 +341,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Trigger to create profile on user signup
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
 
--- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION public.update_updated_at_column()
 RETURNS trigger AS $$
 BEGIN
@@ -354,7 +354,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Triggers for updated_at
 DROP TRIGGER IF EXISTS update_user_profiles_updated_at ON user_profiles;
 CREATE TRIGGER update_user_profiles_updated_at
   BEFORE UPDATE ON user_profiles
@@ -370,7 +369,6 @@ CREATE TRIGGER update_friend_requests_updated_at
   BEFORE UPDATE ON friend_requests
   FOR EACH ROW EXECUTE PROCEDURE public.update_updated_at_column();
 
--- Function to update conversation last_updated
 CREATE OR REPLACE FUNCTION public.update_conversation_timestamp()
 RETURNS trigger AS $$
 BEGIN
@@ -381,13 +379,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Trigger to update conversation on new message
 DROP TRIGGER IF EXISTS update_conversation_on_message ON messages;
 CREATE TRIGGER update_conversation_on_message
   AFTER INSERT ON messages
   FOR EACH ROW EXECUTE PROCEDURE public.update_conversation_timestamp();
 
--- Function to update post counts
 CREATE OR REPLACE FUNCTION public.update_post_likes_count()
 RETURNS trigger AS $$
 BEGIN
@@ -416,7 +412,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Triggers for post counts
 DROP TRIGGER IF EXISTS update_likes_count ON post_likes;
 CREATE TRIGGER update_likes_count
   AFTER INSERT OR DELETE ON post_likes
