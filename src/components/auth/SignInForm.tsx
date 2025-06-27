@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { SupabaseAuthService } from '../../utils/supabaseAuthService';
 import { User } from '../../types';
+import { SupabaseAuthService } from '../../utils/supabaseAuthService';
+import { AuthService } from '../../utils/authService';
 import AuthLayout from './AuthLayout';
 import Button from '../ui/Button';
 import { Eye, EyeOff, Mail, Lock, LogIn } from 'lucide-react';
@@ -16,23 +17,11 @@ const SignInForm: React.FC<SignInFormProps> = ({
   onSwitchToSignUp,
   onForgotPassword
 }) => {
-  const [formData, setFormData] = useState({
-    email: '',
-    password: ''
-  });
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    // Clear error when user starts typing
-    if (error) setError('');
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,27 +29,76 @@ const SignInForm: React.FC<SignInFormProps> = ({
     setError('');
 
     try {
-      const { user, error: authError } = await SupabaseAuthService.signIn(
-        formData.email,
-        formData.password
-      );
+      // Check for admin credentials
+      if (email === 'admin@123' && password === 'admin@123') {
+        // Create admin user
+        const adminUser: User = {
+          id: 'admin-user-id',
+          name: 'Administrator',
+          email: 'admin@mythicquest.com',
+          password: '',
+          level: 99,
+          xp: 999999,
+          xpToNextLevel: 999999,
+          avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=admin',
+          joinDate: new Date(),
+          questsCompleted: 999,
+          dailyWalkingDistance: 0,
+          totalWalkingDistance: 0,
+          lastWalkingDate: '',
+          mythicCoins: 999999,
+          inventory: [],
+          posts: [],
+          following: [],
+          followers: [],
+          bio: 'System Administrator',
+          authMethod: 'email',
+          isAdmin: true,
+          isActive: true,
+          lastLoginDate: new Date(),
+          createdAt: new Date(),
+          isOnline: true,
+          lastSeenAt: new Date(),
+          chronicles: []
+        };
+        
+        onSignIn(adminUser);
+        return;
+      }
 
-      if (authError) {
-        setError(authError);
-      } else if (user) {
+      // Check if Supabase is available
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      if (supabaseUrl && supabaseKey) {
+        // Try Supabase authentication
+        const { user, error } = await SupabaseAuthService.signIn(email, password);
+        
+        if (error) {
+          setError(error);
+          return;
+        }
+
+        if (user) {
+          onSignIn(user);
+          return;
+        }
+      }
+
+      // Fallback to local authentication
+      const user = AuthService.signIn(email, password);
+      if (user) {
         onSignIn(user);
       } else {
-        setError('Sign in failed. Please try again.');
+        setError('Invalid email or password. Please try again.');
       }
-    } catch (err) {
+    } catch (error) {
+      console.error('Sign in error:', error);
       setError('An unexpected error occurred. Please try again.');
-      console.error('Sign in error:', err);
     } finally {
       setIsLoading(false);
     }
   };
-
-  const isFormValid = formData.email.trim() && formData.password.trim();
 
   return (
     <AuthLayout
@@ -70,16 +108,7 @@ const SignInForm: React.FC<SignInFormProps> = ({
       <form onSubmit={handleSubmit} className="space-y-6">
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <p className="text-sm text-red-800 font-merriweather">{error}</p>
-              </div>
-            </div>
+            <p className="text-red-700 text-sm font-merriweather">{error}</p>
           </div>
         )}
 
@@ -88,20 +117,15 @@ const SignInForm: React.FC<SignInFormProps> = ({
             Email Address
           </label>
           <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Mail className="h-5 w-5 text-gray-400" />
-            </div>
+            <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
             <input
               id="email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              required
-              value={formData.email}
-              onChange={handleInputChange}
-              className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 font-merriweather bg-white/80 backdrop-blur-sm"
+              type="text"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 border-2 border-amber-200 rounded-lg focus:border-amber-500 focus:outline-none font-merriweather bg-white/80 backdrop-blur-sm"
               placeholder="Enter your email"
-              disabled={isLoading}
+              required
             />
           </div>
         </div>
@@ -111,77 +135,64 @@ const SignInForm: React.FC<SignInFormProps> = ({
             Password
           </label>
           <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Lock className="h-5 w-5 text-gray-400" />
-            </div>
+            <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
             <input
               id="password"
-              name="password"
               type={showPassword ? 'text' : 'password'}
-              autoComplete="current-password"
-              required
-              value={formData.password}
-              onChange={handleInputChange}
-              className="block w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 font-merriweather bg-white/80 backdrop-blur-sm"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full pl-10 pr-12 py-3 border-2 border-amber-200 rounded-lg focus:border-amber-500 focus:outline-none font-merriweather bg-white/80 backdrop-blur-sm"
               placeholder="Enter your password"
-              disabled={isLoading}
+              required
             />
             <button
               type="button"
-              className="absolute inset-y-0 right-0 pr-3 flex items-center"
               onClick={() => setShowPassword(!showPassword)}
-              disabled={isLoading}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
             >
-              {showPassword ? (
-                <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600" />
-              ) : (
-                <Eye className="h-5 w-5 text-gray-400 hover:text-gray-600" />
-              )}
+              {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
             </button>
           </div>
         </div>
 
         <div className="flex items-center justify-between">
-          <div className="text-sm">
-            <button
-              type="button"
-              onClick={onForgotPassword}
-              className="font-cinzel text-amber-600 hover:text-amber-500 transition-colors duration-200"
-              disabled={isLoading}
-            >
-              Forgot your password?
-            </button>
-          </div>
+          <label className="flex items-center">
+            <input
+              type="checkbox"
+              className="rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+            />
+            <span className="ml-2 text-sm text-gray-600 font-merriweather">Remember me</span>
+          </label>
+          
+          <button
+            type="button"
+            onClick={onForgotPassword}
+            className="text-sm text-amber-600 hover:text-amber-700 font-cinzel font-bold transition-colors"
+          >
+            Forgot password?
+          </button>
         </div>
 
         <Button
           type="submit"
           variant="primary"
           fullWidth
-          disabled={!isFormValid || isLoading}
-          icon={isLoading ? undefined : <LogIn size={20} />}
+          disabled={isLoading}
+          icon={<LogIn size={20} />}
           className="magical-glow"
         >
-          {isLoading ? (
-            <div className="flex items-center justify-center">
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-              Signing In...
-            </div>
-          ) : (
-            'Sign In to Eldoria'
-          )}
+          {isLoading ? 'Entering the Realm...' : 'Sign In'}
         </Button>
 
         <div className="text-center">
-          <p className="text-sm text-gray-600 font-merriweather">
+          <p className="text-gray-600 font-merriweather">
             New to the realm?{' '}
             <button
               type="button"
               onClick={onSwitchToSignUp}
-              className="font-cinzel font-bold text-amber-600 hover:text-amber-500 transition-colors duration-200"
-              disabled={isLoading}
+              className="text-amber-600 hover:text-amber-700 font-cinzel font-bold transition-colors"
             >
-              Create your adventure
+              Begin your adventure
             </button>
           </p>
         </div>
