@@ -36,7 +36,6 @@ const HomePage: React.FC<HomePageProps> = ({
   const [lastLevel, setLastLevel] = useState<number>(user.level);
   const [lastWalkingDistance, setLastWalkingDistance] = useState<number>(user.totalWalkingDistance);
   const [hasInitialized, setHasInitialized] = useState<boolean>(false);
-  const [isAudioMuted, setIsAudioMuted] = useState(true);
   
   // Get active quests
   const activeQuests = quests.filter(quest => !quest.completed).slice(0, 3);
@@ -47,24 +46,6 @@ const HomePage: React.FC<HomePageProps> = ({
     }
     return `${Math.round(meters)} m`;
   };
-
-  // Listen for audio state changes
-  useEffect(() => {
-    const handleAudioStateChange = (event: CustomEvent) => {
-      setIsAudioMuted(event.detail.muted);
-    };
-
-    // Get initial state
-    const saved = localStorage.getItem('mythic_audio_muted');
-    setIsAudioMuted(saved ? JSON.parse(saved) : true);
-
-    // Listen for changes
-    window.addEventListener('audioStateChanged', handleAudioStateChange as EventListener);
-
-    return () => {
-      window.removeEventListener('audioStateChanged', handleAudioStateChange as EventListener);
-    };
-  }, []);
 
   // Calculate coin statistics
   const totalPossibleCoins = quests.length * 20; // Assuming 20 coins per quest
@@ -144,10 +125,10 @@ const HomePage: React.FC<HomePageProps> = ({
     }
   }, [user.totalWalkingDistance, lastWalkingDistance, hasInitialized, user]);
 
-  // Voice message queue processor - only process when audio is unmuted
+  // Voice message queue processor - ALWAYS process (no audio mute check)
   useEffect(() => {
     const processVoiceQueue = () => {
-      if (!isAudioMuted && !VoiceMessageService.getIsPlaying() && VoiceMessageService.hasQueuedMessages()) {
+      if (!VoiceMessageService.getIsPlaying() && VoiceMessageService.hasQueuedMessages()) {
         const nextMessage = VoiceMessageService.getNextMessage();
         if (nextMessage) {
           setVoiceText(nextMessage);
@@ -158,7 +139,7 @@ const HomePage: React.FC<HomePageProps> = ({
 
     const interval = setInterval(processVoiceQueue, 1000); // Check every second
     return () => clearInterval(interval);
-  }, [isAudioMuted]);
+  }, []); // No dependencies - always run
 
   const handleVoiceComplete = () => {
     VoiceMessageService.setPlaying(false);
@@ -358,8 +339,8 @@ const HomePage: React.FC<HomePageProps> = ({
         </a>
       </div>
       
-      {/* Voice integration - only plays when audio is unmuted */}
-      {voiceText && !isAudioMuted && (
+      {/* Voice integration - ALWAYS plays when there's voice text */}
+      {voiceText && (
         <ElevenLabsVoice 
           text={voiceText} 
           voiceId="MezYwaNLTOfydzsFJwwt"
