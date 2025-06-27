@@ -47,28 +47,31 @@ const ChroniclesPage: React.FC<ChroniclesPageProps> = ({ user, onUserUpdate }) =
     }
   };
 
-  const handleGenerateWeeklyChronicle = async () => {
+  const generateFantasyTale = async () => {
     setIsGenerating(true);
     try {
-      // Use the local chronicle service for generation, then save to Supabase
-      await ChronicleService.generateWeeklyChronicle(user.id);
-      loadChronicles();
+      // Generate a fantasy tale based on user's achievements
+      const tale = await generateUserFantasyTale(user);
+      
+      // Create chronicle entry
+      const chronicle = await SupabaseService.createChronicle(
+        user.id,
+        tale.title,
+        tale.content,
+        tale.mood,
+        getCurrentWeekNumber(),
+        tale.xpGained,
+        tale.coinsEarned,
+        tale.imageUrl,
+        false // Public by default
+      );
+      
+      if (chronicle) {
+        loadChronicles();
+      }
     } catch (error) {
-      console.error('Failed to generate chronicle:', error);
-      alert('Failed to generate weekly chronicle. Please try again.');
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const handleGenerateMissingChronicles = async () => {
-    setIsGenerating(true);
-    try {
-      await ChronicleService.generateMissingChronicles(user.id, 4);
-      loadChronicles();
-    } catch (error) {
-      console.error('Failed to generate missing chronicles:', error);
-      alert('Failed to generate missing chronicles. Please try again.');
+      console.error('Failed to generate fantasy tale:', error);
+      alert('Failed to generate your fantasy tale. Please try again.');
     } finally {
       setIsGenerating(false);
     }
@@ -133,30 +136,20 @@ const ChroniclesPage: React.FC<ChroniclesPageProps> = ({ user, onUserUpdate }) =
                 Chronicles of Eldoria
               </h1>
               <p className="text-amber-700 font-merriweather">
-                Weekly tales of your wellness journey, narrated by Eldrin the Mage
+                Epic tales of your wellness journey, woven by the mystical realm
               </p>
             </div>
           </div>
           
           <div className="flex items-center space-x-3">
             <Button
-              variant="outline"
-              onClick={handleGenerateMissingChronicles}
-              disabled={isGenerating}
-              icon={<RefreshCw size={16} className={isGenerating ? 'animate-spin' : ''} />}
-              className="magical-glow"
-            >
-              Generate Missing
-            </Button>
-            
-            <Button
               variant="primary"
-              onClick={handleGenerateWeeklyChronicle}
+              onClick={generateFantasyTale}
               disabled={isGenerating}
               icon={<PenTool size={16} />}
               className="magical-glow"
             >
-              {isGenerating ? 'Generating...' : 'Generate This Week'}
+              {isGenerating ? 'Weaving Tale...' : 'Generate Epic Tale'}
             </Button>
           </div>
         </div>
@@ -232,16 +225,16 @@ const ChroniclesPage: React.FC<ChroniclesPageProps> = ({ user, onUserUpdate }) =
                 No Chronicles Yet
               </h3>
               <p className="text-gray-500 font-merriweather mb-4">
-                Your weekly wellness adventures await chronicling by Eldrin the Mage!
+                Your epic wellness adventures await chronicling by the mystical realm!
               </p>
               <Button
                 variant="primary"
-                onClick={handleGenerateWeeklyChronicle}
+                onClick={generateFantasyTale}
                 disabled={isGenerating}
                 icon={<PenTool size={16} />}
                 className="magical-glow"
               >
-                {isGenerating ? 'Generating...' : 'Create Your First Chronicle'}
+                {isGenerating ? 'Weaving Tale...' : 'Create Your First Epic Tale'}
               </Button>
             </div>
           ) : (
@@ -423,5 +416,138 @@ const ChroniclesPage: React.FC<ChroniclesPageProps> = ({ user, onUserUpdate }) =
     </div>
   );
 };
+
+// Fantasy Tale Generator based on user achievements
+async function generateUserFantasyTale(user: User): Promise<{
+  title: string;
+  content: string;
+  mood: string;
+  xpGained: number;
+  coinsEarned: number;
+  imageUrl: string;
+}> {
+  // Analyze user's achievements
+  const level = user.level;
+  const questsCompleted = user.questsCompleted;
+  const coinsEarned = user.mythicCoins;
+  const walkingDistance = Math.floor(user.totalWalkingDistance / 1000); // km
+  
+  // Generate title based on achievements
+  const titles = [
+    `The Legend of ${user.name}: Chapter ${level}`,
+    `${user.name} and the ${questsCompleted > 50 ? 'Hundred' : questsCompleted > 20 ? 'Many' : 'First'} Quests`,
+    `The Chronicles of ${user.name}: The ${getAchievementTitle(level, questsCompleted)}`,
+    `${user.name}'s Journey Through the Mystical Realm`,
+    `The Wellness Warrior: ${user.name}'s Epic Tale`
+  ];
+  
+  const title = titles[Math.floor(Math.random() * titles.length)];
+  
+  // Generate epic fantasy content
+  const content = generateEpicContent(user, level, questsCompleted, coinsEarned, walkingDistance);
+  
+  // Determine mood based on achievements
+  const mood = determineMood(level, questsCompleted);
+  
+  // Select thematic image
+  const imageUrl = selectFantasyImage(level, questsCompleted);
+  
+  return {
+    title,
+    content,
+    mood,
+    xpGained: Math.floor(level * 10 + questsCompleted * 5),
+    coinsEarned: Math.floor(level * 25 + questsCompleted * 10),
+    imageUrl
+  };
+}
+
+function generateEpicContent(user: User, level: number, quests: number, coins: number, walkingKm: number): string {
+  const openings = [
+    `In the mystical realm of Eldoria, where wellness and magic intertwine, there lived a legendary adventurer known as ${user.name}.`,
+    `Long ago, in the enchanted lands where health and harmony reign supreme, ${user.name} began an extraordinary journey.`,
+    `Within the sacred boundaries of Eldoria, where every step strengthens both body and spirit, ${user.name} carved their legend.`,
+    `In times when the realm needed heroes most, ${user.name} answered the call to wellness and adventure.`
+  ];
+  
+  const achievements = [
+    `Through ${quests} completed quests, they proved their unwavering dedication to the path of wellness.`,
+    `Having reached the prestigious Level ${level}, ${user.name} commanded respect from all corners of the realm.`,
+    `With ${coins} Mythic Coins in their treasury, they became known as one of the realm's most prosperous adventurers.`,
+    walkingKm > 0 ? `Their feet had carried them across ${walkingKm} kilometers of mystical paths, each step a testament to their endurance.` : `Their journey had just begun, but already the realm whispered of their potential.`
+  ];
+  
+  const challenges = [
+    `But the path was not without its trials. Dark forces of laziness and doubt constantly threatened to derail their progress.`,
+    `Ancient curses of procrastination and self-doubt plagued the land, testing even the strongest of wills.`,
+    `The Shadow of Comfort Zone loomed large, tempting adventurers to abandon their noble quests.`,
+    `Mystical barriers of habit and routine stood between ${user.name} and their ultimate destiny.`
+  ];
+  
+  const victories = [
+    `Yet ${user.name} persevered, wielding the twin blades of Determination and Consistency against all odds.`,
+    `With each quest completed, their inner light grew brighter, illuminating the path for other adventurers.`,
+    `The ancient spirits of wellness blessed their journey, granting them strength beyond measure.`,
+    `Through meditation, movement, and mindful living, they unlocked powers that few could comprehend.`
+  ];
+  
+  const futures = [
+    `And so the legend continues, with each new day bringing fresh opportunities for growth and adventure.`,
+    `The realm watches with anticipation as ${user.name} writes the next chapter of their epic tale.`,
+    `Their story serves as inspiration to all who seek the path of wellness and self-improvement.`,
+    `In the annals of Eldoria, ${user.name}'s name shall be remembered as a true champion of wellness.`
+  ];
+  
+  const opening = openings[Math.floor(Math.random() * openings.length)];
+  const achievement = achievements[Math.floor(Math.random() * achievements.length)];
+  const challenge = challenges[Math.floor(Math.random() * challenges.length)];
+  const victory = victories[Math.floor(Math.random() * victories.length)];
+  const future = futures[Math.floor(Math.random() * futures.length)];
+  
+  return `${opening}\n\n${achievement} ${challenge}\n\n${victory}\n\n${future}\n\nThe mystical energies of Eldoria continue to flow through ${user.name}, empowering them for the adventures that lie ahead. Their wellness journey has become the stuff of legends, inspiring countless others to embark upon their own paths of transformation and growth.`;
+}
+
+function getAchievementTitle(level: number, quests: number): string {
+  if (level >= 20) return 'Grandmaster of Wellness';
+  if (level >= 15) return 'Master of Balance';
+  if (level >= 10) return 'Champion of Health';
+  if (level >= 5) return 'Guardian of Vitality';
+  if (quests >= 50) return 'Quest Conqueror';
+  if (quests >= 20) return 'Dedicated Seeker';
+  if (quests >= 10) return 'Rising Hero';
+  return 'Brave Beginner';
+}
+
+function determineMood(level: number, quests: number): string {
+  if (level >= 15 || quests >= 40) return 'triumphant';
+  if (level >= 10 || quests >= 20) return 'accomplished';
+  if (level >= 5 || quests >= 10) return 'determined';
+  return 'hopeful';
+}
+
+function selectFantasyImage(level: number, quests: number): string {
+  const images = [
+    'https://images.pexels.com/photos/2437291/pexels-photo-2437291.jpeg?auto=compress&cs=tinysrgb&w=800', // Mountain peak
+    'https://images.pexels.com/photos/4101555/pexels-photo-4101555.jpeg?auto=compress&cs=tinysrgb&w=800', // Magical forest
+    'https://images.pexels.com/photos/3822622/pexels-photo-3822622.jpeg?auto=compress&cs=tinysrgb&w=800', // Meditation scene
+    'https://images.pexels.com/photos/1898555/pexels-photo-1898555.jpeg?auto=compress&cs=tinysrgb&w=800', // Peaceful nature
+    'https://images.pexels.com/photos/6945775/pexels-photo-6945775.jpeg?auto=compress&cs=tinysrgb&w=800', // Wellness journey
+    'https://images.pexels.com/photos/4162449/pexels-photo-4162449.jpeg?auto=compress&cs=tinysrgb&w=800'  // Strength training
+  ];
+  
+  // Select image based on achievement level
+  if (level >= 15) return images[0]; // Mountain peak for high achievers
+  if (level >= 10) return images[1]; // Magical forest for intermediate
+  if (quests >= 20) return images[2]; // Meditation for quest masters
+  if (quests >= 10) return images[3]; // Nature for active users
+  return images[Math.floor(Math.random() * images.length)];
+}
+
+function getCurrentWeekNumber(): number {
+  const now = new Date();
+  const startOfYear = new Date(now.getFullYear(), 0, 1);
+  const daysSinceStart = Math.floor((now.getTime() - startOfYear.getTime()) / (24 * 60 * 60 * 1000));
+  return Math.ceil((daysSinceStart + startOfYear.getDay() + 1) / 7);
+}
 
 export default ChroniclesPage;
