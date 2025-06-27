@@ -1,10 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
+import React, { useEffect, useState, useRef } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from 'react-leaflet';
 import { Icon, LatLng } from 'leaflet';
 import { locationService } from '../../utils/locationService';
 import { routingService } from '../../utils/routingService';
-import { MapPin, Navigation, Award, Target, Route } from 'lucide-react';
+import { MagicalLocation } from '../../types';
 import 'leaflet/dist/leaflet.css';
+
+// Fix for default markers
+delete (Icon.Default.prototype as any)._getIconUrl;
+Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
 
 interface WellnessLocation {
   id: string;
@@ -26,61 +34,59 @@ interface LiveAdventureMapProps {
   markedPath?: WellnessLocation | null;
 }
 
-// Custom map component to handle location updates
-const MapController: React.FC<{
-  userLocation: { latitude: number; longitude: number } | null;
-  onLocationUpdate: (locations: WellnessLocation[]) => void;
+// Component to handle map updates
+const MapUpdater: React.FC<{
+  center: [number, number];
+  userLocation: [number, number] | null;
+  wellnessLocations: WellnessLocation[];
   markedPath?: WellnessLocation | null;
-  onPathUpdate: (path: [number, number][] | null) => void;
-}> = ({ userLocation, onLocationUpdate, markedPath, onPathUpdate }) => {
+}> = ({ center, userLocation, wellnessLocations, markedPath }) => {
   const map = useMap();
+  const [routeCoordinates, setRouteCoordinates] = useState<[number, number][]>([]);
 
   useEffect(() => {
-    if (userLocation) {
-      // Center map on user location
-      map.setView([userLocation.latitude, userLocation.longitude], 14);
-      
-      // Get nearby wellness locations
-      const nearbyLocations = locationService.getNearbyLocations(
-        userLocation.latitude,
-        userLocation.longitude,
-        10 // 10km radius
-      );
-      
-      console.log('Found nearby wellness locations:', nearbyLocations);
-      onLocationUpdate(nearbyLocations);
-    }
-  }, [userLocation, map, onLocationUpdate]);
+    map.setView(center, 13);
+  }, [map, center]);
 
-  // Handle marked path
+  // Handle path marking
   useEffect(() => {
     if (markedPath && userLocation) {
-      const drawPath = async () => {
+      const getRoute = async () => {
         try {
           const route = await routingService.getRoute(
-            { latitude: userLocation.latitude, longitude: userLocation.longitude },
+            { latitude: userLocation[0], longitude: userLocation[1] },
             { latitude: markedPath.latitude, longitude: markedPath.longitude }
           );
           
           if (route) {
-            onPathUpdate(route.coordinates);
+            setRouteCoordinates(route.coordinates as [number, number][]);
           }
         } catch (error) {
-          console.warn('Failed to get route, using straight line:', error);
-          onPathUpdate([
-            [userLocation.latitude, userLocation.longitude],
-            [markedPath.latitude, markedPath.longitude]
-          ]);
+          console.warn('Failed to get route:', error);
+          // Fallback to straight line
+          setRouteCoordinates([userLocation, [markedPath.latitude, markedPath.longitude]]);
         }
       };
       
-      drawPath();
+      getRoute();
     } else {
-      onPathUpdate(null);
+      setRouteCoordinates([]);
     }
-  }, [markedPath, userLocation, onPathUpdate]);
+  }, [markedPath, userLocation]);
 
-  return null;
+  return (
+    <>
+      {routeCoordinates.length > 0 && (
+        <Polyline
+          positions={routeCoordinates}
+          color="blue"
+          weight={4}
+          opacity={0.7}
+          dashArray="10, 10"
+        />
+      )}
+    </>
+  );
 };
 
 const LiveAdventureMap: React.FC<LiveAdventureMapProps> = ({
@@ -88,132 +94,147 @@ const LiveAdventureMap: React.FC<LiveAdventureMapProps> = ({
   onLocationUpdate,
   markedPath
 }) => {
-  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [wellnessLocations, setWellnessLocations] = useState<WellnessLocation[]>([]);
-  const [locationError, setLocationError] = useState<string>('');
-  const [isLoadingLocation, setIsLoadingLocation] = useState(true);
-  const [pathCoordinates, setPathCoordinates] = useState<[number, number][] | null>(null);
+  const [mapCenter, setMapCenter] = useState<[number, number]>([40.7829, -73.9654]); // Default to Central Park
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string>('');
   const watchIdRef = useRef<number | null>(null);
 
-  // Get user's current location with better error handling
+  // Initialize location detection
   useEffect(() => {
-    const getCurrentLocation = async () => {
-      setIsLoadingLocation(true);
-      setLocationError('');
-
-      if (!navigator.geolocation) {
-        setLocationError('Geolocation is not supported by this browser');
-        // Use default location (New York City) for demo
-        const defaultLocation = { latitude: 40.7829, longitude: -73.9654 };
-        setUserLocation(defaultLocation);
-        setIsLoadingLocation(false);
-        return;
-      }
-
+    const initializeLocation = async () => {
+      setIsLoading(true);
+      setError('');
+      
       try {
-        // First try to get current position
-        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(
-            resolve,
-            reject,
-            {
-              enableHighAccuracy: true,
-              timeout: 10000,
-              maximumAge: 60000
-            }
-          );
+        console.log('🗺️ Initializing location detection...');
+        
+        // Get user's current location
+        const location = await locationService.getCurrentLocation();
+        console.log('📍 User location detected:', location);
+        
+        const userPos: [number, number] = [location.latitude, location.longitude];
+        setUserLocation(userPos);
+        setMapCenter(userPos);
+        
+        // Find nearby wellness locations (limit to 5 nearest)
+        console.log('🔍 Searching for nearby wellness locations...');
+        const nearbyLocations = locationService.getNearbyLocations(
+          location.latitude,
+          location.longitude,
+          25 // 25km radius
+        );
+        
+        // Take only the 5 nearest locations
+        const nearest5Locations = nearbyLocations.slice(0, 5);
+        console.log('🏃‍♀️ Found 5 nearest wellness locations:', nearest5Locations.map(l => l.name));
+        
+        // Convert to WellnessLocation format and generate quests
+        const wellnessLocs: WellnessLocation[] = nearest5Locations.map(loc => {
+          const quest = locationService.generateLocationQuest(loc);
+          return {
+            id: loc.id,
+            name: loc.name,
+            type: loc.type,
+            latitude: loc.latitude,
+            longitude: loc.longitude,
+            description: loc.description,
+            magicalName: loc.magicalName,
+            questReward: loc.questReward,
+            questTask: quest.description,
+            discovered: loc.discovered,
+            visitCount: loc.visitCount
+          };
         });
-
-        const location = {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude
-        };
-
-        console.log('User location detected:', location);
-        setUserLocation(location);
-
-        // Set up location watching for real-time updates
+        
+        setWellnessLocations(wellnessLocs);
+        onLocationUpdate(wellnessLocs);
+        
+        console.log('✅ Wellness locations loaded successfully:', wellnessLocs.length);
+        
+        // Start watching for location changes
         if (navigator.geolocation) {
           watchIdRef.current = navigator.geolocation.watchPosition(
             (position) => {
-              const newLocation = {
-                latitude: position.coords.latitude,
-                longitude: position.coords.longitude
-              };
-              setUserLocation(newLocation);
+              const newPos: [number, number] = [position.coords.latitude, position.coords.longitude];
+              setUserLocation(newPos);
+              
+              // Check for quest completion (within 100m of any location)
+              wellnessLocs.forEach(location => {
+                const isNear = locationService.checkLocationProximity(
+                  position.coords.latitude,
+                  position.coords.longitude,
+                  location,
+                  100 // 100 meters
+                );
+                
+                if (isNear && !location.discovered) {
+                  console.log(`🎯 Quest completed at ${location.name}!`);
+                  locationService.visitLocation(location.id);
+                  onQuestComplete(location.id, location.questReward);
+                }
+              });
             },
             (error) => {
               console.warn('Location watch error:', error);
             },
             {
               enableHighAccuracy: true,
-              timeout: 5000,
+              timeout: 10000,
               maximumAge: 30000
             }
           );
         }
-
-      } catch (error) {
-        console.warn('Geolocation error:', error);
-        setLocationError('Unable to access your location. Using default location for demo.');
         
-        // Use default location (New York City) for demo
+      } catch (error) {
+        console.error('❌ Failed to initialize location:', error);
+        setError('Failed to detect location. Using default NYC area.');
+        
+        // Fallback: Use default NYC location and show nearby locations
         const defaultLocation = { latitude: 40.7829, longitude: -73.9654 };
-        setUserLocation(defaultLocation);
+        const fallbackLocations = locationService.getNearbyLocations(
+          defaultLocation.latitude,
+          defaultLocation.longitude,
+          25
+        ).slice(0, 5);
+        
+        const wellnessLocs: WellnessLocation[] = fallbackLocations.map(loc => {
+          const quest = locationService.generateLocationQuest(loc);
+          return {
+            id: loc.id,
+            name: loc.name,
+            type: loc.type,
+            latitude: loc.latitude,
+            longitude: loc.longitude,
+            description: loc.description,
+            magicalName: loc.magicalName,
+            questReward: loc.questReward,
+            questTask: quest.description,
+            discovered: loc.discovered,
+            visitCount: loc.visitCount
+          };
+        });
+        
+        setWellnessLocations(wellnessLocs);
+        onLocationUpdate(wellnessLocs);
+        setMapCenter([defaultLocation.latitude, defaultLocation.longitude]);
       } finally {
-        setIsLoadingLocation(false);
+        setIsLoading(false);
       }
     };
 
-    getCurrentLocation();
+    initializeLocation();
 
-    // Cleanup function
+    // Cleanup
     return () => {
       if (watchIdRef.current !== null) {
         navigator.geolocation.clearWatch(watchIdRef.current);
       }
     };
-  }, []);
+  }, [onQuestComplete, onLocationUpdate]);
 
-  // Update wellness locations when user location changes
-  const handleLocationUpdate = (locations: WellnessLocation[]) => {
-    setWellnessLocations(locations);
-    onLocationUpdate(locations);
-  };
-
-  // Handle quest completion at a location
-  const handleLocationQuestComplete = (location: WellnessLocation) => {
-    if (!userLocation) return;
-
-    // Check if user is close enough to the location (within 100 meters)
-    const distance = locationService.calculateDistance(
-      userLocation.latitude,
-      userLocation.longitude,
-      location.latitude,
-      location.longitude
-    );
-
-    if (distance <= 100) {
-      // Mark location as visited
-      locationService.visitLocation(location.id);
-      
-      // Complete the quest
-      onQuestComplete(location.id, location.questReward);
-      
-      // Update the locations list
-      const updatedLocations = wellnessLocations.map(loc =>
-        loc.id === location.id
-          ? { ...loc, discovered: true, visitCount: loc.visitCount + 1 }
-          : loc
-      );
-      setWellnessLocations(updatedLocations);
-      onLocationUpdate(updatedLocations);
-    } else {
-      alert(`You need to be within 100 meters of ${location.magicalName} to complete this quest. You are currently ${Math.round(distance)} meters away.`);
-    }
-  };
-
-  // Custom icons for different location types
+  // Create custom icons for different location types
   const createLocationIcon = (type: string, discovered: boolean) => {
     const iconMap: Record<string, string> = {
       park: '🌳',
@@ -222,15 +243,15 @@ const LiveAdventureMap: React.FC<LiveAdventureMapProps> = ({
       cafe: '☕',
       landmark: '🏛️'
     };
-
+    
     const emoji = iconMap[type] || '📍';
-    const opacity = discovered ? '1' : '0.7';
+    const opacity = discovered ? '0.6' : '1.0';
     
     return new Icon({
       iconUrl: `data:image/svg+xml;base64,${btoa(`
-        <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+        <svg width="32" height="32" xmlns="http://www.w3.org/2000/svg">
           <circle cx="16" cy="16" r="14" fill="${discovered ? '#10b981' : '#f59e0b'}" stroke="#fff" stroke-width="2" opacity="${opacity}"/>
-          <text x="16" y="20" text-anchor="middle" font-size="12" fill="white">${emoji}</text>
+          <text x="16" y="20" text-anchor="middle" font-size="12">${emoji}</text>
         </svg>
       `)}`,
       iconSize: [32, 32],
@@ -242,86 +263,65 @@ const LiveAdventureMap: React.FC<LiveAdventureMapProps> = ({
   // User location icon
   const userIcon = new Icon({
     iconUrl: `data:image/svg+xml;base64,${btoa(`
-      <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <svg width="24" height="24" xmlns="http://www.w3.org/2000/svg">
         <circle cx="12" cy="12" r="10" fill="#3b82f6" stroke="#fff" stroke-width="2"/>
         <circle cx="12" cy="12" r="4" fill="#fff"/>
       </svg>
     `)}`,
     iconSize: [24, 24],
-    iconAnchor: [12, 12],
-    popupAnchor: [0, -12]
+    iconAnchor: [12, 12]
   });
 
-  if (isLoadingLocation) {
+  if (isLoading) {
     return (
       <div className="h-96 bg-gray-100 rounded-lg flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-600 mx-auto mb-2"></div>
-          <p className="text-amber-800 font-cinzel">Detecting your location...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!userLocation) {
-    return (
-      <div className="h-96 bg-gray-100 rounded-lg flex items-center justify-center">
-        <div className="text-center">
-          <MapPin className="mx-auto mb-2 text-red-500" size={32} />
-          <p className="text-red-600 font-cinzel mb-2">Location access required</p>
-          <p className="text-gray-600 text-sm font-merriweather">
-            {locationError || 'Please enable location services to discover wellness locations nearby.'}
-          </p>
+          <p className="text-amber-800 font-cinzel">Detecting wellness locations...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      {/* Location Status */}
-      <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-        <div className="flex items-center text-green-700">
-          <Navigation size={16} className="mr-2" />
-          <span className="font-cinzel text-sm">
-            Location detected: {userLocation.latitude.toFixed(4)}, {userLocation.longitude.toFixed(4)}
-          </span>
+    <div className="relative">
+      {error && (
+        <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+          <p className="text-orange-700 text-sm font-merriweather">{error}</p>
         </div>
-        {locationError && (
-          <p className="text-orange-600 text-xs font-merriweather mt-1">{locationError}</p>
-        )}
-      </div>
-
-      {/* Map */}
+      )}
+      
       <div className="h-96 rounded-lg overflow-hidden shadow-lg border-2 border-amber-200">
         <MapContainer
-          center={[userLocation.latitude, userLocation.longitude]}
-          zoom={14}
+          center={mapCenter}
+          zoom={13}
           style={{ height: '100%', width: '100%' }}
-          zoomControl={true}
+          className="z-0"
         >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           
-          <MapController
+          <MapUpdater
+            center={mapCenter}
             userLocation={userLocation}
-            onLocationUpdate={handleLocationUpdate}
+            wellnessLocations={wellnessLocations}
             markedPath={markedPath}
-            onPathUpdate={setPathCoordinates}
           />
-
+          
           {/* User location marker */}
-          <Marker position={[userLocation.latitude, userLocation.longitude]} icon={userIcon}>
-            <Popup>
-              <div className="text-center">
-                <h3 className="font-cinzel font-bold text-blue-800">Your Location</h3>
-                <p className="text-sm font-merriweather">Ready for wellness adventures!</p>
-              </div>
-            </Popup>
-          </Marker>
-
+          {userLocation && (
+            <Marker position={userLocation} icon={userIcon}>
+              <Popup>
+                <div className="text-center">
+                  <h3 className="font-cinzel font-bold text-blue-800">Your Location</h3>
+                  <p className="text-sm font-merriweather">You are here!</p>
+                </div>
+              </Popup>
+            </Marker>
+          )}
+          
           {/* Wellness location markers */}
           {wellnessLocations.map(location => (
             <Marker
@@ -334,110 +334,60 @@ const LiveAdventureMap: React.FC<LiveAdventureMapProps> = ({
                   <h3 className="font-cinzel font-bold text-amber-800 mb-1">
                     {location.magicalName}
                   </h3>
-                  <p className="text-xs text-gray-600 font-merriweather mb-2">
+                  <p className="text-sm text-gray-600 font-merriweather mb-2">
                     {location.name}
                   </p>
-                  <p className="text-sm font-merriweather mb-3">
+                  <p className="text-xs text-gray-700 font-merriweather mb-2">
                     {location.description}
                   </p>
-                  
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-cinzel text-amber-700">Quest Reward:</span>
-                      <div className="flex items-center">
-                        <Award size={12} className="mr-1 text-amber-600" />
-                        <span className="font-bold">{location.questReward} XP</span>
-                      </div>
-                    </div>
-                    
-                    {location.discovered ? (
-                      <div className="bg-green-50 border border-green-200 rounded p-2 text-center">
-                        <span className="text-green-700 font-cinzel text-xs">
-                          ✓ Discovered • Visited {location.visitCount} time{location.visitCount !== 1 ? 's' : ''}
-                        </span>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => handleLocationQuestComplete(location)}
-                        className="w-full bg-amber-500 hover:bg-amber-600 text-white px-3 py-1 rounded text-xs font-cinzel transition-colors"
-                      >
-                        Complete Quest
-                      </button>
-                    )}
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-cinzel text-amber-700">
+                      Reward: {location.questReward} XP
+                    </span>
+                    <span className="font-cinzel text-green-600">
+                      {location.discovered ? '✅ Discovered' : '📍 Undiscovered'}
+                    </span>
                   </div>
+                  {location.visitCount > 0 && (
+                    <p className="text-xs text-purple-600 font-cinzel mt-1">
+                      Visited {location.visitCount} time{location.visitCount > 1 ? 's' : ''}
+                    </p>
+                  )}
                 </div>
               </Popup>
             </Marker>
           ))}
-
-          {/* Marked path */}
-          {pathCoordinates && (
-            <Polyline
-              positions={pathCoordinates}
-              color="#f59e0b"
-              weight={4}
-              opacity={0.8}
-              dashArray="10, 10"
-            />
-          )}
         </MapContainer>
       </div>
-
-      {/* Map Legend */}
-      <div className="bg-white rounded-lg shadow-md p-4 border border-amber-100">
-        <h3 className="font-cinzel font-bold text-amber-800 mb-3 flex items-center">
-          <Target size={16} className="mr-2" />
-          Map Legend
-        </h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-          <div className="flex items-center">
-            <div className="w-4 h-4 bg-blue-500 rounded-full mr-2"></div>
-            <span className="font-merriweather">Your Location</span>
+      
+      {/* Location stats */}
+      <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+        <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+          <div className="text-green-700 font-cinzel font-bold text-lg">
+            {wellnessLocations.filter(l => l.discovered).length}
           </div>
-          <div className="flex items-center">
-            <div className="w-4 h-4 bg-amber-500 rounded-full mr-2"></div>
-            <span className="font-merriweather">Undiscovered</span>
-          </div>
-          <div className="flex items-center">
-            <div className="w-4 h-4 bg-green-500 rounded-full mr-2"></div>
-            <span className="font-merriweather">Discovered</span>
-          </div>
-          {pathCoordinates && (
-            <div className="flex items-center">
-              <Route size={16} className="text-amber-500 mr-2" />
-              <span className="font-merriweather">Marked Path</span>
-            </div>
-          )}
+          <div className="text-green-600 text-xs font-merriweather">Discovered</div>
         </div>
-      </div>
-
-      {/* Location Stats */}
-      <div className="bg-gradient-to-r from-amber-50 to-yellow-50 rounded-lg p-4 border border-amber-200">
-        <div className="grid grid-cols-3 gap-4 text-center">
-          <div>
-            <div className="text-2xl font-cinzel font-bold text-amber-800">
-              {wellnessLocations.length}
-            </div>
-            <div className="text-xs font-merriweather text-amber-700">
-              Locations Found
-            </div>
+        
+        <div className="bg-amber-50 p-3 rounded-lg border border-amber-200">
+          <div className="text-amber-700 font-cinzel font-bold text-lg">
+            {wellnessLocations.length}
           </div>
-          <div>
-            <div className="text-2xl font-cinzel font-bold text-green-600">
-              {wellnessLocations.filter(loc => loc.discovered).length}
-            </div>
-            <div className="text-xs font-merriweather text-green-700">
-              Discovered
-            </div>
+          <div className="text-amber-600 text-xs font-merriweather">Total Locations</div>
+        </div>
+        
+        <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+          <div className="text-blue-700 font-cinzel font-bold text-lg">
+            {wellnessLocations.reduce((sum, l) => sum + l.visitCount, 0)}
           </div>
-          <div>
-            <div className="text-2xl font-cinzel font-bold text-purple-600">
-              {wellnessLocations.reduce((total, loc) => total + loc.visitCount, 0)}
-            </div>
-            <div className="text-xs font-merriweather text-purple-700">
-              Total Visits
-            </div>
+          <div className="text-blue-600 text-xs font-merriweather">Total Visits</div>
+        </div>
+        
+        <div className="bg-purple-50 p-3 rounded-lg border border-purple-200">
+          <div className="text-purple-700 font-cinzel font-bold text-lg">
+            {wellnessLocations.reduce((sum, l) => sum + l.questReward, 0)}
           </div>
+          <div className="text-purple-600 text-xs font-merriweather">Total XP Available</div>
         </div>
       </div>
     </div>
