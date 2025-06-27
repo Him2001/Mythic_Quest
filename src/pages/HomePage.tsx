@@ -32,6 +32,7 @@ const HomePage: React.FC<HomePageProps> = ({
 }) => {
   const [avatarMessage, setAvatarMessage] = useState<string>('');
   const [voiceText, setVoiceText] = useState<string>('');
+  const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
   const [lastCoinCount, setLastCoinCount] = useState<number>(user.mythicCoins);
   const [lastLevel, setLastLevel] = useState<number>(user.level);
   const [lastWalkingDistance, setLastWalkingDistance] = useState<number>(user.totalWalkingDistance);
@@ -135,11 +136,18 @@ const HomePage: React.FC<HomePageProps> = ({
   const handleVoiceComplete = () => {
     console.log('🎵 Voice playback completed, clearing voice text');
     setVoiceText('');
+    setIsSpeaking(false);
   };
 
   const handleVoiceError = (error: string) => {
     console.warn('🎵 Voice playback error:', error);
     setVoiceText('');
+    setIsSpeaking(false);
+  };
+
+  const handleSpeakingChange = (speaking: boolean) => {
+    console.log('🎭 Avatar speaking state changed:', speaking);
+    setIsSpeaking(speaking);
   };
 
   // Handle quest completion with voice feedback
@@ -164,6 +172,7 @@ const HomePage: React.FC<HomePageProps> = ({
             <AvatarDisplay 
               avatar={avatar} 
               message={avatarMessage}
+              isSpeaking={isSpeaking}
             />
           </div>
           
@@ -329,7 +338,7 @@ const HomePage: React.FC<HomePageProps> = ({
         </a>
       </div>
       
-      {/* Voice integration - COMPLETELY REWRITTEN */}
+      {/* Voice integration with speaking state tracking */}
       {voiceText && (
         <ElevenLabsVoice 
           key={`voice-${welcomeMessageId}-${voiceText.substring(0, 20)}`}
@@ -337,6 +346,7 @@ const HomePage: React.FC<HomePageProps> = ({
           voiceId="MezYwaNLTOfydzsFJwwt"
           onComplete={handleVoiceComplete}
           onError={handleVoiceError}
+          onSpeakingChange={handleSpeakingChange}
         />
       )}
     </div>
