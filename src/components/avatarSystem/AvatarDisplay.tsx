@@ -47,9 +47,19 @@ const AvatarDisplay: React.FC<AvatarDisplayProps> = ({
 
   return (
     <div className={`relative flex flex-col items-center ${className}`}>
-      {/* 3D Avatar - positioned exactly where the wizard image was */}
-      <div className={`relative mb-4 transition-all duration-500 ${isAnimating ? 'scale-105' : 'scale-100'}`}>
-        <Avatar3D className="relative z-10" />
+      {/* 3D Avatar with magical portal effect */}
+      <div className={`relative rounded-full overflow-hidden mb-4 transition-all duration-500 ${isAnimating ? 'scale-105' : 'scale-100'}`}>
+        <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 via-amber-500/20 to-purple-500/20 animate-pulse rounded-full"></div>
+        <div className="absolute inset-0 magical-particles"></div>
+        <div className="relative z-10 p-1 rounded-full overflow-hidden border-4 border-amber-500/50 magical-glow">
+          <Avatar3D className="relative z-10" />
+        </div>
+        
+        {/* Magical overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-purple-500/20 to-transparent rounded-full"></div>
+        
+        {/* Animated runes */}
+        <div className="absolute inset-0 magical-runes rounded-full"></div>
       </div>
       
       {/* Avatar name with magical styling */}
