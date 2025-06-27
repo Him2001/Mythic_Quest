@@ -6,6 +6,17 @@ export class SupabaseAuthService {
   // Sign up with email and password
   static async signUp(email: string, password: string, username: string): Promise<{ user: User | null; error: string | null }> {
     try {
+      // First, check if username is already taken
+      const { data: existingUser } = await supabase
+        .from('user_profiles')
+        .select('username')
+        .eq('username', username)
+        .single();
+
+      if (existingUser) {
+        return { user: null, error: 'Username is already taken. Please choose a different one.' };
+      }
+
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -21,26 +32,30 @@ export class SupabaseAuthService {
       }
 
       if (data.user) {
-        // Wait a moment for the trigger to create the profile
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Wait for the trigger to create the profile
+        await new Promise(resolve => setTimeout(resolve, 2000));
         
-        // Fetch the created profile
+        // Try to fetch the created profile
         let profile = await SupabaseService.getUserProfile(data.user.id);
         
         // If profile doesn't exist, create it manually
         if (!profile) {
+          console.log('Profile not found, creating manually...');
           profile = await SupabaseService.createProfile(data.user.id, username, email);
         }
         
         if (profile) {
           const user = this.convertProfileToUser(profile, data.user.email!);
           return { user, error: null };
+        } else {
+          return { user: null, error: 'Failed to create user profile. Please try again.' };
         }
       }
 
-      return { user: null, error: 'Failed to create user profile' };
+      return { user: null, error: 'Account creation failed. Please try again.' };
     } catch (error) {
-      return { user: null, error: error instanceof Error ? error.message : 'Unknown error occurred' };
+      console.error('Sign up error:', error);
+      return { user: null, error: error instanceof Error ? error.message : 'An unexpected error occurred' };
     }
   }
 
@@ -61,12 +76,15 @@ export class SupabaseAuthService {
         if (profile) {
           const user = this.convertProfileToUser(profile, data.user.email!);
           return { user, error: null };
+        } else {
+          return { user: null, error: 'User profile not found. Please contact support.' };
         }
       }
 
-      return { user: null, error: 'Failed to fetch user profile' };
+      return { user: null, error: 'Sign in failed. Please try again.' };
     } catch (error) {
-      return { user: null, error: error instanceof Error ? error.message : 'Unknown error occurred' };
+      console.error('Sign in error:', error);
+      return { user: null, error: error instanceof Error ? error.message : 'An unexpected error occurred' };
     }
   }
 
@@ -150,16 +168,16 @@ export class SupabaseAuthService {
       name: profile.username,
       email: email,
       password: '', // Don't store password in client
-      level: profile.level,
-      xp: profile.xp,
-      xpToNextLevel: this.calculateXPToNextLevel(profile.level),
+      level: profile.level || 1,
+      xp: profile.xp || 0,
+      xpToNextLevel: this.calculateXPToNextLevel(profile.level || 1),
       avatarUrl: profile.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile.username}`,
-      joinDate: new Date(profile.date_created),
-      questsCompleted: profile.total_quests_completed,
-      dailyWalkingDistance: profile.daily_walking_distance,
-      totalWalkingDistance: profile.total_walking_distance,
+      joinDate: new Date(profile.date_created || profile.created_at),
+      questsCompleted: profile.total_quests_completed || 0,
+      dailyWalkingDistance: profile.daily_walking_distance || 0,
+      totalWalkingDistance: profile.total_walking_distance || 0,
       lastWalkingDate: profile.last_walking_date || '',
-      mythicCoins: profile.coins,
+      mythicCoins: profile.coins || 0,
       inventory: [],
       posts: [],
       following: [],
@@ -167,9 +185,9 @@ export class SupabaseAuthService {
       bio: profile.bio || '',
       authMethod: 'email',
       isAdmin: false,
-      isActive: profile.is_active,
+      isActive: profile.is_active !== false,
       lastLoginDate: new Date(),
-      createdAt: new Date(profile.date_created),
+      createdAt: new Date(profile.date_created || profile.created_at),
       isOnline: true,
       lastSeenAt: new Date(),
       chronicles: []
