@@ -646,6 +646,22 @@ function App() {
     );
   }
 
+  // Ensure user is not null before rendering main app
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-fantasy bg-cover bg-fixed bg-center relative flex items-center justify-center">
+        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-black/40 pointer-events-none" />
+        <div className="relative z-10 text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-amber-500 mx-auto mb-4"></div>
+          <p className="text-amber-100 font-cinzel text-xl">Initializing your adventure...</p>
+          <p className="text-amber-200 font-merriweather text-sm mt-2">
+            Preparing your wellness realm...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   // Main app for regular users
   const renderPage = () => {
     switch (activeTab) {
@@ -668,7 +684,7 @@ function App() {
       case 'heroes':
         return (
           <HeroesPage 
-            user={user!}
+            user={user}
             onUserUpdate={handleUserUpdate}
             pendingLevelUpShare={pendingLevelUpShare}
             onLevelUpShareProcessed={() => setPendingLevelUpShare(null)}
@@ -677,7 +693,7 @@ function App() {
       case 'marketplace':
         return (
           <MarketplacePage
-            userCoins={user?.mythicCoins || 0}
+            userCoins={user.mythicCoins || 0}
             onCoinSpent={spendCoins}
             onInventoryUpdate={addToInventory}
           />
@@ -685,14 +701,14 @@ function App() {
       case 'chronicles':
         return (
           <ChroniclesPage
-            user={user!}
+            user={user}
             onUserUpdate={handleUserUpdate}
           />
         );
       default:
         return (
           <HomePage 
-            user={user!}
+            user={user}
             avatar={avatar}
             quests={quests}
             onCompleteQuest={handleCompleteQuest}
@@ -730,7 +746,7 @@ function App() {
       )}
       
       <Navbar 
-        user={user!} 
+        user={user} 
         activeTab={activeTab} 
         onTabChange={setActiveTab}
         onSignOut={handleSignOut}
@@ -764,7 +780,7 @@ function App() {
       />
 
       {/* Level Up Popup */}
-      {showLevelUpPopup && levelUpData && user && (
+      {showLevelUpPopup && levelUpData && (
         <LevelUpPopup
           isVisible={showLevelUpPopup}
           user={user}
