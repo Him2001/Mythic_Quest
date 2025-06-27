@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 interface ElevenLabsVoiceProps {
   text: string;
@@ -8,82 +8,37 @@ interface ElevenLabsVoiceProps {
 
 const ElevenLabsVoice: React.FC<ElevenLabsVoiceProps> = ({
   text,
-  voiceId = 'MezYwaNLTOfydzsFJwwt',
+  voiceId = 'MezYwaNLTOfydzsFJwwt', // Default voice ID
   onComplete
 }) => {
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isMuted, setIsMuted] = useState(false);
-
-  // Check mute state from localStorage
-  useEffect(() => {
-    const checkMuteState = () => {
-      const savedMuteState = localStorage.getItem('mythic_audio_muted');
-      setIsMuted(savedMuteState === 'true');
-    };
-
-    checkMuteState();
-
-    // Listen for mute events
-    const handleMuteEvent = () => {
-      checkMuteState();
-      // Stop current audio if muted
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
-      }
-      if (onComplete) {
-        onComplete();
-      }
-    };
-
-    window.addEventListener('muteAudio', handleMuteEvent);
-    
-    // Also listen for storage changes (in case mute state changes in another tab)
-    window.addEventListener('storage', (e) => {
-      if (e.key === 'mythic_audio_muted') {
-        checkMuteState();
-      }
-    });
-
-    return () => {
-      window.removeEventListener('muteAudio', handleMuteEvent);
-      window.removeEventListener('storage', checkMuteState);
-    };
-  }, [onComplete]);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    // Don't make API calls if muted
-    if (isMuted) {
+    // Check if audio is muted
+    const isAudioMuted = localStorage.getItem('mythic_audio_muted');
+    if (isAudioMuted === 'true') {
       console.log('Audio is muted, skipping ElevenLabs API call');
-      if (onComplete) {
-        onComplete();
-      }
+      onComplete?.();
       return;
     }
 
-    if (!text || !text.trim()) {
-      if (onComplete) {
-        onComplete();
-      }
+    if (!text || text.trim() === '') {
+      onComplete?.();
       return;
     }
 
     const apiKey = import.meta.env.VITE_ELEVENLABS_API_KEY;
     if (!apiKey) {
       console.warn('ElevenLabs API key not configured');
-      if (onComplete) {
-        onComplete();
-      }
+      onComplete?.();
       return;
     }
 
     const generateSpeech = async () => {
-      setIsLoading(true);
-      setError(null);
-
       try {
+        setIsPlaying(true);
+
         const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
           method: 'POST',
           headers: {
@@ -107,78 +62,85 @@ const ElevenLabsVoice: React.FC<ElevenLabsVoiceProps> = ({
 
         const audioBlob = await response.blob();
         const audioUrl = URL.createObjectURL(audioBlob);
+        
+        const audioElement = new Audio(audioUrl);
+        setAudio(audioElement);
 
-        if (audioRef.current) {
-          audioRef.current.src = audioUrl;
-          
-          // Check mute state again before playing
-          const currentMuteState = localStorage.getItem('mythic_audio_muted');
-          if (currentMuteState !== 'true') {
-            await audioRef.current.play();
-          } else {
-            console.log('Audio muted during generation, not playing');
-            if (onComplete) {
-              onComplete();
-            }
-          }
+        audioElement.onended = () => {
+          setIsPlaying(false);
+          URL.revokeObjectURL(audioUrl);
+          onComplete?.();
+        };
+
+        audioElement.onerror = () => {
+          setIsPlaying(false);
+          URL.revokeObjectURL(audioUrl);
+          onComplete?.();
+        };
+
+        // Check again if audio is muted before playing (in case it was muted during API call)
+        const currentMuteState = localStorage.getItem('mythic_audio_muted');
+        if (currentMuteState === 'true') {
+          console.log('Audio was muted during API call, not playing');
+          setIsPlaying(false);
+          URL.revokeObjectURL(audioUrl);
+          onComplete?.();
+          return;
         }
-      } catch (err) {
-        console.warn('ElevenLabs TTS error:', err);
-        setError(err instanceof Error ? err.message : 'Failed to generate speech');
-        if (onComplete) {
-          onComplete();
-        }
-      } finally {
-        setIsLoading(false);
+
+        await audioElement.play();
+      } catch (error) {
+        console.warn('ElevenLabs speech generation failed:', error);
+        setIsPlaying(false);
+        onComplete?.();
       }
     };
 
     generateSpeech();
-  }, [text, voiceId, onComplete, isMuted]);
 
-  const handleAudioEnd = () => {
-    if (onComplete) {
-      onComplete();
-    }
-  };
+    // Cleanup function
+    return () => {
+      if (audio) {
+        audio.pause();
+        audio.currentTime = 0;
+      }
+    };
+  }, [text, voiceId, onComplete]);
 
-  const handleAudioError = () => {
-    console.warn('Audio playback error');
-    setError('Audio playback failed');
-    if (onComplete) {
-      onComplete();
-    }
-  };
+  // Stop audio if muted while playing
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'mythic_audio_muted' && e.newValue === 'true' && audio && isPlaying) {
+        console.log('Audio muted while playing, stopping current audio');
+        audio.pause();
+        audio.currentTime = 0;
+        setIsPlaying(false);
+        onComplete?.();
+      }
+    };
 
-  return (
-    <>
-      <audio
-        ref={audioRef}
-        onEnded={handleAudioEnd}
-        onError={handleAudioError}
-        style={{ display: 'none' }}
-      />
-      
-      {/* Optional: Show loading/error states */}
-      {isLoading && !isMuted && (
-        <div className="fixed bottom-4 left-4 bg-blue-500 text-white px-3 py-2 rounded-lg text-sm font-merriweather z-50">
-          🎵 Generating voice...
-        </div>
-      )}
-      
-      {error && !isMuted && (
-        <div className="fixed bottom-4 left-4 bg-red-500 text-white px-3 py-2 rounded-lg text-sm font-merriweather z-50">
-          ⚠️ Voice error: {error}
-        </div>
-      )}
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [audio, isPlaying, onComplete]);
 
-      {isMuted && (
-        <div className="fixed bottom-4 left-4 bg-gray-500 text-white px-3 py-2 rounded-lg text-sm font-merriweather z-50">
-          🔇 Audio muted (dev mode)
-        </div>
-      )}
-    </>
-  );
+  // Manual check for mute state changes (for same-tab changes)
+  useEffect(() => {
+    const checkMuteState = () => {
+      const isAudioMuted = localStorage.getItem('mythic_audio_muted');
+      if (isAudioMuted === 'true' && audio && isPlaying) {
+        console.log('Audio muted, stopping current audio');
+        audio.pause();
+        audio.currentTime = 0;
+        setIsPlaying(false);
+        onComplete?.();
+      }
+    };
+
+    const interval = setInterval(checkMuteState, 500);
+    return () => clearInterval(interval);
+  }, [audio, isPlaying, onComplete]);
+
+  return null; // This component doesn't render anything visible
 };
 
 export default ElevenLabsVoice;
