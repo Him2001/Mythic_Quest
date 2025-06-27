@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Chronicle, User } from '../types';
+import { SupabaseService } from '../utils/supabaseService';
 import { ChronicleService } from '../utils/chronicleService';
-import { SocialService } from '../utils/socialService';
 import ChronicleEntry from '../components/storySystem/ChronicleEntry';
 import Button from '../components/ui/Button';
 import Avatar from '../components/ui/Avatar';
@@ -15,8 +15,8 @@ interface ChroniclesPageProps {
 
 const ChroniclesPage: React.FC<ChroniclesPageProps> = ({ user, onUserUpdate }) => {
   const [activeTab, setActiveTab] = useState<'my-chronicles' | 'friends-chronicles'>('my-chronicles');
-  const [chronicles, setChronicles] = useState<Chronicle[]>([]);
-  const [friendsChronicles, setFriendsChronicles] = useState<{ user: User; chronicles: Chronicle[] }[]>([]);
+  const [chronicles, setChronicles] = useState<any[]>([]);
+  const [friendsChronicles, setFriendsChronicles] = useState<any[]>([]);
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -26,10 +26,10 @@ const ChroniclesPage: React.FC<ChroniclesPageProps> = ({ user, onUserUpdate }) =
     loadFriendsChronicles();
   }, [user.id]);
 
-  const loadChronicles = () => {
+  const loadChronicles = async () => {
     setIsLoading(true);
     try {
-      const userChronicles = ChronicleService.getUserChronicles(user.id);
+      const userChronicles = await SupabaseService.getUserChronicles(user.id);
       setChronicles(userChronicles);
     } catch (error) {
       console.error('Failed to load chronicles:', error);
@@ -38,9 +38,9 @@ const ChroniclesPage: React.FC<ChroniclesPageProps> = ({ user, onUserUpdate }) =
     }
   };
 
-  const loadFriendsChronicles = () => {
+  const loadFriendsChronicles = async () => {
     try {
-      const friendsData = ChronicleService.getFriendsChronicles(user.id);
+      const friendsData = await SupabaseService.getFriendsChronicles(user.id);
       setFriendsChronicles(friendsData);
     } catch (error) {
       console.error('Failed to load friends chronicles:', error);
@@ -50,6 +50,7 @@ const ChroniclesPage: React.FC<ChroniclesPageProps> = ({ user, onUserUpdate }) =
   const handleGenerateWeeklyChronicle = async () => {
     setIsGenerating(true);
     try {
+      // Use the local chronicle service for generation, then save to Supabase
       await ChronicleService.generateWeeklyChronicle(user.id);
       loadChronicles();
     } catch (error) {
@@ -73,17 +74,17 @@ const ChroniclesPage: React.FC<ChroniclesPageProps> = ({ user, onUserUpdate }) =
     }
   };
 
-  const handleTogglePrivacy = (chronicleId: string, isPrivate: boolean) => {
-    const success = ChronicleService.updateChroniclePrivacy(user.id, chronicleId, isPrivate);
+  const handleTogglePrivacy = async (chronicleId: string, isPrivate: boolean) => {
+    const success = await SupabaseService.updateChroniclePrivacy(chronicleId, isPrivate);
     if (success) {
       loadChronicles();
       loadFriendsChronicles();
     }
   };
 
-  const handleDeleteChronicle = (chronicleId: string) => {
+  const handleDeleteChronicle = async (chronicleId: string) => {
     if (confirm('Are you sure you want to delete this chronicle? This action cannot be undone.')) {
-      const success = ChronicleService.deleteChronicle(user.id, chronicleId);
+      const success = await SupabaseService.deleteChronicle(chronicleId);
       if (success) {
         loadChronicles();
       }
@@ -91,13 +92,13 @@ const ChroniclesPage: React.FC<ChroniclesPageProps> = ({ user, onUserUpdate }) =
   };
 
   const sortedChronicles = [...chronicles].sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    (a, b) => new Date(b.date_created).getTime() - new Date(a.date_created).getTime()
   );
 
   const months = Array.from(
     new Set(
       chronicles.map(c => {
-        const date = new Date(c.date);
+        const date = new Date(c.date_created);
         return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
       })
     )
@@ -113,12 +114,12 @@ const ChroniclesPage: React.FC<ChroniclesPageProps> = ({ user, onUserUpdate }) =
   const filteredChronicles = selectedMonth === 'all'
     ? sortedChronicles
     : sortedChronicles.filter(c => {
-        const date = new Date(c.date);
+        const date = new Date(c.date_created);
         const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
         return monthKey === selectedMonth;
       });
 
-  const friendsCount = SocialService.getFriends(user.id).length;
+  const friendsCount = friendsChronicles.length;
 
   return (
     <div className="container mx-auto px-4 py-6">
@@ -247,20 +248,33 @@ const ChroniclesPage: React.FC<ChroniclesPageProps> = ({ user, onUserUpdate }) =
             <div className="space-y-6">
               {filteredChronicles.map(chronicle => (
                 <div key={chronicle.id} className="relative">
-                  <ChronicleEntry chronicle={chronicle} />
+                  <ChronicleEntry chronicle={{
+                    id: chronicle.id,
+                    date: new Date(chronicle.date_created),
+                    title: chronicle.title,
+                    content: chronicle.content,
+                    mood: chronicle.mood,
+                    questsCompleted: [],
+                    fellowInteractions: [],
+                    imageUrl: chronicle.image_url,
+                    weekNumber: chronicle.week_number,
+                    isPrivate: chronicle.is_private,
+                    xpGained: chronicle.xp_gained,
+                    coinsEarned: chronicle.coins_earned
+                  }} />
                   
                   {/* Chronicle Controls */}
                   <div className="absolute top-4 right-4 flex items-center space-x-2">
                     <button
-                      onClick={() => handleTogglePrivacy(chronicle.id, !chronicle.isPrivate)}
+                      onClick={() => handleTogglePrivacy(chronicle.id, !chronicle.is_private)}
                       className={`p-2 rounded-full transition-colors ${
-                        chronicle.isPrivate 
+                        chronicle.is_private 
                           ? 'bg-red-100 text-red-600 hover:bg-red-200' 
                           : 'bg-green-100 text-green-600 hover:bg-green-200'
                       }`}
-                      title={chronicle.isPrivate ? 'Make public' : 'Make private'}
+                      title={chronicle.is_private ? 'Make public' : 'Make private'}
                     >
-                      {chronicle.isPrivate ? <EyeOff size={16} /> : <Eye size={16} />}
+                      {chronicle.is_private ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                     
                     <button
@@ -276,10 +290,10 @@ const ChroniclesPage: React.FC<ChroniclesPageProps> = ({ user, onUserUpdate }) =
                   <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
                     <div className="flex items-center space-x-4">
                       <span className="font-cinzel">
-                        {ChronicleService.formatTimeAgo(chronicle.date)}
+                        {ChronicleService.formatTimeAgo(new Date(chronicle.date_created))}
                       </span>
-                      {chronicle.weekNumber && (
-                        <span className="font-cinzel">Week {chronicle.weekNumber}</span>
+                      {chronicle.week_number && (
+                        <span className="font-cinzel">Week {chronicle.week_number}</span>
                       )}
                       {chronicle.mood && (
                         <div className="flex items-center">
@@ -290,19 +304,19 @@ const ChroniclesPage: React.FC<ChroniclesPageProps> = ({ user, onUserUpdate }) =
                     </div>
                     
                     <div className="flex items-center space-x-3">
-                      {chronicle.xpGained && chronicle.xpGained > 0 && (
+                      {chronicle.xp_gained && chronicle.xp_gained > 0 && (
                         <Badge color="primary" size="sm">
-                          +{chronicle.xpGained} XP
+                          +{chronicle.xp_gained} XP
                         </Badge>
                       )}
-                      {chronicle.coinsEarned && chronicle.coinsEarned > 0 && (
+                      {chronicle.coins_earned && chronicle.coins_earned > 0 && (
                         <Badge color="warning" size="sm">
-                          +{chronicle.coinsEarned} Coins
+                          +{chronicle.coins_earned} Coins
                         </Badge>
                       )}
-                      <Badge color={chronicle.isPrivate ? 'error' : 'success'} size="sm">
-                        {chronicle.isPrivate ? <Lock size={12} className="mr-1" /> : <Unlock size={12} className="mr-1" />}
-                        {chronicle.isPrivate ? 'Private' : 'Public'}
+                      <Badge color={chronicle.is_private ? 'error' : 'success'} size="sm">
+                        {chronicle.is_private ? <Lock size={12} className="mr-1" /> : <Unlock size={12} className="mr-1" />}
+                        {chronicle.is_private ? 'Private' : 'Public'}
                       </Badge>
                     </div>
                   </div>
@@ -318,16 +332,6 @@ const ChroniclesPage: React.FC<ChroniclesPageProps> = ({ user, onUserUpdate }) =
             <div className="text-center py-12 bg-white rounded-lg shadow-md">
               <Users className="mx-auto mb-4 text-gray-400" size={48} />
               <h3 className="text-xl font-cinzel font-bold text-gray-600 mb-2">
-                No Friends Yet
-              </h3>
-              <p className="text-gray-500 font-merriweather">
-                Add friends to read their wellness chronicles and share in their adventures!
-              </p>
-            </div>
-          ) : friendsChronicles.length === 0 ? (
-            <div className="text-center py-12 bg-white rounded-lg shadow-md">
-              <ScrollText className="mx-auto mb-4 text-gray-400" size={48} />
-              <h3 className="text-xl font-cinzel font-bold text-gray-600 mb-2">
                 No Friend Chronicles Available
               </h3>
               <p className="text-gray-500 font-merriweather">
@@ -336,95 +340,79 @@ const ChroniclesPage: React.FC<ChroniclesPageProps> = ({ user, onUserUpdate }) =
             </div>
           ) : (
             <div className="space-y-8">
-              {friendsChronicles.map(({ user: friend, chronicles: friendChronicles }) => (
-                <div key={friend.id} className="bg-white rounded-lg shadow-md p-6">
+              {friendsChronicles.map(chronicle => (
+                <div key={chronicle.id} className="bg-white rounded-lg shadow-md p-6">
                   {/* Friend Header */}
                   <div className="flex items-center mb-6 pb-4 border-b border-gray-200">
                     <Avatar
-                      src={friend.avatarUrl}
-                      alt={friend.name}
+                      src={chronicle.user_profiles?.avatar_url}
+                      alt={chronicle.user_profiles?.username}
                       size="lg"
                       className="mr-4"
                     />
                     <div className="flex-1">
                       <h3 className="text-xl font-cinzel font-bold text-amber-800">
-                        {friend.name}'s Chronicles
+                        {chronicle.user_profiles?.username}'s Chronicle
                       </h3>
                       <div className="flex items-center space-x-3 mt-1">
                         <Badge color="accent" size="sm">
-                          Level {friend.level}
+                          Level {chronicle.user_profiles?.level}
                         </Badge>
                         <span className="text-sm text-gray-600 font-merriweather">
-                          {friend.questsCompleted} quests completed
-                        </span>
-                        <span className="text-sm text-gray-600 font-merriweather">
-                          {friend.mythicCoins} coins
+                          {ChronicleService.formatTimeAgo(new Date(chronicle.date_created))}
                         </span>
                       </div>
-                    </div>
-                    <div className="text-right">
-                      <Badge color="primary" size="sm">
-                        {friendChronicles.length} Public Chronicles
-                      </Badge>
                     </div>
                   </div>
 
-                  {/* Friend's Chronicles */}
-                  <div className="space-y-4">
-                    {friendChronicles.map(chronicle => (
-                      <div key={chronicle.id} className="border-l-4 border-amber-300 pl-4">
-                        <div className="flex items-start justify-between mb-2">
-                          <h4 className="font-cinzel font-bold text-amber-800 text-lg">
-                            {chronicle.title}
-                          </h4>
-                          <div className="flex items-center space-x-2 text-sm text-gray-500">
-                            {chronicle.mood && (
-                              <span>{ChronicleService.getMoodEmoji(chronicle.mood)}</span>
-                            )}
-                            <span className="font-merriweather">
-                              {ChronicleService.formatTimeAgo(chronicle.date)}
-                            </span>
-                          </div>
-                        </div>
-                        
-                        <div className="prose prose-amber max-w-none">
-                          <p className="font-merriweather text-gray-700 leading-relaxed">
-                            {chronicle.content}
-                          </p>
-                        </div>
+                  {/* Chronicle Content */}
+                  <div className="border-l-4 border-amber-300 pl-4">
+                    <h4 className="font-cinzel font-bold text-amber-800 text-lg mb-2">
+                      {chronicle.title}
+                    </h4>
+                    
+                    <div className="prose prose-amber max-w-none">
+                      <p className="font-merriweather text-gray-700 leading-relaxed">
+                        {chronicle.content}
+                      </p>
+                    </div>
 
-                        {chronicle.imageUrl && (
-                          <div className="mt-3">
-                            <img 
-                              src={chronicle.imageUrl} 
-                              alt={chronicle.title}
-                              className="w-full h-48 object-cover rounded-lg"
-                            />
+                    {chronicle.image_url && (
+                      <div className="mt-3">
+                        <img 
+                          src={chronicle.image_url} 
+                          alt={chronicle.title}
+                          className="w-full h-48 object-cover rounded-lg"
+                        />
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+                      <div className="flex items-center space-x-3">
+                        {chronicle.xp_gained && chronicle.xp_gained > 0 && (
+                          <Badge color="primary" size="sm">
+                            +{chronicle.xp_gained} XP
+                          </Badge>
+                        )}
+                        {chronicle.coins_earned && chronicle.coins_earned > 0 && (
+                          <Badge color="warning" size="sm">
+                            +{chronicle.coins_earned} Coins
+                          </Badge>
+                        )}
+                        {chronicle.mood && (
+                          <div className="flex items-center text-sm text-gray-600">
+                            <span className="mr-1">{ChronicleService.getMoodEmoji(chronicle.mood)}</span>
+                            <span className="font-merriweather capitalize">{chronicle.mood}</span>
                           </div>
                         )}
-
-                        <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
-                          <div className="flex items-center space-x-3">
-                            {chronicle.xpGained && chronicle.xpGained > 0 && (
-                              <Badge color="primary" size="sm">
-                                +{chronicle.xpGained} XP
-                              </Badge>
-                            )}
-                            {chronicle.coinsEarned && chronicle.coinsEarned > 0 && (
-                              <Badge color="warning" size="sm">
-                                +{chronicle.coinsEarned} Coins
-                              </Badge>
-                            )}
-                          </div>
-                          
-                          {chronicle.weekNumber && (
-                            <span className="text-xs text-gray-500 font-cinzel">
-                              Week {chronicle.weekNumber}
-                            </span>
-                          )}
-                        </div>
                       </div>
-                    ))}
+                      
+                      {chronicle.week_number && (
+                        <span className="text-xs text-gray-500 font-cinzel">
+                          Week {chronicle.week_number}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}

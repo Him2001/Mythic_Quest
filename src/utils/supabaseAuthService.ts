@@ -1,4 +1,5 @@
 import { supabase, UserProfile } from './supabaseClient';
+import { SupabaseService } from './supabaseService';
 import { User } from '../types';
 
 export class SupabaseAuthService {
@@ -24,7 +25,7 @@ export class SupabaseAuthService {
         await new Promise(resolve => setTimeout(resolve, 1000));
         
         // Fetch the created profile
-        const profile = await this.getUserProfile(data.user.id);
+        const profile = await SupabaseService.getUserProfile(data.user.id);
         if (profile) {
           const user = this.convertProfileToUser(profile, data.user.email!);
           return { user, error: null };
@@ -50,7 +51,7 @@ export class SupabaseAuthService {
       }
 
       if (data.user) {
-        const profile = await this.getUserProfile(data.user.id);
+        const profile = await SupabaseService.getUserProfile(data.user.id);
         if (profile) {
           const user = this.convertProfileToUser(profile, data.user.email!);
           return { user, error: null };
@@ -83,7 +84,7 @@ export class SupabaseAuthService {
       }
 
       if (session?.user) {
-        const profile = await this.getUserProfile(session.user.id);
+        const profile = await SupabaseService.getUserProfile(session.user.id);
         if (profile) {
           const user = this.convertProfileToUser(profile, session.user.email!);
           return { user, error: null };
@@ -96,71 +97,48 @@ export class SupabaseAuthService {
     }
   }
 
-  // Get user profile from database
-  static async getUserProfile(userId: string): Promise<UserProfile | null> {
-    try {
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (error) {
-        console.error('Error fetching user profile:', error);
-        return null;
-      }
-
-      return data;
-    } catch (error) {
-      console.error('Error fetching user profile:', error);
-      return null;
-    }
-  }
-
-  // Update user profile
-  static async updateUserProfile(userId: string, updates: Partial<UserProfile>): Promise<{ success: boolean; error: string | null }> {
-    try {
-      const { error } = await supabase
-        .from('user_profiles')
-        .update(updates)
-        .eq('id', userId);
-
-      if (error) {
-        return { success: false, error: error.message };
-      }
-
-      return { success: true, error: null };
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : 'Unknown error occurred' };
-    }
-  }
-
-  // Update XP and level
+  // Update user progress (XP, level, coins)
   static async updateUserProgress(userId: string, xp: number, level: number, coins: number): Promise<{ success: boolean; error: string | null }> {
-    return this.updateUserProfile(userId, { xp, level, coins });
+    const success = await SupabaseService.updateUserProgress(userId, xp, level, coins);
+    return { success, error: success ? null : 'Failed to update user progress' };
   }
 
-  // Update coins
+  // Update user coins
   static async updateUserCoins(userId: string, coins: number): Promise<{ success: boolean; error: string | null }> {
-    return this.updateUserProfile(userId, { coins });
+    const success = await SupabaseService.updateUserProfile(userId, { coins });
+    return { success, error: success ? null : 'Failed to update user coins' };
   }
 
   // Update quests completed
   static async updateQuestsCompleted(userId: string, questsCompleted: number): Promise<{ success: boolean; error: string | null }> {
-    return this.updateUserProfile(userId, { quests_completed: questsCompleted });
+    const success = await SupabaseService.updateUserProfile(userId, { total_quests_completed: questsCompleted });
+    return { success, error: success ? null : 'Failed to update quests completed' };
   }
 
   // Update walking distance
   static async updateWalkingDistance(userId: string, dailyDistance: number, totalDistance: number, lastWalkingDate: string): Promise<{ success: boolean; error: string | null }> {
-    return this.updateUserProfile(userId, {
+    const success = await SupabaseService.updateUserProfile(userId, {
       daily_walking_distance: dailyDistance,
       total_walking_distance: totalDistance,
       last_walking_date: lastWalkingDate
     });
+    return { success, error: success ? null : 'Failed to update walking distance' };
+  }
+
+  // Record quest completion
+  static async recordQuestCompletion(
+    userId: string,
+    questName: string,
+    questType: string,
+    xpEarned: number,
+    coinsEarned: number
+  ): Promise<{ success: boolean; error: string | null }> {
+    const success = await SupabaseService.recordQuestCompletion(userId, questName, questType, xpEarned, coinsEarned);
+    return { success, error: success ? null : 'Failed to record quest completion' };
   }
 
   // Convert Supabase profile to app User type
-  private static convertProfileToUser(profile: UserProfile, email: string): User {
+  private static convertProfileToUser(profile: any, email: string): User {
     return {
       id: profile.id,
       name: profile.username,
@@ -170,8 +148,8 @@ export class SupabaseAuthService {
       xp: profile.xp,
       xpToNextLevel: this.calculateXPToNextLevel(profile.level),
       avatarUrl: profile.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile.username}`,
-      joinDate: new Date(profile.created_at),
-      questsCompleted: profile.quests_completed,
+      joinDate: new Date(profile.date_created),
+      questsCompleted: profile.total_quests_completed,
       dailyWalkingDistance: profile.daily_walking_distance,
       totalWalkingDistance: profile.total_walking_distance,
       lastWalkingDate: profile.last_walking_date || '',
@@ -185,7 +163,7 @@ export class SupabaseAuthService {
       isAdmin: false,
       isActive: profile.is_active,
       lastLoginDate: new Date(),
-      createdAt: new Date(profile.created_at),
+      createdAt: new Date(profile.date_created),
       isOnline: true,
       lastSeenAt: new Date(),
       chronicles: []
@@ -218,7 +196,7 @@ export class SupabaseAuthService {
   static onAuthStateChange(callback: (user: User | null) => void) {
     return supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
-        const profile = await this.getUserProfile(session.user.id);
+        const profile = await SupabaseService.getUserProfile(session.user.id);
         if (profile) {
           const user = this.convertProfileToUser(profile, session.user.email!);
           callback(user);

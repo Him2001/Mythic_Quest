@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { SupabaseAuthService } from './utils/supabaseAuthService';
+import { SupabaseService } from './utils/supabaseService';
 import { User } from './types';
 
 // Auth Components
@@ -262,9 +263,18 @@ function App() {
       // Update in Supabase
       await SupabaseAuthService.updateUserProgress(user.id, newXP, newLevel, user.mythicCoins);
       await SupabaseAuthService.updateQuestsCompleted(user.id, newQuestsCompleted);
+      
+      // Record quest completion in Supabase
+      const questCoinReward = completedQuest.coinReward || CoinSystem.calculateQuestReward(completedQuest.type, completedQuest.difficulty);
+      await SupabaseAuthService.recordQuestCompletion(
+        user.id,
+        completedQuest.title,
+        completedQuest.type,
+        completedQuest.xpReward,
+        questCoinReward
+      );
 
       // Award coins for quest completion
-      const questCoinReward = completedQuest.coinReward || CoinSystem.calculateQuestReward(completedQuest.type, completedQuest.difficulty);
       await awardCoins(
         questCoinReward,
         'quest_completion',
@@ -328,9 +338,18 @@ function App() {
     // Update in Supabase
     await SupabaseAuthService.updateUserProgress(user.id, newXP, newLevel, user.mythicCoins);
     await SupabaseAuthService.updateQuestsCompleted(user.id, newQuestsCompleted);
+    
+    // Record location quest completion
+    const locationCoinReward = CoinSystem.calculateQuestReward('location', 'medium');
+    await SupabaseAuthService.recordQuestCompletion(
+      user.id,
+      'Location-based wellness quest',
+      'location',
+      xpReward,
+      locationCoinReward
+    );
 
     // Award coins for location quest completion
-    const locationCoinReward = CoinSystem.calculateQuestReward('location', 'medium');
     await awardCoins(
       locationCoinReward,
       'quest_completion',
@@ -376,8 +395,25 @@ function App() {
     );
   };
 
-  const handleChronicleAdd = (chronicle: any) => {
-    setChronicles(prev => [chronicle, ...prev]);
+  const handleChronicleAdd = async (chronicle: any) => {
+    if (!user) return;
+    
+    // Save chronicle to Supabase
+    const savedChronicle = await SupabaseService.createChronicle(
+      user.id,
+      chronicle.title,
+      chronicle.content,
+      chronicle.mood,
+      chronicle.weekNumber,
+      chronicle.xpGained,
+      chronicle.coinsEarned,
+      chronicle.imageUrl,
+      chronicle.isPrivate || false
+    );
+    
+    if (savedChronicle) {
+      setChronicles(prev => [savedChronicle, ...prev]);
+    }
   };
 
   const handleCoinAnimationComplete = () => {

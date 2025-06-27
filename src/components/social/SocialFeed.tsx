@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { SocialPost, User } from '../../types';
-import { SocialService } from '../../utils/socialService';
+import { SupabaseService } from '../../utils/supabaseService';
 import PostCard from './PostCard';
 import CreatePostModal from './CreatePostModal';
 import { Plus, Users, TrendingUp, UserPlus } from 'lucide-react';
@@ -38,7 +38,7 @@ const SocialFeed: React.FC<SocialFeedProps> = ({
   onCreatePostModalClose,
   onCreatePost
 }) => {
-  const [posts, setPosts] = useState<SocialPost[]>([]);
+  const [posts, setPosts] = useState<any[]>([]);
   const [internalShowCreateModal, setInternalShowCreateModal] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [friendsCount, setFriendsCount] = useState(0);
@@ -51,11 +51,10 @@ const SocialFeed: React.FC<SocialFeedProps> = ({
     loadFriendsCount();
   }, [currentUser.id]);
 
-  const loadPosts = () => {
+  const loadPosts = async () => {
     setIsLoading(true);
     try {
-      // Get posts from friends and self only
-      const feedPosts = SocialService.getFeedPosts(currentUser.id);
+      const feedPosts = await SupabaseService.getFeedPosts(currentUser.id);
       setPosts(feedPosts);
     } catch (error) {
       console.error('Failed to load posts:', error);
@@ -64,12 +63,16 @@ const SocialFeed: React.FC<SocialFeedProps> = ({
     }
   };
 
-  const loadFriendsCount = () => {
-    const friends = SocialService.getFriends(currentUser.id);
-    setFriendsCount(friends.length);
+  const loadFriendsCount = async () => {
+    try {
+      const friends = await SupabaseService.getFriends(currentUser.id);
+      setFriendsCount(friends.length);
+    } catch (error) {
+      console.error('Failed to load friends count:', error);
+    }
   };
 
-  const handleCreatePost = (
+  const handleCreatePost = async (
     caption: string,
     mediaUrl?: string,
     mediaType?: 'image' | 'video',
@@ -77,11 +80,8 @@ const SocialFeed: React.FC<SocialFeedProps> = ({
     achievementTag?: { achievementId: string; achievementTitle: string; achievementType: string }
   ) => {
     try {
-      const newPost = SocialService.createPost(
+      const newPost = await SupabaseService.createPost(
         currentUser.id,
-        currentUser.name,
-        currentUser.avatarUrl,
-        currentUser.level,
         caption,
         mediaUrl,
         mediaType,
@@ -89,15 +89,10 @@ const SocialFeed: React.FC<SocialFeedProps> = ({
         achievementTag
       );
 
-      // Update user's posts
-      const updatedUser = {
-        ...currentUser,
-        posts: [newPost, ...currentUser.posts]
-      };
-      onUserUpdate(updatedUser);
-
-      // Refresh feed
-      loadPosts();
+      if (newPost) {
+        // Refresh feed
+        loadPosts();
+      }
       
       // Close modal
       if (onCreatePostModalClose) {
@@ -125,7 +120,7 @@ const SocialFeed: React.FC<SocialFeedProps> = ({
 
   const handleLike = async (postId: string) => {
     try {
-      const success = SocialService.likePost(postId, currentUser.id);
+      const success = await SupabaseService.likePost(postId, currentUser.id);
       if (success) {
         // Refresh posts to show updated likes
         loadPosts();
@@ -137,13 +132,7 @@ const SocialFeed: React.FC<SocialFeedProps> = ({
 
   const handleComment = async (postId: string, content: string) => {
     try {
-      const comment = SocialService.addComment(
-        postId,
-        currentUser.id,
-        currentUser.name,
-        currentUser.avatarUrl,
-        content
-      );
+      const comment = await SupabaseService.addComment(postId, currentUser.id, content);
       
       if (comment) {
         // Refresh posts to show new comment
@@ -222,13 +211,40 @@ const SocialFeed: React.FC<SocialFeedProps> = ({
           </div>
         ) : (
           posts.map(post => (
-            <PostCard
-              key={post.id}
-              post={post}
-              currentUser={currentUser}
-              onLike={handleLike}
-              onComment={handleComment}
-            />
+            <div key={post.id} className="bg-white rounded-xl shadow-lg border border-amber-100 overflow-hidden fantasy-card">
+              {/* Post content would be rendered here */}
+              <div className="p-4">
+                <div className="flex items-center mb-3">
+                  <img 
+                    src={post.user_profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${post.user_profiles?.username}`}
+                    alt={post.user_profiles?.username}
+                    className="w-10 h-10 rounded-full mr-3"
+                  />
+                  <div>
+                    <h4 className="font-cinzel font-bold text-gray-800">{post.user_profiles?.username}</h4>
+                    <p className="text-sm text-gray-500 font-merriweather">Level {post.user_profiles?.level}</p>
+                  </div>
+                </div>
+                
+                <p className="text-gray-800 font-merriweather mb-4">{post.content}</p>
+                
+                {post.media_url && (
+                  <div className="mb-4">
+                    {post.media_type === 'video' ? (
+                      <video src={post.media_url} controls className="w-full rounded-lg" />
+                    ) : (
+                      <img src={post.media_url} alt="Post media" className="w-full rounded-lg" />
+                    )}
+                  </div>
+                )}
+                
+                <div className="flex items-center justify-between text-sm text-gray-500">
+                  <span>{post.likes_count} likes</span>
+                  <span>{post.comments_count} comments</span>
+                  <span>{new Date(post.timestamp).toLocaleDateString()}</span>
+                </div>
+              </div>
+            </div>
           ))
         )}
       </div>
