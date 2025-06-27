@@ -1,20 +1,18 @@
 import React, { useState } from 'react';
 import { User } from '../../types';
+import { SupabaseAuthService } from '../../utils/supabaseAuthService';
+import { mockUser } from '../../data/mockData';
 import AuthLayout from './AuthLayout';
 import Button from '../ui/Button';
-import { Eye, EyeOff, Mail, Lock, LogIn, UserPlus, HelpCircle } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, LogIn } from 'lucide-react';
 
 interface SignInFormProps {
-  onSignIn: (email: string, password: string) => Promise<void>;
+  onSignIn: (user: User) => void;
   onSwitchToSignUp: () => void;
   onForgotPassword: () => void;
 }
 
-const SignInForm: React.FC<SignInFormProps> = ({
-  onSignIn,
-  onSwitchToSignUp,
-  onForgotPassword
-}) => {
+const SignInForm: React.FC<SignInFormProps> = ({ onSignIn, onSwitchToSignUp, onForgotPassword }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -23,37 +21,64 @@ const SignInForm: React.FC<SignInFormProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || !password.trim()) {
-      setError('Please fill in all fields');
-      return;
-    }
-
     setIsLoading(true);
     setError('');
 
     try {
-      await onSignIn(email.trim(), password);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sign in failed. Please try again.');
+      // Check for admin credentials
+      if (email === 'admin@123' && password === 'admin@123') {
+        const adminUser: User = {
+          ...mockUser,
+          id: 'admin-user-id',
+          email: 'admin@123',
+          name: 'Administrator',
+          isAdmin: true
+        };
+        onSignIn(adminUser);
+        return;
+      }
+
+      // Check if Supabase is configured
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      if (!supabaseUrl || !supabaseKey) {
+        // Demo mode - accept any credentials
+        console.log('Demo mode: Using mock authentication');
+        const demoUser: User = {
+          ...mockUser,
+          email: email,
+          name: email.split('@')[0]
+        };
+        onSignIn(demoUser);
+        return;
+      }
+
+      // Try Supabase authentication
+      const { user, error: authError } = await SupabaseAuthService.signIn(email, password);
+
+      if (authError) {
+        setError(authError);
+        return;
+      }
+
+      if (user) {
+        onSignIn(user);
+      } else {
+        setError('Sign in failed. Please try again.');
+      }
+    } catch (error) {
+      console.error('Sign in error:', error);
+      setError('An unexpected error occurred. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleDemoLogin = () => {
-    setEmail('demo@mythicquest.com');
-    setPassword('demo123');
-  };
-
-  const handleAdminLogin = () => {
-    setEmail('admin@123');
-    setPassword('admin@123');
-  };
-
   return (
     <AuthLayout
       title="Welcome Back, Adventurer"
-      subtitle="Continue your mythical wellness journey"
+      subtitle="Continue your mystical wellness journey in the realm of Eldoria"
     >
       <form onSubmit={handleSubmit} className="space-y-6">
         {error && (
@@ -62,34 +87,12 @@ const SignInForm: React.FC<SignInFormProps> = ({
           </div>
         )}
 
-        {/* Demo Account Info */}
+        {/* Demo Notice */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h3 className="text-blue-800 font-cinzel font-bold mb-2">Demo Accounts</h3>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between items-center">
-              <span className="text-blue-700 font-merriweather">Regular User:</span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={handleDemoLogin}
-                className="text-blue-600 hover:text-blue-800"
-              >
-                Use Demo Account
-              </Button>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-blue-700 font-merriweather">Administrator:</span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={handleAdminLogin}
-                className="text-blue-600 hover:text-blue-800"
-              >
-                Use Admin Account
-              </Button>
-            </div>
+          <h4 className="text-blue-800 font-cinzel font-bold text-sm mb-2">Demo Access</h4>
+          <div className="text-blue-700 text-sm font-merriweather space-y-1">
+            <p><strong>Admin:</strong> admin@123 / admin@123</p>
+            <p><strong>Demo:</strong> Any email/password works</p>
           </div>
         </div>
 
@@ -144,11 +147,10 @@ const SignInForm: React.FC<SignInFormProps> = ({
             />
             <span className="ml-2 text-sm text-gray-600 font-merriweather">Remember me</span>
           </label>
-          
           <button
             type="button"
             onClick={onForgotPassword}
-            className="text-sm text-amber-600 hover:text-amber-800 font-cinzel font-bold"
+            className="text-sm text-amber-600 hover:text-amber-700 font-cinzel font-bold"
           >
             Forgot password?
           </button>
@@ -162,18 +164,18 @@ const SignInForm: React.FC<SignInFormProps> = ({
           icon={<LogIn size={20} />}
           className="magical-glow"
         >
-          {isLoading ? 'Signing In...' : 'Sign In'}
+          {isLoading ? 'Signing In...' : 'Enter the Realm'}
         </Button>
 
         <div className="text-center">
           <p className="text-gray-600 font-merriweather">
-            New to Mythic Quest?{' '}
+            New to Eldoria?{' '}
             <button
               type="button"
               onClick={onSwitchToSignUp}
-              className="text-amber-600 hover:text-amber-800 font-cinzel font-bold"
+              className="text-amber-600 hover:text-amber-700 font-cinzel font-bold"
             >
-              Create Account
+              Begin Your Journey
             </button>
           </p>
         </div>
