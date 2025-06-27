@@ -125,12 +125,11 @@ function App() {
       const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
       
       if (supabaseUrl && supabaseKey) {
-        const { data } = SupabaseAuthService.onAuthStateChange((user) => {
+        subscription = SupabaseAuthService.onAuthStateChange((user) => {
           setUser(user);
           setIsAuthenticated(!!user);
           setIsLoading(false);
         });
-        subscription = data;
       }
     } catch (error) {
       console.warn('Could not set up auth listener:', error);
@@ -138,7 +137,7 @@ function App() {
 
     return () => {
       clearTimeout(loadingTimeout);
-      if (subscription) {
+      if (subscription && subscription.unsubscribe) {
         subscription.unsubscribe();
       }
     };
