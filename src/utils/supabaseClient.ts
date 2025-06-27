@@ -3,21 +3,11 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// Only create client if environment variables are present
-let supabase: any = null;
-
-if (supabaseUrl && supabaseAnonKey) {
-  try {
-    supabase = createClient(supabaseUrl, supabaseAnonKey);
-  } catch (error) {
-    console.warn('Failed to initialize Supabase client:', error);
-  }
-} else {
-  console.warn('Supabase environment variables not found. Running in demo mode.');
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Missing Supabase environment variables. Please add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env file.');
 }
 
-// Export a safe client that handles missing configuration
-export { supabase };
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Database types
 export interface UserProfile {
