@@ -1,36 +1,22 @@
 import React from 'react';
-import Button from '../ui/Button';
+import { MagicalLocation } from '../../types';
+import Card from '../ui/Card';
 import Badge from '../ui/Badge';
-import { MapPin, Navigation, Target, Award, Clock, Route } from 'lucide-react';
-
-interface WellnessLocation {
-  id: string;
-  name: string;
-  type: 'park' | 'library' | 'gym' | 'cafe' | 'landmark';
-  latitude: number;
-  longitude: number;
-  description: string;
-  magicalName: string;
-  questReward: number;
-  questTask: string;
-  discovered: boolean;
-  visitCount: number;
-}
+import Button from '../ui/Button';
+import { MapPin, Navigation, Award, CheckCircle, Target, Sparkles } from 'lucide-react';
 
 interface WellnessQuestPanelProps {
-  locations: WellnessLocation[];
+  locations: MagicalLocation[];
   userLocation: { latitude: number; longitude: number } | null;
   completedQuests: Set<string>;
-  onNavigateToLocation: (location: WellnessLocation) => void;
-  onMarkPath: (location: WellnessLocation) => void;
+  onNavigateToLocation: (location: MagicalLocation) => void;
 }
 
 const WellnessQuestPanel: React.FC<WellnessQuestPanelProps> = ({
   locations,
   userLocation,
   completedQuests,
-  onNavigateToLocation,
-  onMarkPath
+  onNavigateToLocation
 }) => {
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
     const R = 6371e3; // Earth's radius in meters
@@ -54,13 +40,14 @@ const WellnessQuestPanel: React.FC<WellnessQuestPanelProps> = ({
     return `${Math.round(meters)} m`;
   };
 
-  const getLocationTypeIcon = (type: string) => {
+  const getLocationIcon = (type: string): string => {
     const iconMap: Record<string, string> = {
       park: '🌳',
       gym: '💪',
       library: '📚',
       cafe: '☕',
-      landmark: '🏛️'
+      landmark: '🏛️',
+      temple: '⛩️'
     };
     return iconMap[type] || '📍';
   };
@@ -71,145 +58,134 @@ const WellnessQuestPanel: React.FC<WellnessQuestPanelProps> = ({
       gym: 'primary',
       library: 'accent',
       cafe: 'warning',
-      landmark: 'secondary'
+      landmark: 'secondary',
+      temple: 'primary'
     };
     return colorMap[type] || 'primary';
   };
 
   if (locations.length === 0) {
     return (
-      <div className="text-center py-8 bg-white rounded-lg shadow-md">
-        <MapPin className="mx-auto mb-4 text-gray-400" size={48} />
+      <div className="text-center py-12 bg-white rounded-lg shadow-md">
+        <Target className="mx-auto mb-4 text-gray-400" size={48} />
         <h3 className="text-xl font-cinzel font-bold text-gray-600 mb-2">
-          No Wellness Locations Found
+          Discovering Wellness Locations...
         </h3>
         <p className="text-gray-500 font-merriweather">
-          We're searching for wellness locations in your area. Please ensure location services are enabled.
+          Allow location access to discover magical wellness quests near you!
         </p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {locations.map(location => {
-        const isCompleted = completedQuests.has(location.id) || location.discovered;
+        const isCompleted = completedQuests.has(location.id);
         const distance = userLocation 
-          ? calculateDistance(
-              userLocation.latitude,
-              userLocation.longitude,
-              location.latitude,
-              location.longitude
-            )
+          ? calculateDistance(userLocation.latitude, userLocation.longitude, location.latitude, location.longitude)
           : null;
+        const isNearby = distance !== null && distance <= 50; // Within 50 meters
 
         return (
-          <div
+          <Card 
             key={location.id}
-            className={`bg-white rounded-xl shadow-lg border-2 p-6 transition-all duration-300 hover:shadow-xl ${
-              isCompleted 
-                ? 'border-green-300 bg-green-50' 
-                : 'border-amber-200 hover:border-amber-300'
-            }`}
+            variant="hover" 
+            className={`relative border-l-4 ${
+              isCompleted ? 'border-l-green-500' : isNearby ? 'border-l-blue-500' : 'border-l-amber-500'
+            } fantasy-card`}
           >
-            {/* Header */}
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center">
-                <div className="text-2xl mr-3">
-                  {getLocationTypeIcon(location.type)}
-                </div>
-                <div>
-                  <h3 className="text-lg font-cinzel font-bold text-amber-800 mb-1">
-                    {location.magicalName}
-                  </h3>
-                  <p className="text-sm text-gray-600 font-merriweather">
-                    {location.name}
-                  </p>
+            {isCompleted && (
+              <div className="absolute top-4 right-4 magical-glow">
+                <CheckCircle className="text-green-500" size={24} />
+              </div>
+            )}
+            
+            {isNearby && !isCompleted && (
+              <div className="absolute top-4 right-4">
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
+                  <Sparkles className="text-blue-500" size={20} />
                 </div>
               </div>
-              
-              <div className="flex flex-col items-end space-y-2">
+            )}
+            
+            <div className="flex flex-col h-full p-5">
+              <div className="mb-3 flex items-start justify-between">
                 <Badge 
                   color={getLocationTypeColor(location.type)} 
-                  className="magical-glow"
+                  variant="default"
+                  className="mb-2 magical-glow"
                 >
+                  <MapPin size={14} className="mr-1" />
                   {location.type.charAt(0).toUpperCase() + location.type.slice(1)}
                 </Badge>
                 
-                {distance && (
-                  <div className="flex items-center text-xs text-gray-500">
-                    <Target size={12} className="mr-1" />
-                    <span className="font-merriweather">{formatDistance(distance)}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Quest Description */}
-            <div className="mb-4 p-3 bg-amber-50 rounded-lg border border-amber-200">
-              <h4 className="font-cinzel font-bold text-amber-800 mb-2 flex items-center">
-                <Clock size={16} className="mr-2" />
-                Wellness Quest
-              </h4>
-              <p className="text-sm text-amber-700 font-merriweather">
-                {location.questTask}
-              </p>
-            </div>
-
-            {/* Rewards and Status */}
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-4">
-                <div className="flex items-center text-amber-700">
-                  <Award size={16} className="mr-1 magical-glow" />
-                  <span className="text-sm font-cinzel font-bold">{location.questReward} XP</span>
-                </div>
-                
-                {location.visitCount > 0 && (
-                  <div className="flex items-center text-purple-600">
-                    <span className="text-sm font-cinzel">
-                      Visited {location.visitCount} time{location.visitCount > 1 ? 's' : ''}
-                    </span>
-                  </div>
+                {distance !== null && (
+                  <span className="text-xs text-gray-500 font-cinzel">
+                    {formatDistance(distance)}
+                  </span>
                 )}
               </div>
               
-              {isCompleted && (
-                <Badge color="success" className="magical-glow">
-                  ✅ Completed
-                </Badge>
-              )}
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex space-x-3">
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => onNavigateToLocation(location)}
-                icon={<Navigation size={16} />}
-                className="flex-1 magical-glow"
-              >
-                Navigate to Location
-              </Button>
+              <div className="mb-3">
+                <h3 className="text-lg font-cinzel font-bold text-mystic-dark mb-1">
+                  {getLocationIcon(location.type)} {location.magicalName}
+                </h3>
+                <p className="text-sm text-amber-700 font-merriweather">
+                  {location.name}
+                </p>
+              </div>
               
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onMarkPath(location)}
-                icon={<Route size={16} />}
-                className="flex-1"
-              >
-                Mark Path
-              </Button>
-            </div>
-
-            {/* Location Description */}
-            <div className="mt-4 pt-3 border-t border-gray-200">
-              <p className="text-xs text-gray-600 font-merriweather italic">
+              <p className="text-sm text-gray-700 mb-4 font-merriweather flex-grow">
                 {location.description}
               </p>
+              
+              <div className="mt-auto space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center text-amber-700">
+                    <Award size={16} className="mr-1 magical-glow" />
+                    <span className="text-sm font-cinzel">{location.questReward} XP</span>
+                  </div>
+                  
+                  {isNearby && !isCompleted && (
+                    <Badge color="primary" size="sm" className="animate-pulse">
+                      <Target size={12} className="mr-1" />
+                      In Range!
+                    </Badge>
+                  )}
+                </div>
+                
+                {isCompleted ? (
+                  <div className="flex items-center justify-center p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <CheckCircle className="text-green-600 mr-2" size={16} />
+                    <span className="font-cinzel text-green-800 font-bold">Quest Completed!</span>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Button 
+                      variant="primary" 
+                      fullWidth
+                      onClick={() => onNavigateToLocation(location)}
+                      icon={<Navigation size={16} />}
+                      className="font-cinzel magical-glow"
+                    >
+                      Navigate to Location
+                    </Button>
+                    
+                    {isNearby && (
+                      <div className="text-center">
+                        <p className="text-xs text-blue-600 font-cinzel">
+                          <Sparkles size={12} className="inline mr-1" />
+                          You're close! Quest will auto-complete when you arrive.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          </Card>
         );
       })}
     </div>
