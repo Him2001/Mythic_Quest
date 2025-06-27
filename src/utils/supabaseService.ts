@@ -4,63 +4,81 @@ import { User, SocialPost, DirectMessage, Conversation, Chronicle, Quest } from 
 export class SupabaseService {
   // User Profile Management
   static async getUserProfile(userId: string) {
-    const { data, error } = await supabase
-      .from('user_profiles')
-      .select('*')
-      .eq('id', userId);
+    try {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('id', userId);
 
-    if (error) {
-      console.error('Error fetching user profile:', error);
+      if (error) {
+        console.error('Error fetching user profile:', error);
+        return null;
+      }
+
+      // Return the first profile if it exists, otherwise null
+      return data && data.length > 0 ? data[0] : null;
+    } catch (error) {
+      console.error('Error in getUserProfile:', error);
       return null;
     }
-
-    // Return the first profile if it exists, otherwise null
-    return data && data.length > 0 ? data[0] : null;
   }
 
   static async createProfile(userId: string, username: string, email?: string) {
-    const { data, error } = await supabase
-      .from('user_profiles')
-      .insert({
+    try {
+      const profileData = {
         id: userId,
         username: username,
-        email: email,
+        email: email || '',
         xp: 0,
         coins: 0,
         level: 1,
-        quests_completed: 0,
+        total_quests_completed: 0,
         daily_walking_distance: 0,
         total_walking_distance: 0,
-        total_quests_completed: 0,
-        is_active: true
-      })
-      .select()
-      .single();
+        is_active: true,
+        avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`,
+        date_created: new Date().toISOString()
+      };
 
-    if (error) {
-      console.error('Error creating user profile:', error);
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .insert(profileData)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating user profile:', error);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in createProfile:', error);
       return null;
     }
-
-    return data;
   }
 
   static async updateUserProfile(userId: string, updates: any) {
-    const { error } = await supabase
-      .from('user_profiles')
-      .update(updates)
-      .eq('id', userId);
+    try {
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq('id', userId);
 
-    if (error) {
-      console.error('Error updating user profile:', error);
+      if (error) {
+        console.error('Error updating user profile:', error);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error in updateUserProfile:', error);
       return false;
     }
-
-    return true;
   }
 
   static async updateUserProgress(userId: string, xp: number, level: number, coins: number) {
-    return this.updateUserProfile(userId, { xp, level, coins, updated_at: new Date().toISOString() });
+    return this.updateUserProfile(userId, { xp, level, coins });
   }
 
   // Quest Completion Tracking
@@ -71,50 +89,60 @@ export class SupabaseService {
     xpEarned: number,
     coinsEarned: number
   ) {
-    const { error } = await supabase
-      .from('quests_completed')
-      .insert({
-        user_id: userId,
-        quest_name: questName,
-        quest_type: questType,
-        xp_earned: xpEarned,
-        coins_earned: coinsEarned
-      });
+    try {
+      const { error } = await supabase
+        .from('quests_completed')
+        .insert({
+          user_id: userId,
+          quest_name: questName,
+          quest_type: questType,
+          xp_earned: xpEarned,
+          coins_earned: coinsEarned
+        });
 
-    if (error) {
-      console.error('Error recording quest completion:', error);
+      if (error) {
+        console.error('Error recording quest completion:', error);
+        return false;
+      }
+
+      // Update user's total quest count
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('total_quests_completed')
+        .eq('id', userId)
+        .single();
+
+      if (profile) {
+        await this.updateUserProfile(userId, {
+          total_quests_completed: (profile.total_quests_completed || 0) + 1
+        });
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error in recordQuestCompletion:', error);
       return false;
     }
-
-    // Update user's total quest count
-    const { data: profile } = await supabase
-      .from('user_profiles')
-      .select('total_quests_completed')
-      .eq('id', userId)
-      .single();
-
-    if (profile) {
-      await this.updateUserProfile(userId, {
-        total_quests_completed: profile.total_quests_completed + 1
-      });
-    }
-
-    return true;
   }
 
   static async getUserQuestHistory(userId: string) {
-    const { data, error } = await supabase
-      .from('quests_completed')
-      .select('*')
-      .eq('user_id', userId)
-      .order('date_completed', { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from('quests_completed')
+        .select('*')
+        .eq('user_id', userId)
+        .order('date_completed', { ascending: false });
 
-    if (error) {
-      console.error('Error fetching quest history:', error);
+      if (error) {
+        console.error('Error fetching quest history:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error in getUserQuestHistory:', error);
       return [];
     }
-
-    return data || [];
   }
 
   // Social Posts Management
@@ -126,165 +154,169 @@ export class SupabaseService {
     questTag?: any,
     achievementTag?: any
   ) {
-    const postData: any = {
-      user_id: userId,
-      content,
-      media_url: mediaUrl,
-      media_type: mediaType
-    };
+    try {
+      const postData: any = {
+        user_id: userId,
+        content,
+        media_url: mediaUrl,
+        media_type: mediaType
+      };
 
-    if (questTag) {
-      postData.quest_tag_id = questTag.questId;
-      postData.quest_tag_title = questTag.questTitle;
-      postData.quest_tag_type = questTag.questType;
-    }
+      if (questTag) {
+        postData.quest_tag_id = questTag.questId;
+        postData.quest_tag_title = questTag.questTitle;
+        postData.quest_tag_type = questTag.questType;
+      }
 
-    if (achievementTag) {
-      postData.achievement_tag_id = achievementTag.achievementId;
-      postData.achievement_tag_title = achievementTag.achievementTitle;
-      postData.achievement_tag_type = achievementTag.achievementType;
-    }
+      if (achievementTag) {
+        postData.achievement_tag_id = achievementTag.achievementId;
+        postData.achievement_tag_title = achievementTag.achievementTitle;
+        postData.achievement_tag_type = achievementTag.achievementType;
+      }
 
-    const { data, error } = await supabase
-      .from('posts')
-      .insert(postData)
-      .select()
-      .single();
+      const { data, error } = await supabase
+        .from('posts')
+        .insert(postData)
+        .select()
+        .single();
 
-    if (error) {
-      console.error('Error creating post:', error);
+      if (error) {
+        console.error('Error creating post:', error);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in createPost:', error);
       return null;
     }
-
-    return data;
   }
 
   static async getFeedPosts(userId: string) {
-    // Get posts from user and their friends
-    const { data, error } = await supabase
-      .from('posts')
-      .select(`
-        *,
-        user_profiles!posts_user_id_fkey (
-          username,
-          avatar_url,
-          level
-        )
-      `)
-      .order('timestamp', { ascending: false })
-      .limit(50);
+    try {
+      // Get posts from user and their friends
+      const { data, error } = await supabase
+        .from('posts')
+        .select(`
+          *,
+          user_profiles!posts_user_id_fkey (
+            username,
+            avatar_url,
+            level
+          )
+        `)
+        .order('timestamp', { ascending: false })
+        .limit(50);
 
-    if (error) {
-      console.error('Error fetching feed posts:', error);
+      if (error) {
+        console.error('Error fetching feed posts:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error in getFeedPosts:', error);
       return [];
     }
-
-    return data || [];
   }
 
   static async likePost(postId: string, userId: string) {
-    // Check if already liked
-    const { data: existingLike } = await supabase
-      .from('post_likes')
-      .select('id')
-      .eq('post_id', postId)
-      .eq('user_id', userId)
-      .single();
-
-    if (existingLike) {
-      // Unlike
-      const { error } = await supabase
+    try {
+      // Check if already liked
+      const { data: existingLike } = await supabase
         .from('post_likes')
-        .delete()
+        .select('id')
         .eq('post_id', postId)
-        .eq('user_id', userId);
+        .eq('user_id', userId)
+        .single();
 
-      return !error;
-    } else {
-      // Like
-      const { error } = await supabase
-        .from('post_likes')
-        .insert({ post_id: postId, user_id: userId });
+      if (existingLike) {
+        // Unlike
+        const { error } = await supabase
+          .from('post_likes')
+          .delete()
+          .eq('post_id', postId)
+          .eq('user_id', userId);
 
-      return !error;
+        return !error;
+      } else {
+        // Like
+        const { error } = await supabase
+          .from('post_likes')
+          .insert({ post_id: postId, user_id: userId });
+
+        return !error;
+      }
+    } catch (error) {
+      console.error('Error in likePost:', error);
+      return false;
     }
   }
 
   static async addComment(postId: string, userId: string, content: string) {
-    const { data, error } = await supabase
-      .from('post_comments')
-      .insert({
-        post_id: postId,
-        user_id: userId,
-        content
-      })
-      .select(`
-        *,
-        user_profiles!post_comments_user_id_fkey (
-          username,
-          avatar_url
-        )
-      `)
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('post_comments')
+        .insert({
+          post_id: postId,
+          user_id: userId,
+          content
+        })
+        .select(`
+          *,
+          user_profiles!post_comments_user_id_fkey (
+            username,
+            avatar_url
+          )
+        `)
+        .single();
 
-    if (error) {
-      console.error('Error adding comment:', error);
+      if (error) {
+        console.error('Error adding comment:', error);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in addComment:', error);
       return null;
     }
-
-    return data;
-  }
-
-  static async getPostComments(postId: string) {
-    const { data, error } = await supabase
-      .from('post_comments')
-      .select(`
-        *,
-        user_profiles!post_comments_user_id_fkey (
-          username,
-          avatar_url
-        )
-      `)
-      .eq('post_id', postId)
-      .order('created_at', { ascending: true });
-
-    if (error) {
-      console.error('Error fetching comments:', error);
-      return [];
-    }
-
-    return data || [];
   }
 
   // Messaging System
   static async createConversation(user1Id: string, user2Id: string) {
-    // Check if conversation already exists
-    const { data: existing } = await supabase
-      .from('conversations')
-      .select('*')
-      .or(`and(user1_id.eq.${user1Id},user2_id.eq.${user2Id}),and(user1_id.eq.${user2Id},user2_id.eq.${user1Id})`)
-      .single();
+    try {
+      // Check if conversation already exists
+      const { data: existing } = await supabase
+        .from('conversations')
+        .select('*')
+        .or(`and(user1_id.eq.${user1Id},user2_id.eq.${user2Id}),and(user1_id.eq.${user2Id},user2_id.eq.${user1Id})`)
+        .single();
 
-    if (existing) {
-      return existing;
-    }
+      if (existing) {
+        return existing;
+      }
 
-    // Create new conversation
-    const { data, error } = await supabase
-      .from('conversations')
-      .insert({
-        user1_id: user1Id,
-        user2_id: user2Id
-      })
-      .select()
-      .single();
+      // Create new conversation
+      const { data, error } = await supabase
+        .from('conversations')
+        .insert({
+          user1_id: user1Id,
+          user2_id: user2Id
+        })
+        .select()
+        .single();
 
-    if (error) {
-      console.error('Error creating conversation:', error);
+      if (error) {
+        console.error('Error creating conversation:', error);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in createConversation:', error);
       return null;
     }
-
-    return data;
   }
 
   static async sendMessage(
@@ -295,89 +327,109 @@ export class SupabaseService {
     mediaUrl?: string,
     mediaType?: 'image' | 'video'
   ) {
-    const { data, error } = await supabase
-      .from('messages')
-      .insert({
-        conversation_id: conversationId,
-        sender_id: senderId,
-        receiver_id: receiverId,
-        message_text: messageText,
-        media_url: mediaUrl,
-        media_type: mediaType
-      })
-      .select()
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .insert({
+          conversation_id: conversationId,
+          sender_id: senderId,
+          receiver_id: receiverId,
+          message_text: messageText,
+          media_url: mediaUrl,
+          media_type: mediaType
+        })
+        .select()
+        .single();
 
-    if (error) {
-      console.error('Error sending message:', error);
+      if (error) {
+        console.error('Error sending message:', error);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in sendMessage:', error);
       return null;
     }
-
-    return data;
   }
 
   static async getConversations(userId: string) {
-    const { data, error } = await supabase
-      .from('conversations')
-      .select(`
-        *,
-        user1:user_profiles!conversations_user1_id_fkey (
-          id,
-          username,
-          avatar_url
-        ),
-        user2:user_profiles!conversations_user2_id_fkey (
-          id,
-          username,
-          avatar_url
-        )
-      `)
-      .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
-      .order('last_updated', { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from('conversations')
+        .select(`
+          *,
+          user1:user_profiles!conversations_user1_id_fkey (
+            id,
+            username,
+            avatar_url
+          ),
+          user2:user_profiles!conversations_user2_id_fkey (
+            id,
+            username,
+            avatar_url
+          )
+        `)
+        .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
+        .order('last_updated', { ascending: false });
 
-    if (error) {
-      console.error('Error fetching conversations:', error);
+      if (error) {
+        console.error('Error fetching conversations:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error in getConversations:', error);
       return [];
     }
-
-    return data || [];
   }
 
   static async getMessages(conversationId: string) {
-    const { data, error } = await supabase
-      .from('messages')
-      .select(`
-        *,
-        sender:user_profiles!messages_sender_id_fkey (
-          username,
-          avatar_url
-        )
-      `)
-      .eq('conversation_id', conversationId)
-      .order('timestamp', { ascending: true });
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .select(`
+          *,
+          sender:user_profiles!messages_sender_id_fkey (
+            username,
+            avatar_url
+          )
+        `)
+        .eq('conversation_id', conversationId)
+        .order('timestamp', { ascending: true });
 
-    if (error) {
-      console.error('Error fetching messages:', error);
+      if (error) {
+        console.error('Error fetching messages:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error in getMessages:', error);
       return [];
     }
-
-    return data || [];
   }
 
   static async markMessagesAsRead(conversationId: string, userId: string) {
-    const { error } = await supabase
-      .from('messages')
-      .update({ is_read: true })
-      .eq('conversation_id', conversationId)
-      .eq('receiver_id', userId)
-      .eq('is_read', false);
+    try {
+      const { error } = await supabase
+        .from('messages')
+        .update({ is_read: true })
+        .eq('conversation_id', conversationId)
+        .eq('receiver_id', userId)
+        .eq('is_read', false);
 
-    if (error) {
-      console.error('Error marking messages as read:', error);
+      if (error) {
+        console.error('Error marking messages as read:', error);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error in markMessagesAsRead:', error);
       return false;
     }
-
-    return true;
   }
 
   // Chronicles Management
@@ -392,211 +444,256 @@ export class SupabaseService {
     imageUrl?: string,
     isPrivate: boolean = false
   ) {
-    const { data, error } = await supabase
-      .from('chronicles')
-      .insert({
-        user_id: userId,
-        title,
-        content,
-        mood,
-        week_number: weekNumber,
-        xp_gained: xpGained,
-        coins_earned: coinsEarned,
-        image_url: imageUrl,
-        is_private: isPrivate
-      })
-      .select()
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('chronicles')
+        .insert({
+          user_id: userId,
+          title,
+          content,
+          mood,
+          week_number: weekNumber,
+          xp_gained: xpGained,
+          coins_earned: coinsEarned,
+          image_url: imageUrl,
+          is_private: isPrivate
+        })
+        .select()
+        .single();
 
-    if (error) {
-      console.error('Error creating chronicle:', error);
+      if (error) {
+        console.error('Error creating chronicle:', error);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in createChronicle:', error);
       return null;
     }
-
-    return data;
   }
 
   static async getUserChronicles(userId: string) {
-    const { data, error } = await supabase
-      .from('chronicles')
-      .select('*')
-      .eq('user_id', userId)
-      .order('date_created', { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from('chronicles')
+        .select('*')
+        .eq('user_id', userId)
+        .order('date_created', { ascending: false });
 
-    if (error) {
-      console.error('Error fetching user chronicles:', error);
+      if (error) {
+        console.error('Error fetching user chronicles:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error in getUserChronicles:', error);
       return [];
     }
-
-    return data || [];
   }
 
   static async getFriendsChronicles(userId: string) {
-    // Get public chronicles from friends
-    const { data, error } = await supabase
-      .from('chronicles')
-      .select(`
-        *,
-        user_profiles!chronicles_user_id_fkey (
-          username,
-          avatar_url,
-          level
-        )
-      `)
-      .eq('is_private', false)
-      .neq('user_id', userId)
-      .order('date_created', { ascending: false })
-      .limit(20);
+    try {
+      // Get public chronicles from friends
+      const { data, error } = await supabase
+        .from('chronicles')
+        .select(`
+          *,
+          user_profiles!chronicles_user_id_fkey (
+            username,
+            avatar_url,
+            level
+          )
+        `)
+        .eq('is_private', false)
+        .neq('user_id', userId)
+        .order('date_created', { ascending: false })
+        .limit(20);
 
-    if (error) {
-      console.error('Error fetching friends chronicles:', error);
+      if (error) {
+        console.error('Error fetching friends chronicles:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error in getFriendsChronicles:', error);
       return [];
     }
-
-    return data || [];
   }
 
   static async updateChroniclePrivacy(chronicleId: string, isPrivate: boolean) {
-    const { error } = await supabase
-      .from('chronicles')
-      .update({ is_private: isPrivate })
-      .eq('id', chronicleId);
+    try {
+      const { error } = await supabase
+        .from('chronicles')
+        .update({ is_private: isPrivate })
+        .eq('id', chronicleId);
 
-    if (error) {
-      console.error('Error updating chronicle privacy:', error);
+      if (error) {
+        console.error('Error updating chronicle privacy:', error);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error in updateChroniclePrivacy:', error);
       return false;
     }
-
-    return true;
   }
 
   static async deleteChronicle(chronicleId: string) {
-    const { error } = await supabase
-      .from('chronicles')
-      .delete()
-      .eq('id', chronicleId);
+    try {
+      const { error } = await supabase
+        .from('chronicles')
+        .delete()
+        .eq('id', chronicleId);
 
-    if (error) {
-      console.error('Error deleting chronicle:', error);
+      if (error) {
+        console.error('Error deleting chronicle:', error);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error in deleteChronicle:', error);
       return false;
     }
-
-    return true;
   }
 
   // Friend System
   static async sendFriendRequest(senderId: string, receiverId: string) {
-    const { data, error } = await supabase
-      .from('friend_requests')
-      .insert({
-        sender_id: senderId,
-        receiver_id: receiverId
-      })
-      .select()
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('friend_requests')
+        .insert({
+          sender_id: senderId,
+          receiver_id: receiverId
+        })
+        .select()
+        .single();
 
-    if (error) {
-      console.error('Error sending friend request:', error);
+      if (error) {
+        console.error('Error sending friend request:', error);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in sendFriendRequest:', error);
       return null;
     }
-
-    return data;
   }
 
   static async acceptFriendRequest(requestId: string) {
-    // Get the friend request
-    const { data: request, error: requestError } = await supabase
-      .from('friend_requests')
-      .select('*')
-      .eq('id', requestId)
-      .single();
+    try {
+      // Get the friend request
+      const { data: request, error: requestError } = await supabase
+        .from('friend_requests')
+        .select('*')
+        .eq('id', requestId)
+        .single();
 
-    if (requestError || !request) {
-      console.error('Error fetching friend request:', requestError);
+      if (requestError || !request) {
+        console.error('Error fetching friend request:', requestError);
+        return false;
+      }
+
+      // Update request status
+      const { error: updateError } = await supabase
+        .from('friend_requests')
+        .update({ status: 'accepted' })
+        .eq('id', requestId);
+
+      if (updateError) {
+        console.error('Error updating friend request:', updateError);
+        return false;
+      }
+
+      // Create friendship
+      const { error: friendshipError } = await supabase
+        .from('friendships')
+        .insert({
+          user1_id: request.sender_id,
+          user2_id: request.receiver_id
+        });
+
+      if (friendshipError) {
+        console.error('Error creating friendship:', friendshipError);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error in acceptFriendRequest:', error);
       return false;
     }
-
-    // Update request status
-    const { error: updateError } = await supabase
-      .from('friend_requests')
-      .update({ status: 'accepted' })
-      .eq('id', requestId);
-
-    if (updateError) {
-      console.error('Error updating friend request:', updateError);
-      return false;
-    }
-
-    // Create friendship
-    const { error: friendshipError } = await supabase
-      .from('friendships')
-      .insert({
-        user1_id: request.sender_id,
-        user2_id: request.receiver_id
-      });
-
-    if (friendshipError) {
-      console.error('Error creating friendship:', friendshipError);
-      return false;
-    }
-
-    return true;
   }
 
   static async getFriendRequests(userId: string) {
-    const { data, error } = await supabase
-      .from('friend_requests')
-      .select(`
-        *,
-        sender:user_profiles!friend_requests_sender_id_fkey (
-          id,
-          username,
-          avatar_url
-        ),
-        receiver:user_profiles!friend_requests_receiver_id_fkey (
-          id,
-          username,
-          avatar_url
-        )
-      `)
-      .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
-      .eq('status', 'pending')
-      .order('created_at', { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from('friend_requests')
+        .select(`
+          *,
+          sender:user_profiles!friend_requests_sender_id_fkey (
+            id,
+            username,
+            avatar_url
+          ),
+          receiver:user_profiles!friend_requests_receiver_id_fkey (
+            id,
+            username,
+            avatar_url
+          )
+        `)
+        .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Error fetching friend requests:', error);
+      if (error) {
+        console.error('Error fetching friend requests:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error in getFriendRequests:', error);
       return [];
     }
-
-    return data || [];
   }
 
   static async getFriends(userId: string) {
-    const { data, error } = await supabase
-      .from('friendships')
-      .select(`
-        *,
-        user1:user_profiles!friendships_user1_id_fkey (
-          id,
-          username,
-          avatar_url,
-          level
-        ),
-        user2:user_profiles!friendships_user2_id_fkey (
-          id,
-          username,
-          avatar_url,
-          level
-        )
-      `)
-      .or(`user1_id.eq.${userId},user2_id.eq.${userId}`);
+    try {
+      const { data, error } = await supabase
+        .from('friendships')
+        .select(`
+          *,
+          user1:user_profiles!friendships_user1_id_fkey (
+            id,
+            username,
+            avatar_url,
+            level
+          ),
+          user2:user_profiles!friendships_user2_id_fkey (
+            id,
+            username,
+            avatar_url,
+            level
+          )
+        `)
+        .or(`user1_id.eq.${userId},user2_id.eq.${userId}`);
 
-    if (error) {
-      console.error('Error fetching friends:', error);
+      if (error) {
+        console.error('Error fetching friends:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error in getFriends:', error);
       return [];
     }
-
-    return data || [];
   }
 
   // Real-time subscriptions
@@ -637,16 +734,25 @@ export class SupabaseService {
 
   // Analytics and Stats
   static async getUserStats(userId: string) {
-    const [profile, questsCount, postsCount] = await Promise.all([
-      this.getUserProfile(userId),
-      supabase.from('quests_completed').select('*', { count: 'exact' }).eq('user_id', userId),
-      supabase.from('posts').select('*', { count: 'exact' }).eq('user_id', userId)
-    ]);
+    try {
+      const [profile, questsCount, postsCount] = await Promise.all([
+        this.getUserProfile(userId),
+        supabase.from('quests_completed').select('*', { count: 'exact' }).eq('user_id', userId),
+        supabase.from('posts').select('*', { count: 'exact' }).eq('user_id', userId)
+      ]);
 
-    return {
-      profile,
-      totalQuests: questsCount.count || 0,
-      totalPosts: postsCount.count || 0
-    };
+      return {
+        profile,
+        totalQuests: questsCount.count || 0,
+        totalPosts: postsCount.count || 0
+      };
+    } catch (error) {
+      console.error('Error in getUserStats:', error);
+      return {
+        profile: null,
+        totalQuests: 0,
+        totalPosts: 0
+      };
+    }
   }
 }

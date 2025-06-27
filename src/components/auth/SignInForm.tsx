@@ -3,7 +3,7 @@ import { SupabaseAuthService } from '../../utils/supabaseAuthService';
 import { User } from '../../types';
 import AuthLayout from './AuthLayout';
 import Button from '../ui/Button';
-import { Eye, EyeOff, Mail, Lock, AlertCircle, CheckCircle } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, LogIn } from 'lucide-react';
 
 interface SignInFormProps {
   onSignIn: (user: User) => void;
@@ -11,10 +11,10 @@ interface SignInFormProps {
   onForgotPassword: () => void;
 }
 
-const SignInForm: React.FC<SignInFormProps> = ({ 
-  onSignIn, 
-  onSwitchToSignUp, 
-  onForgotPassword 
+const SignInForm: React.FC<SignInFormProps> = ({
+  onSignIn,
+  onSwitchToSignUp,
+  onForgotPassword
 }) => {
   const [formData, setFormData] = useState({
     email: '',
@@ -23,211 +23,165 @@ const SignInForm: React.FC<SignInFormProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-    setError('');
-  };
-
-  const validateForm = () => {
-    if (!formData.email.trim()) {
-      setError('Email is required');
-      return false;
-    }
-
-    if (!formData.password) {
-      setError('Password is required');
-      return false;
-    }
-
-    return true;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    // Clear error when user starts typing
+    if (error) setError('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!validateForm()) return;
-
     setIsLoading(true);
     setError('');
-    setSuccess('');
 
     try {
-      const { user, error } = await SupabaseAuthService.signIn(
-        formData.email.trim(),
+      const { user, error: authError } = await SupabaseAuthService.signIn(
+        formData.email,
         formData.password
       );
 
-      if (error) {
-        setError(error);
+      if (authError) {
+        setError(authError);
       } else if (user) {
-        setSuccess('Welcome back, adventurer!');
-        setTimeout(() => {
-          onSignIn(user);
-        }, 1000);
+        onSignIn(user);
       } else {
-        setError('Failed to sign in. Please try again.');
+        setError('Sign in failed. Please try again.');
       }
-    } catch (error) {
+    } catch (err) {
       setError('An unexpected error occurred. Please try again.');
-      console.error('Sign in error:', error);
+      console.error('Sign in error:', err);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Demo account login
-  const handleDemoLogin = async () => {
-    setFormData({
-      email: 'demo@mythicquest.com',
-      password: 'demo123'
-    });
-    
-    setIsLoading(true);
-    setError('');
-    setSuccess('');
-
-    try {
-      const { user, error } = await SupabaseAuthService.signIn(
-        'demo@mythicquest.com',
-        'demo123'
-      );
-
-      if (error) {
-        setError('Demo account not available. Please create your own account.');
-      } else if (user) {
-        setSuccess('Welcome to the demo account!');
-        setTimeout(() => {
-          onSignIn(user);
-        }, 1000);
-      }
-    } catch (error) {
-      setError('Demo account not available. Please create your own account.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const isFormValid = formData.email.trim() && formData.password.trim();
 
   return (
     <AuthLayout
-      title="Welcome Back, Hero"
-      subtitle="Sign in to continue your wellness adventure in the mystical realm of Eldoria"
+      title="Welcome Back, Adventurer"
+      subtitle="Continue your mystical wellness journey in the realm of Eldoria"
     >
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Email Field */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-red-800 font-merriweather">{error}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div>
-          <label htmlFor="email" className="block text-sm font-cinzel font-bold text-amber-800 mb-2">
+          <label htmlFor="email" className="block text-sm font-cinzel font-bold text-gray-700 mb-2">
             Email Address
           </label>
           <div className="relative">
-            <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-amber-600" size={20} />
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Mail className="h-5 w-5 text-gray-400" />
+            </div>
             <input
-              type="email"
               id="email"
               name="email"
+              type="email"
+              autoComplete="email"
+              required
               value={formData.email}
               onChange={handleInputChange}
-              className="w-full pl-10 pr-4 py-3 border-2 border-amber-200 rounded-lg focus:border-amber-500 focus:outline-none font-merriweather bg-white/80 backdrop-blur-sm"
+              className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 font-merriweather bg-white/80 backdrop-blur-sm"
               placeholder="Enter your email"
-              required
               disabled={isLoading}
             />
           </div>
         </div>
 
-        {/* Password Field */}
         <div>
-          <label htmlFor="password" className="block text-sm font-cinzel font-bold text-amber-800 mb-2">
+          <label htmlFor="password" className="block text-sm font-cinzel font-bold text-gray-700 mb-2">
             Password
           </label>
           <div className="relative">
-            <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-amber-600" size={20} />
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Lock className="h-5 w-5 text-gray-400" />
+            </div>
             <input
-              type={showPassword ? 'text' : 'password'}
               id="password"
               name="password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
+              required
               value={formData.password}
               onChange={handleInputChange}
-              className="w-full pl-10 pr-12 py-3 border-2 border-amber-200 rounded-lg focus:border-amber-500 focus:outline-none font-merriweather bg-white/80 backdrop-blur-sm"
+              className="block w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 font-merriweather bg-white/80 backdrop-blur-sm"
               placeholder="Enter your password"
-              required
               disabled={isLoading}
             />
             <button
               type="button"
+              className="absolute inset-y-0 right-0 pr-3 flex items-center"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-amber-600 hover:text-amber-700"
               disabled={isLoading}
             >
-              {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              {showPassword ? (
+                <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+              ) : (
+                <Eye className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+              )}
             </button>
           </div>
         </div>
 
-        {/* Forgot Password Link */}
-        <div className="text-right">
-          <button
-            type="button"
-            onClick={onForgotPassword}
-            className="text-amber-600 hover:text-amber-700 font-cinzel text-sm underline"
-            disabled={isLoading}
-          >
-            Forgot your password?
-          </button>
+        <div className="flex items-center justify-between">
+          <div className="text-sm">
+            <button
+              type="button"
+              onClick={onForgotPassword}
+              className="font-cinzel text-amber-600 hover:text-amber-500 transition-colors duration-200"
+              disabled={isLoading}
+            >
+              Forgot your password?
+            </button>
+          </div>
         </div>
 
-        {/* Error Message */}
-        {error && (
-          <div className="flex items-center p-3 bg-red-50 border border-red-200 rounded-lg">
-            <AlertCircle className="text-red-500 mr-2 flex-shrink-0" size={20} />
-            <span className="text-red-700 font-merriweather text-sm">{error}</span>
-          </div>
-        )}
-
-        {/* Success Message */}
-        {success && (
-          <div className="flex items-center p-3 bg-green-50 border border-green-200 rounded-lg">
-            <CheckCircle className="text-green-500 mr-2 flex-shrink-0" size={20} />
-            <span className="text-green-700 font-merriweather text-sm">{success}</span>
-          </div>
-        )}
-
-        {/* Submit Button */}
         <Button
           type="submit"
           variant="primary"
           fullWidth
-          disabled={isLoading}
-          className="py-3 font-cinzel font-bold text-lg magical-glow"
+          disabled={!isFormValid || isLoading}
+          icon={isLoading ? undefined : <LogIn size={20} />}
+          className="magical-glow"
         >
-          {isLoading ? 'Signing In...' : 'Enter the Realm'}
+          {isLoading ? (
+            <div className="flex items-center justify-center">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+              Signing In...
+            </div>
+          ) : (
+            'Sign In to Eldoria'
+          )}
         </Button>
 
-        {/* Demo Account Button */}
-        <Button
-          type="button"
-          variant="outline"
-          fullWidth
-          onClick={handleDemoLogin}
-          disabled={isLoading}
-          className="py-3 font-cinzel font-bold"
-        >
-          Try Demo Account
-        </Button>
-
-        {/* Sign Up Link */}
         <div className="text-center">
-          <p className="text-amber-800 font-merriweather">
-            New to Mythic Quest?{' '}
+          <p className="text-sm text-gray-600 font-merriweather">
+            New to the realm?{' '}
             <button
               type="button"
               onClick={onSwitchToSignUp}
-              className="text-amber-600 hover:text-amber-700 font-cinzel font-bold underline"
+              className="font-cinzel font-bold text-amber-600 hover:text-amber-500 transition-colors duration-200"
               disabled={isLoading}
             >
-              Create Account
+              Create your adventure
             </button>
           </p>
         </div>
