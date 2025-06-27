@@ -150,6 +150,12 @@ const HomePage: React.FC<HomePageProps> = ({
     VoiceMessageService.setPlaying(false);
     setVoiceText('');
   };
+
+  const handleRateLimitExceeded = () => {
+    console.log('ElevenLabs rate limit exceeded, implementing cooldown');
+    VoiceMessageService.handleRateLimitError();
+    setVoiceText(''); // Clear current voice text
+  };
   
   return (
     <div className="container mx-auto px-4 py-6 relative">
@@ -332,6 +338,7 @@ const HomePage: React.FC<HomePageProps> = ({
           voiceId="MezYwaNLTOfydzsFJwwt"
           onComplete={handleVoiceComplete}
           onError={handleVoiceError}
+          onRateLimitExceeded={handleRateLimitExceeded}
         />
       )}
     </div>
