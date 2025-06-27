@@ -7,6 +7,7 @@ import ProgressBar from '../ui/ProgressBar';
 import { CheckCircle, MapPin, Play, Square, Navigation, Award, AlertCircle, Coins, Plus } from 'lucide-react';
 import { gpsTracker } from '../../utils/gpsTracker';
 import { CoinSystem } from '../../utils/coinSystem';
+import { VoiceMessageService } from '../../utils/voiceMessageService';
 
 interface WalkingQuestCardProps {
   quest: Quest;
@@ -83,6 +84,11 @@ const WalkingQuestCard: React.FC<WalkingQuestCardProps> = ({
     if (isTracking) {
       handleStopTracking();
     }
+    
+    // Queue voice message for quest completion
+    const questMessage = `Excellent work! You've completed "${quest.title}" by walking ${formatDistance(currentDistance)}! Your dedication earns you ${quest.xpReward} XP and ${coinReward} Mythic Coins!`;
+    VoiceMessageService.queueMessage(questMessage, 2); // Priority 2
+    
     onComplete(quest.id, currentDistance);
   };
 

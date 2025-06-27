@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { User } from '../../types';
 import Avatar from '../ui/Avatar';
-import { ChevronDown, LogOut, Volume2, VolumeX } from 'lucide-react';
+import Badge from '../ui/Badge';
+import { ChevronDown, LogOut, User as UserIcon } from 'lucide-react';
 
 interface ProfileDropdownProps {
   user: User;
@@ -10,103 +11,94 @@ interface ProfileDropdownProps {
 
 const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ user, onSignOut }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [isAudioMuted, setIsAudioMuted] = useState(true);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Load audio preference on mount
   useEffect(() => {
-    const saved = localStorage.getItem('mythic_audio_muted');
-    setIsAudioMuted(saved ? JSON.parse(saved) : true);
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, []);
 
-  const toggleAudio = () => {
-    const newMutedState = !isAudioMuted;
-    setIsAudioMuted(newMutedState);
-    localStorage.setItem('mythic_audio_muted', JSON.stringify(newMutedState));
-    
-    // Dispatch custom event to notify other components
-    window.dispatchEvent(new CustomEvent('audioStateChanged', {
-      detail: { muted: newMutedState }
-    }));
-  };
-
   return (
-    <div className="relative">
+    <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center space-x-2 bg-amber-600/20 hover:bg-amber-600/30 px-3 py-2 rounded-lg transition-colors duration-200"
+        className="flex items-center space-x-3 bg-gradient-to-r from-amber-500 to-yellow-500 text-white px-4 py-2 rounded-lg font-cinzel font-bold shadow-lg hover:shadow-xl transition-all duration-300 magical-glow"
       >
         <Avatar
           src={user.avatarUrl}
           alt={user.name}
           size="sm"
+          className="border-2 border-white/30"
         />
-        <div className="text-left hidden sm:block">
-          <p className="text-amber-100 font-cinzel font-bold text-sm">{user.name}</p>
-          <p className="text-amber-200 text-xs font-merriweather">Level {user.level}</p>
+        <div className="text-left">
+          <div className="text-sm font-bold">{user.name}</div>
+          <div className="text-xs opacity-90">Level {user.level}</div>
         </div>
         <ChevronDown 
           size={16} 
-          className={`text-amber-200 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} 
+          className={`transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
         />
       </button>
 
       {isOpen && (
-        <>
-          {/* Backdrop */}
-          <div 
-            className="fixed inset-0 z-10" 
-            onClick={() => setIsOpen(false)}
-          />
-          
-          {/* Dropdown */}
-          <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-amber-200 z-20 overflow-hidden">
-            {/* User Info */}
-            <div className="p-4 border-b border-gray-100 bg-gradient-to-r from-amber-50 to-yellow-50">
-              <div className="flex items-center space-x-3">
-                <Avatar
-                  src={user.avatarUrl}
-                  alt={user.name}
-                  size="md"
-                />
-                <div>
-                  <p className="font-cinzel font-bold text-gray-800">{user.name}</p>
-                  <p className="text-sm text-amber-700 font-merriweather">Level {user.level}</p>
-                  <p className="text-xs text-gray-600 font-merriweather">{user.email}</p>
+        <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-amber-200 z-50 overflow-hidden">
+          {/* User Info Header */}
+          <div className="bg-gradient-to-r from-amber-50 to-yellow-50 p-4 border-b border-amber-200">
+            <div className="flex items-center space-x-3">
+              <Avatar
+                src={user.avatarUrl}
+                alt={user.name}
+                size="md"
+              />
+              <div>
+                <h3 className="font-cinzel font-bold text-gray-800">{user.name}</h3>
+                <div className="flex items-center space-x-2 mt-1">
+                  <Badge color="accent" size="sm">
+                    Level {user.level}
+                  </Badge>
+                  <span className="text-xs text-gray-600 font-merriweather">
+                    {user.xp} XP
+                  </span>
                 </div>
               </div>
             </div>
-
-            {/* Menu Items */}
-            <div className="py-2">
-              {/* Audio Toggle */}
-              <button
-                onClick={toggleAudio}
-                className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors duration-200 flex items-center space-x-3"
-              >
-                {isAudioMuted ? (
-                  <VolumeX size={18} className="text-gray-500" />
-                ) : (
-                  <Volume2 size={18} className="text-green-600" />
-                )}
-                <span className="font-merriweather text-gray-700">
-                  {isAudioMuted ? 'Unmute Audio' : 'Mute Audio'}
-                </span>
-              </button>
-
-              {/* Sign Out */}
-              <button
-                onClick={() => {
-                  setIsOpen(false);
-                  onSignOut();
-                }}
-                className="w-full px-4 py-3 text-left hover:bg-red-50 transition-colors duration-200 flex items-center space-x-3 text-red-600"
-              >
-                <LogOut size={18} />
-                <span className="font-merriweather">Sign Out</span>
-              </button>
-            </div>
           </div>
-        </>
+
+          {/* Menu Items */}
+          <div className="py-2">
+            <button
+              onClick={() => {
+                setIsOpen(false);
+                // Could add profile editing functionality here
+              }}
+              className="w-full px-4 py-2 text-left hover:bg-gray-50 transition-colors duration-200 flex items-center space-x-3 text-gray-700"
+            >
+              <UserIcon size={16} className="text-gray-500" />
+              <span className="font-merriweather">View Profile</span>
+            </button>
+
+            <hr className="my-2 border-gray-200" />
+
+            <button
+              onClick={() => {
+                setIsOpen(false);
+                onSignOut();
+              }}
+              className="w-full px-4 py-2 text-left hover:bg-red-50 transition-colors duration-200 flex items-center space-x-3 text-red-600"
+            >
+              <LogOut size={16} />
+              <span className="font-merriweather">Sign Out</span>
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
