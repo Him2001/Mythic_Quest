@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { User, Conversation, DirectMessage } from '../../types';
-import { SocialService } from '../../utils/socialService';
-import { AuthService } from '../../utils/authService';
+import { User } from '../../types';
+import { SupabaseService } from '../../utils/supabaseService';
 import Avatar from '../ui/Avatar';
 import Button from '../ui/Button';
 import { MessageCircle, Send, ArrowLeft, Users, Search, Shield } from 'lucide-react';
@@ -17,12 +16,12 @@ const MessagingSystem: React.FC<MessagingSystemProps> = ({
   selectedUserId,
   onClose
 }) => {
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
-  const [messages, setMessages] = useState<DirectMessage[]>([]);
+  const [conversations, setConversations] = useState<any[]>([]);
+  const [selectedConversation, setSelectedConversation] = useState<any | null>(null);
+  const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [friends, setFriends] = useState<User[]>([]);
+  const [friends, setFriends] = useState<any[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -39,7 +38,7 @@ const MessagingSystem: React.FC<MessagingSystemProps> = ({
   useEffect(() => {
     if (selectedConversation) {
       loadMessages(selectedConversation.id);
-      SocialService.markMessagesAsRead(selectedConversation.id, currentUser.id);
+      SupabaseService.markMessagesAsRead(selectedConversation.id, currentUser.id);
     }
   }, [selectedConversation]);
 
@@ -51,70 +50,86 @@ const MessagingSystem: React.FC<MessagingSystemProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const loadConversations = () => {
-    const userConversations = SocialService.getConversations(currentUser.id);
-    setConversations(userConversations);
-  };
-
-  const loadFriends = () => {
-    const friendIds = SocialService.getFriends(currentUser.id);
-    const friendUsers = friendIds
-      .map(id => AuthService.getUserById(id))
-      .filter(user => user !== null) as User[];
-    setFriends(friendUsers);
-  };
-
-  const loadMessages = (conversationId: string) => {
-    const conversationMessages = SocialService.getMessages(conversationId);
-    setMessages(conversationMessages);
-  };
-
-  const startConversationWithUser = (userId: string) => {
-    // Check if users are friends
-    if (!SocialService.areFriends(currentUser.id, userId)) {
-      alert('You can only message friends. Send a friend request first!');
-      return;
-    }
-
-    const conversation = SocialService.createConversation(currentUser.id, userId);
-    if (conversation) {
-      setSelectedConversation(conversation);
-      loadConversations();
+  const loadConversations = async () => {
+    try {
+      const userConversations = await SupabaseService.getConversations(currentUser.id);
+      setConversations(userConversations);
+    } catch (error) {
+      console.error('Failed to load conversations:', error);
     }
   };
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  const loadFriends = async () => {
+    try {
+      const friendships = await SupabaseService.getFriends(currentUser.id);
+      const friendUsers = friendships.map(friendship => {
+        // Get the other user in the friendship
+        return friendship.user1_id === currentUser.id ? friendship.user2 : friendship.user1;
+      });
+      setFriends(friendUsers);
+    } catch (error) {
+      console.error('Failed to load friends:', error);
+    }
+  };
+
+  const loadMessages = async (conversationId: string) => {
+    try {
+      const conversationMessages = await SupabaseService.getMessages(conversationId);
+      setMessages(conversationMessages);
+    } catch (error) {
+      console.error('Failed to load messages:', error);
+    }
+  };
+
+  const startConversationWithUser = async (userId: string) => {
+    try {
+      const conversation = await SupabaseService.createConversation(currentUser.id, userId);
+      if (conversation) {
+        setSelectedConversation(conversation);
+        loadConversations();
+      } else {
+        alert('You can only message friends. Send a friend request first!');
+      }
+    } catch (error) {
+      console.error('Failed to start conversation:', error);
+    }
+  };
+
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !selectedConversation) return;
 
-    const otherUserId = selectedConversation.participants.find(id => id !== currentUser.id);
-    if (!otherUserId) return;
+    const otherUserId = selectedConversation.user1_id === currentUser.id 
+      ? selectedConversation.user2_id 
+      : selectedConversation.user1_id;
 
-    const message = SocialService.sendMessage(
-      selectedConversation.id,
-      currentUser.id,
-      otherUserId,
-      newMessage.trim()
-    );
+    try {
+      const message = await SupabaseService.sendMessage(
+        selectedConversation.id,
+        currentUser.id,
+        otherUserId,
+        newMessage.trim()
+      );
 
-    if (message) {
-      setNewMessage('');
-      loadMessages(selectedConversation.id);
-      loadConversations();
-    } else {
-      alert('You can only message friends!');
+      if (message) {
+        setNewMessage('');
+        loadMessages(selectedConversation.id);
+        loadConversations();
+      } else {
+        alert('You can only message friends!');
+      }
+    } catch (error) {
+      console.error('Failed to send message:', error);
     }
   };
 
-  const getOtherUser = (conversation: Conversation) => {
-    const otherUserId = conversation.participants.find(id => id !== currentUser.id);
-    return friends.find(friend => friend.id === otherUserId) || 
-           AuthService.getUserById(otherUserId || '');
+  const getOtherUser = (conversation: any) => {
+    return conversation.user1_id === currentUser.id ? conversation.user2 : conversation.user1;
   };
 
-  const formatMessageTime = (date: Date) => {
-    const now = new Date();
+  const formatMessageTime = (date: string) => {
     const messageDate = new Date(date);
+    const now = new Date();
     const diffInHours = (now.getTime() - messageDate.getTime()) / (1000 * 60 * 60);
 
     if (diffInHours < 24) {
@@ -127,12 +142,12 @@ const MessagingSystem: React.FC<MessagingSystemProps> = ({
   const filteredConversations = conversations.filter(conv => {
     if (!searchQuery.trim()) return true;
     const otherUser = getOtherUser(conv);
-    return otherUser?.name.toLowerCase().includes(searchQuery.toLowerCase());
+    return otherUser?.username.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
   const filteredFriends = friends.filter(friend => {
     if (!searchQuery.trim()) return true;
-    return friend.name.toLowerCase().includes(searchQuery.toLowerCase());
+    return friend.username.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
   return (
@@ -187,34 +202,30 @@ const MessagingSystem: React.FC<MessagingSystemProps> = ({
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {friends.map(friend => {
-                      const isOnline = friend.isOnline || Math.random() > 0.5; // Mock online status
-                      return (
-                        <div
-                          key={friend.id}
-                          onClick={() => startConversationWithUser(friend.id)}
-                          className="p-3 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors"
-                        >
-                          <div className="flex items-center">
-                            <Avatar
-                              src={friend.avatarUrl}
-                              alt={friend.name}
-                              size="sm"
-                              status={isOnline ? 'online' : 'offline'}
-                              className="mr-3"
-                            />
-                            <div className="flex-1 min-w-0">
-                              <h4 className="font-cinzel font-bold text-gray-800 truncate text-sm">
-                                {friend.name}
-                              </h4>
-                              <p className="text-xs text-gray-500 font-merriweather">
-                                {isOnline ? 'Online' : 'Offline'}
-                              </p>
-                            </div>
+                    {friends.map(friend => (
+                      <div
+                        key={friend.id}
+                        onClick={() => startConversationWithUser(friend.id)}
+                        className="p-3 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors"
+                      >
+                        <div className="flex items-center">
+                          <Avatar
+                            src={friend.avatar_url}
+                            alt={friend.username}
+                            size="sm"
+                            className="mr-3"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-cinzel font-bold text-gray-800 truncate text-sm">
+                              {friend.username}
+                            </h4>
+                            <p className="text-xs text-gray-500 font-merriweather">
+                              Start conversation
+                            </p>
                           </div>
                         </div>
-                      );
-                    })}
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -225,9 +236,7 @@ const MessagingSystem: React.FC<MessagingSystemProps> = ({
                   const otherUser = getOtherUser(conversation);
                   if (!otherUser) return null;
 
-                  const unreadCount = conversation.unreadCount[currentUser.id] || 0;
                   const isSelected = selectedConversation?.id === conversation.id;
-                  const isOnline = otherUser.isOnline || Math.random() > 0.5; // Mock online status
 
                   return (
                     <div
@@ -239,75 +248,30 @@ const MessagingSystem: React.FC<MessagingSystemProps> = ({
                     >
                       <div className="flex items-center">
                         <Avatar
-                          src={otherUser.avatarUrl}
-                          alt={otherUser.name}
+                          src={otherUser.avatar_url}
+                          alt={otherUser.username}
                           size="md"
-                          status={isOnline ? 'online' : 'offline'}
                           className="mr-3"
                         />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between">
                             <h3 className="font-cinzel font-bold text-gray-800 truncate">
-                              {otherUser.name}
+                              {otherUser.username}
                             </h3>
-                            {conversation.lastMessage && (
+                            {conversation.last_updated && (
                               <span className="text-xs text-gray-500 font-merriweather">
-                                {formatMessageTime(conversation.lastMessage.createdAt)}
+                                {formatMessageTime(conversation.last_updated)}
                               </span>
                             )}
                           </div>
-                          <div className="flex items-center justify-between">
-                            <p className="text-sm text-gray-600 font-merriweather truncate">
-                              {conversation.lastMessage?.content || 'Start a conversation...'}
-                            </p>
-                            {unreadCount > 0 && (
-                              <span className="bg-amber-500 text-white text-xs rounded-full px-2 py-1 min-w-[20px] text-center">
-                                {unreadCount}
-                              </span>
-                            )}
-                          </div>
+                          <p className="text-sm text-gray-600 font-merriweather truncate">
+                            {conversation.last_message || 'Start a conversation...'}
+                          </p>
                         </div>
                       </div>
                     </div>
                   );
                 })}
-
-                {/* Available Friends to Message */}
-                {searchQuery.trim() && filteredFriends.length > 0 && (
-                  <div className="p-4">
-                    <h3 className="font-cinzel font-bold text-gray-700 mb-3">Available Friends</h3>
-                    {filteredFriends
-                      .filter(friend => !conversations.some(conv => conv.participants.includes(friend.id)))
-                      .map(friend => {
-                        const isOnline = friend.isOnline || Math.random() > 0.5;
-                        return (
-                          <div
-                            key={friend.id}
-                            onClick={() => startConversationWithUser(friend.id)}
-                            className="p-3 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors"
-                          >
-                            <div className="flex items-center">
-                              <Avatar
-                                src={friend.avatarUrl}
-                                alt={friend.name}
-                                size="sm"
-                                status={isOnline ? 'online' : 'offline'}
-                                className="mr-3"
-                              />
-                              <div className="flex-1 min-w-0">
-                                <h4 className="font-cinzel font-bold text-gray-800 truncate text-sm">
-                                  {friend.name}
-                                </h4>
-                                <p className="text-xs text-gray-500 font-merriweather">
-                                  Start conversation
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                  </div>
-                )}
               </>
             )}
           </div>
@@ -329,20 +293,18 @@ const MessagingSystem: React.FC<MessagingSystemProps> = ({
                   
                   {(() => {
                     const otherUser = getOtherUser(selectedConversation);
-                    const isOnline = otherUser?.isOnline || Math.random() > 0.5;
                     return otherUser ? (
                       <>
                         <Avatar
-                          src={otherUser.avatarUrl}
-                          alt={otherUser.name}
+                          src={otherUser.avatar_url}
+                          alt={otherUser.username}
                           size="md"
-                          status={isOnline ? 'online' : 'offline'}
                           className="mr-3"
                         />
                         <div>
-                          <h3 className="font-cinzel font-bold text-gray-800">{otherUser.name}</h3>
+                          <h3 className="font-cinzel font-bold text-gray-800">{otherUser.username}</h3>
                           <p className="text-sm text-gray-600 font-merriweather">
-                            {isOnline ? 'Online' : `Last seen ${SocialService.formatTimeAgo(otherUser.lastSeenAt || new Date())}`}
+                            Level {otherUser.level}
                           </p>
                         </div>
                       </>
@@ -354,8 +316,7 @@ const MessagingSystem: React.FC<MessagingSystemProps> = ({
               {/* Messages */}
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {messages.map(message => {
-                  const isOwnMessage = message.senderId === currentUser.id;
-                  const sender = isOwnMessage ? currentUser : getOtherUser(selectedConversation);
+                  const isOwnMessage = message.sender_id === currentUser.id;
 
                   return (
                     <div
@@ -364,8 +325,8 @@ const MessagingSystem: React.FC<MessagingSystemProps> = ({
                     >
                       <div className={`flex items-end space-x-2 max-w-xs lg:max-w-md ${isOwnMessage ? 'flex-row-reverse space-x-reverse' : ''}`}>
                         <Avatar
-                          src={sender?.avatarUrl || ''}
-                          alt={sender?.name || ''}
+                          src={isOwnMessage ? currentUser.avatarUrl : message.sender?.avatar_url}
+                          alt={isOwnMessage ? currentUser.name : message.sender?.username}
                           size="sm"
                         />
                         <div
@@ -375,9 +336,9 @@ const MessagingSystem: React.FC<MessagingSystemProps> = ({
                               : 'bg-gray-100 text-gray-800'
                           }`}
                         >
-                          <p className="font-merriweather text-sm">{message.content}</p>
+                          <p className="font-merriweather text-sm">{message.message_text}</p>
                           <p className={`text-xs mt-1 ${isOwnMessage ? 'text-amber-100' : 'text-gray-500'}`}>
-                            {formatMessageTime(message.createdAt)}
+                            {formatMessageTime(message.timestamp)}
                           </p>
                         </div>
                       </div>
