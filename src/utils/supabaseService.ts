@@ -7,11 +7,38 @@ export class SupabaseService {
     const { data, error } = await supabase
       .from('user_profiles')
       .select('*')
-      .eq('id', userId)
-      .single();
+      .eq('id', userId);
 
     if (error) {
       console.error('Error fetching user profile:', error);
+      return null;
+    }
+
+    // Return the first profile if it exists, otherwise null
+    return data && data.length > 0 ? data[0] : null;
+  }
+
+  static async createProfile(userId: string, username: string, email?: string) {
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .insert({
+        id: userId,
+        username: username,
+        email: email,
+        xp: 0,
+        coins: 0,
+        level: 1,
+        quests_completed: 0,
+        daily_walking_distance: 0,
+        total_walking_distance: 0,
+        total_quests_completed: 0,
+        is_active: true
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating user profile:', error);
       return null;
     }
 
