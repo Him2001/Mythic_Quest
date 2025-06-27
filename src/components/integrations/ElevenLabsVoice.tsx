@@ -2,26 +2,29 @@ import React, { useEffect, useRef } from 'react';
 
 interface ElevenLabsVoiceProps {
   text: string;
-  voiceId?: string;
+  voiceId: string;
   onComplete?: () => void;
+  onError?: () => void;
 }
 
-const ElevenLabsVoice: React.FC<ElevenLabsVoiceProps> = ({ 
-  text, 
-  voiceId = 'MezYwaNLTOfydzsFJwwt',
-  onComplete 
+const ElevenLabsVoice: React.FC<ElevenLabsVoiceProps> = ({
+  text,
+  voiceId,
+  onComplete,
+  onError
 }) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const isPlayingRef = useRef(false);
 
   useEffect(() => {
-    if (!text || text.trim() === '' || isPlayingRef.current) return;
+    if (!text || isPlayingRef.current) return;
 
-    const generateAndPlayAudio = async () => {
+    const playVoice = async () => {
       try {
         isPlayingRef.current = true;
-        
-        const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/' + voiceId, {
+        console.log('Starting voice synthesis for:', text.substring(0, 50) + '...');
+
+        const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
           method: 'POST',
           headers: {
             'Accept': 'audio/mpeg',
@@ -34,7 +37,7 @@ const ElevenLabsVoice: React.FC<ElevenLabsVoiceProps> = ({
             voice_settings: {
               stability: 0.5,
               similarity_boost: 0.5,
-              style: 0.5,
+              style: 0.0,
               use_speaker_boost: true
             }
           })
@@ -47,36 +50,37 @@ const ElevenLabsVoice: React.FC<ElevenLabsVoiceProps> = ({
         const audioBlob = await response.blob();
         const audioUrl = URL.createObjectURL(audioBlob);
         
-        if (audioRef.current) {
-          audioRef.current.pause();
-        }
-        
+        // Create and play audio
         const audio = new Audio(audioUrl);
         audioRef.current = audio;
         
         audio.onended = () => {
-          URL.revokeObjectURL(audioUrl);
+          console.log('Voice playback completed');
           isPlayingRef.current = false;
+          URL.revokeObjectURL(audioUrl);
           if (onComplete) onComplete();
         };
         
         audio.onerror = () => {
-          URL.revokeObjectURL(audioUrl);
+          console.error('Audio playback error');
           isPlayingRef.current = false;
-          console.warn('Audio playback failed');
+          URL.revokeObjectURL(audioUrl);
+          if (onError) onError();
         };
         
         await audio.play();
+        console.log('Voice playback started');
         
       } catch (error) {
-        console.warn('ElevenLabs TTS failed:', error);
+        console.error('ElevenLabs voice synthesis error:', error);
         isPlayingRef.current = false;
-        if (onComplete) onComplete();
+        if (onError) onError();
       }
     };
 
-    generateAndPlayAudio();
+    playVoice();
 
+    // Cleanup function
     return () => {
       if (audioRef.current) {
         audioRef.current.pause();
@@ -84,7 +88,18 @@ const ElevenLabsVoice: React.FC<ElevenLabsVoiceProps> = ({
       }
       isPlayingRef.current = false;
     };
-  }, [text, voiceId, onComplete]);
+  }, [text, voiceId, onComplete, onError]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      isPlayingRef.current = false;
+    };
+  }, []);
 
   return null; // This component doesn't render anything visible
 };

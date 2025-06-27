@@ -60,35 +60,17 @@ const HomePage: React.FC<HomePageProps> = ({
       
       setAvatarMessage(welcomeMessage);
       
-      // Queue welcome message for voice (priority 1 - highest)
-      VoiceMessageService.queueMessage(welcomeMessage, 1);
-      
-      // After 8 seconds, remind about quests and coins (only if there are active quests)
-      const timer = setTimeout(() => {
-        if (activeQuestCount > 0) {
-          const reminderMessage = `You have ${activeQuestCount} quest${activeQuestCount > 1 ? 's' : ''} awaiting your attention. Each completed quest brings both XP and precious Mythic Coins to your treasury.`;
-          setAvatarMessage(reminderMessage);
-        }
-      }, 8000);
+      // Queue welcome message with highest priority
+      VoiceMessageService.queueMessage(welcomeMessage, VoiceMessageService.PRIORITY.WELCOME);
       
       setHasInitialized(true);
-      return () => clearTimeout(timer);
     }
   }, [user.name, activeQuests.length, hasInitialized]);
 
-  // Check for level ups
-  useEffect(() => {
-    if (hasInitialized && user.level > lastLevel) {
-      const levelUpMessage = VoiceMessageService.getLevelUpMessage(user, user.level, 100); // Assuming 100 coins for level up
-      VoiceMessageService.queueMessage(levelUpMessage, 2); // Priority 2
-      setLastLevel(user.level);
-    }
-  }, [user.level, lastLevel, hasInitialized, user]);
-
-  // Check for quest completions
+  // Check for quest completions FIRST (priority 2)
   useEffect(() => {
     if (hasInitialized && user.questsCompleted > lastQuestCount) {
-      // Find the most recently completed quest (this is a simplified approach)
+      // Find the most recently completed quest
       const completedQuest = quests.find(q => q.completed);
       if (completedQuest) {
         const questMessage = VoiceMessageService.getQuestCompletionMessage(
@@ -97,31 +79,40 @@ const HomePage: React.FC<HomePageProps> = ({
           completedQuest.type, 
           CoinSystem.calculateQuestReward(completedQuest.type, completedQuest.difficulty)
         );
-        VoiceMessageService.queueMessage(questMessage, 3); // Priority 3
+        VoiceMessageService.queueMessage(questMessage, VoiceMessageService.PRIORITY.QUEST_COMPLETION);
       }
       setLastQuestCount(user.questsCompleted);
     }
   }, [user.questsCompleted, lastQuestCount, hasInitialized, quests, user]);
 
-  // Check for coin milestones
+  // Check for level ups SECOND (priority 3)
+  useEffect(() => {
+    if (hasInitialized && user.level > lastLevel) {
+      const levelUpMessage = VoiceMessageService.getLevelUpMessage(user, user.level, 100);
+      VoiceMessageService.queueMessage(levelUpMessage, VoiceMessageService.PRIORITY.LEVEL_UP);
+      setLastLevel(user.level);
+    }
+  }, [user.level, lastLevel, hasInitialized, user]);
+
+  // Check for coin milestones LAST (priority 5)
   useEffect(() => {
     if (hasInitialized && user.mythicCoins > lastCoinCount) {
       const coinMilestone = VoiceMessageService.getCoinMilestoneMessage(user, user.mythicCoins);
       if (coinMilestone) {
-        VoiceMessageService.queueMessage(coinMilestone, 4); // Priority 4
+        VoiceMessageService.queueMessage(coinMilestone, VoiceMessageService.PRIORITY.COIN_MILESTONE);
       }
       
       // Check walking achievements
       const walkingAchievement = VoiceMessageService.getWalkingAchievementMessage(user, user.totalWalkingDistance);
       if (walkingAchievement) {
-        VoiceMessageService.queueMessage(walkingAchievement, 5); // Priority 5
+        VoiceMessageService.queueMessage(walkingAchievement, VoiceMessageService.PRIORITY.COIN_MILESTONE);
       }
       
       setLastCoinCount(user.mythicCoins);
     }
   }, [user.mythicCoins, lastCoinCount, hasInitialized, user]);
 
-  // Voice message queue processor
+  // Voice message queue processor - only process when not playing
   useEffect(() => {
     const processVoiceQueue = () => {
       if (!VoiceMessageService.getIsPlaying() && VoiceMessageService.hasQueuedMessages()) {
@@ -133,13 +124,31 @@ const HomePage: React.FC<HomePageProps> = ({
       }
     };
 
-    const interval = setInterval(processVoiceQueue, 1000); // Check every second
+    const interval = setInterval(processVoiceQueue, 500); // Check every 500ms
     return () => clearInterval(interval);
   }, []);
 
   const handleVoiceComplete = () => {
+    console.log('Voice playback completed');
     VoiceMessageService.setPlaying(false);
     setVoiceText(''); // Clear the current voice text
+    
+    // Small delay before processing next message to prevent overlap
+    setTimeout(() => {
+      if (VoiceMessageService.hasQueuedMessages()) {
+        const nextMessage = VoiceMessageService.getNextMessage();
+        if (nextMessage) {
+          setVoiceText(nextMessage);
+          VoiceMessageService.setPlaying(true);
+        }
+      }
+    }, 500);
+  };
+
+  const handleVoiceError = () => {
+    console.log('Voice playback error, continuing to next message');
+    VoiceMessageService.setPlaying(false);
+    setVoiceText('');
   };
   
   return (
@@ -322,6 +331,7 @@ const HomePage: React.FC<HomePageProps> = ({
           text={voiceText} 
           voiceId="MezYwaNLTOfydzsFJwwt"
           onComplete={handleVoiceComplete}
+          onError={handleVoiceError}
         />
       )}
     </div>
