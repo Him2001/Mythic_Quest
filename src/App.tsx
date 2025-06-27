@@ -66,11 +66,44 @@ function App() {
     coinsEarned: number;
   } | null>(null);
 
+  // Check for admin session on app load
+  const checkAdminSession = () => {
+    try {
+      const adminSession = localStorage.getItem('mythic_admin_session');
+      if (adminSession) {
+        const { user: adminUser, timestamp } = JSON.parse(adminSession);
+        
+        // Check if session is still valid (24 hours)
+        const sessionAge = Date.now() - timestamp;
+        const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+        
+        if (sessionAge < maxAge && adminUser.isAdmin) {
+          setUser(adminUser);
+          setIsAuthenticated(true);
+          setIsLoading(false);
+          return true;
+        } else {
+          // Clear expired session
+          localStorage.removeItem('mythic_admin_session');
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to check admin session:', error);
+      localStorage.removeItem('mythic_admin_session');
+    }
+    return false;
+  };
+
   // Check authentication on app load
   useEffect(() => {
     const checkAuth = async () => {
       try {
         setConnectionError(null);
+        
+        // First check for admin session
+        if (checkAdminSession()) {
+          return;
+        }
         
         // Check if Supabase is configured
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -133,13 +166,17 @@ function App() {
 
   // Set up auth state listener only after initial check
   useEffect(() => {
-    if (!hasSupabase || !isAuthenticated) return;
+    if (!hasSupabase || !isAuthenticated || user?.isAdmin) return;
 
     let subscription: any = null;
     
     try {
       const { data } = SupabaseAuthService.onAuthStateChange((user) => {
         console.log('Auth state changed:', user ? user.name : 'signed out');
+        
+        // Don't override admin users
+        if (user?.isAdmin) return;
+        
         setUser(user);
         setIsAuthenticated(!!user);
       });
@@ -154,7 +191,7 @@ function App() {
         subscription.unsubscribe();
       }
     };
-  }, [hasSupabase, isAuthenticated]);
+  }, [hasSupabase, isAuthenticated, user?.isAdmin]);
 
   // Initialize social posts on first load
   useEffect(() => {
@@ -175,7 +212,10 @@ function App() {
 
   const handleSignOut = async () => {
     try {
-      if (hasSupabase) {
+      // Clear admin session if it exists
+      localStorage.removeItem('mythic_admin_session');
+      
+      if (hasSupabase && !user?.isAdmin) {
         await SupabaseAuthService.signOut();
       }
       setUser(null);
@@ -211,7 +251,7 @@ function App() {
     });
 
     // Update in Supabase if available
-    if (hasSupabase) {
+    if (hasSupabase && !user.isAdmin) {
       try {
         await SupabaseAuthService.updateWalkingDistance(
           user.id,
@@ -241,7 +281,7 @@ function App() {
     });
 
     // Update in Supabase if available
-    if (hasSupabase) {
+    if (hasSupabase && !user.isAdmin) {
       try {
         await SupabaseAuthService.updateUserCoins(user.id, newCoinBalance);
       } catch (error) {
@@ -281,7 +321,7 @@ function App() {
     });
 
     // Update in Supabase if available
-    if (hasSupabase) {
+    if (hasSupabase && !user.isAdmin) {
       try {
         await SupabaseAuthService.updateUserCoins(user.id, newCoinBalance);
       } catch (error) {
@@ -351,7 +391,7 @@ function App() {
       });
 
       // Update in Supabase if available
-      if (hasSupabase) {
+      if (hasSupabase && !user.isAdmin) {
         try {
           await SupabaseAuthService.updateUserProgress(user.id, newXP, newLevel, user.mythicCoins);
           await SupabaseAuthService.updateQuestsCompleted(user.id, newQuestsCompleted);
@@ -433,7 +473,7 @@ function App() {
     });
 
     // Update in Supabase if available
-    if (hasSupabase) {
+    if (hasSupabase && !user.isAdmin) {
       try {
         await SupabaseAuthService.updateUserProgress(user.id, newXP, newLevel, user.mythicCoins);
         await SupabaseAuthService.updateQuestsCompleted(user.id, newQuestsCompleted);
@@ -503,7 +543,7 @@ function App() {
     if (!user) return;
     
     // Save chronicle to Supabase if available
-    if (hasSupabase) {
+    if (hasSupabase && !user.isAdmin) {
       try {
         const savedChronicle = await SupabaseService.createChronicle(
           user.id,
