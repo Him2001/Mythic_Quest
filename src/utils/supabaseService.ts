@@ -797,7 +797,6 @@ export class SupabaseService {
           )
         `)
         .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
-        .eq('status', 'pending')
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -826,13 +825,25 @@ export class SupabaseService {
             id,
             username,
             avatar_url,
-            level
+            level,
+            email,
+            xp,
+            coins,
+            total_quests_completed,
+            created_at,
+            is_active
           ),
           user2:user_profiles!friendships_user2_id_fkey (
             id,
             username,
             avatar_url,
-            level
+            level,
+            email,
+            xp,
+            coins,
+            total_quests_completed,
+            created_at,
+            is_active
           )
         `)
         .or(`user1_id.eq.${userId},user2_id.eq.${userId}`);
