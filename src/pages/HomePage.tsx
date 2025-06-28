@@ -381,22 +381,6 @@ const HomePage: React.FC<HomePageProps> = ({
         </div>
       </div>
       
-      {/* Bolt.new Badge - Fixed position in bottom-right corner */}
-      <div className="fixed bottom-4 right-4 z-50">
-        <a
-          href="https://bolt.new/"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="block transition-transform duration-200 hover:scale-105 hover:shadow-lg"
-        >
-          <img
-            src="/white_circle_360x360.png"
-            alt="Built with Bolt.new"
-            className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 lg:w-18 lg:h-18 xl:w-20 xl:h-20 rounded-full shadow-md hover:shadow-lg transition-shadow duration-200"
-          />
-        </a>
-      </div>
-      
       {/* VOICE INTEGRATION - HIGHEST PRIORITY */}
       {voiceText && hasUserInteractedForAudio && (
         <ElevenLabsVoice 
