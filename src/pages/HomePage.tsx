@@ -37,6 +37,7 @@ const HomePage: React.FC<HomePageProps> = ({
   const [lastLevel, setLastLevel] = useState<number>(user.level);
   const [lastWalkingDistance, setLastWalkingDistance] = useState<number>(user.totalWalkingDistance);
   const [hasInitialized, setHasInitialized] = useState<boolean>(false);
+  const [hasUserInteractedForAudio, setHasUserInteractedForAudio] = useState<boolean>(false);
   const [voiceKey, setVoiceKey] = useState<string>('');
   
   // Get active quests
@@ -54,9 +55,17 @@ const HomePage: React.FC<HomePageProps> = ({
   const earnedCoins = user.mythicCoins;
   const coinProgress = totalPossibleCoins > 0 ? (earnedCoins / totalPossibleCoins) * 100 : 0;
   
-  // Welcome message on mount - ONLY ONCE PER SESSION
+  // Handle user interaction for audio
+  const handleUserInteraction = () => {
+    if (!hasUserInteractedForAudio) {
+      setHasUserInteractedForAudio(true);
+      console.log('🎵 AUDIO: User interaction detected, audio playback now enabled');
+    }
+  };
+
+  // Welcome message on mount - ONLY ONCE PER SESSION AND AFTER USER INTERACTION
   useEffect(() => {
-    if (!hasInitialized) {
+    if (!hasInitialized && hasUserInteractedForAudio) {
       const activeQuestCount = activeQuests.length;
       
       // Set screen message based on quest count
@@ -100,11 +109,45 @@ const HomePage: React.FC<HomePageProps> = ({
       
       console.log('🎵 VOICE PRIORITY: Setting welcome message for', user.name);
     }
-  }, [user.name, activeQuests.length, hasInitialized, user.id]);
+  }, [user.name, activeQuests.length, hasInitialized, hasUserInteractedForAudio, user.id]);
+
+  // Set initial screen message without voice (before user interaction)
+  useEffect(() => {
+    if (!hasInitialized && !hasUserInteractedForAudio) {
+      const activeQuestCount = activeQuests.length;
+      
+      let screenMessage = '';
+      
+      if (activeQuestCount === 0) {
+        const noQuestMessages = [
+          "Behold! You have achieved the legendary status of 'Quest Master' - all adventures completed! The realm celebrates your dedication.",
+          "Magnificent! Your quest log stands empty, a testament to your unwavering commitment to wellness. What new challenges shall we discover?",
+          "Extraordinary! You've conquered every quest in sight. The mystical realm awaits your next great adventure!"
+        ];
+        screenMessage = noQuestMessages[Math.floor(Math.random() * noQuestMessages.length)];
+      } else if (activeQuestCount > 5) {
+        const lazyMessages = [
+          `Oh my! ${activeQuestCount} quests await your attention. Perhaps it's time to transform intention into action, brave adventurer?`,
+          `I see ${activeQuestCount} quests have gathered in your log like eager students. Shall we begin the lessons of completion?`,
+          `Your quest collection has grown to ${activeQuestCount} items! Time to turn this impressive library into legendary achievements.`
+        ];
+        screenMessage = lazyMessages[Math.floor(Math.random() * lazyMessages.length)];
+      } else {
+        const regularMessages = [
+          `You have ${activeQuestCount} quest${activeQuestCount > 1 ? 's' : ''} awaiting your attention. Each completed quest brings both XP and precious Mythic Coins to your treasury.`,
+          `${activeQuestCount} adventure${activeQuestCount > 1 ? 's' : ''} stand${activeQuestCount === 1 ? 's' : ''} ready for your heroic touch. Your wellness journey continues to unfold!`,
+          `The realm presents ${activeQuestCount} quest${activeQuestCount > 1 ? 's' : ''} for your consideration. Each victory strengthens both body and spirit.`
+        ];
+        screenMessage = regularMessages[Math.floor(Math.random() * regularMessages.length)];
+      }
+      
+      setAvatarMessage(screenMessage);
+    }
+  }, [activeQuests.length, hasInitialized, hasUserInteractedForAudio]);
 
   // Check for level ups
   useEffect(() => {
-    if (hasInitialized && user.level > lastLevel) {
+    if (hasInitialized && hasUserInteractedForAudio && user.level > lastLevel) {
       const levelUpMessage = `Magnificent! ${user.name}, you have ascended to Level ${user.level}! The mystical energies of Eldoria surge through you, and your coin purse swells with 100 additional Mythic Coins!`;
       const uniqueKey = `levelup-${user.id}-${user.level}-${Date.now()}`;
       setVoiceKey(uniqueKey);
@@ -113,11 +156,11 @@ const HomePage: React.FC<HomePageProps> = ({
       
       console.log('🎵 VOICE PRIORITY: Level up message for level', user.level);
     }
-  }, [user.level, lastLevel, hasInitialized, user.name, user.id]);
+  }, [user.level, lastLevel, hasInitialized, hasUserInteractedForAudio, user.name, user.id]);
 
   // Check for coin milestones (every 250 coins)
   useEffect(() => {
-    if (hasInitialized && user.mythicCoins > lastCoinCount) {
+    if (hasInitialized && hasUserInteractedForAudio && user.mythicCoins > lastCoinCount) {
       const coinMilestone = VoiceMessageService.getCoinMilestoneMessage(user, user.mythicCoins, lastCoinCount);
       if (coinMilestone) {
         const uniqueKey = `coins-${user.id}-${user.mythicCoins}-${Date.now()}`;
@@ -128,11 +171,11 @@ const HomePage: React.FC<HomePageProps> = ({
       }
       setLastCoinCount(user.mythicCoins);
     }
-  }, [user.mythicCoins, lastCoinCount, hasInitialized, user]);
+  }, [user.mythicCoins, lastCoinCount, hasInitialized, hasUserInteractedForAudio, user]);
 
   // Check for walking achievements (every 5km)
   useEffect(() => {
-    if (hasInitialized && user.totalWalkingDistance > lastWalkingDistance) {
+    if (hasInitialized && hasUserInteractedForAudio && user.totalWalkingDistance > lastWalkingDistance) {
       const walkingAchievement = VoiceMessageService.getWalkingAchievementMessage(user, user.totalWalkingDistance, lastWalkingDistance);
       if (walkingAchievement) {
         const uniqueKey = `walking-${user.id}-${user.totalWalkingDistance}-${Date.now()}`;
@@ -143,7 +186,7 @@ const HomePage: React.FC<HomePageProps> = ({
       }
       setLastWalkingDistance(user.totalWalkingDistance);
     }
-  }, [user.totalWalkingDistance, lastWalkingDistance, hasInitialized, user]);
+  }, [user.totalWalkingDistance, lastWalkingDistance, hasInitialized, hasUserInteractedForAudio, user]);
 
   const handleVoiceComplete = () => {
     console.log('🎵 VOICE PRIORITY: Voice playback completed, clearing voice text');
@@ -165,7 +208,7 @@ const HomePage: React.FC<HomePageProps> = ({
   // Handle quest completion with voice feedback
   const handleQuestComplete = (questId: string, distanceWalked?: number) => {
     const completedQuest = quests.find(q => q.id === questId);
-    if (completedQuest && !completedQuest.completed) {
+    if (completedQuest && !completedQuest.completed && hasUserInteractedForAudio) {
       // Set quest completion message for voice
       const questMessage = `Excellent work! You've completed "${completedQuest.title}"! Your dedication earns you ${completedQuest.xpReward} XP and ${CoinSystem.calculateQuestReward(completedQuest.type, completedQuest.difficulty)} Mythic Coins!`;
       const uniqueKey = `quest-${questId}-${Date.now()}`;
@@ -180,7 +223,7 @@ const HomePage: React.FC<HomePageProps> = ({
   };
   
   return (
-    <div className="container mx-auto px-4 py-6 relative">
+    <div className="container mx-auto px-4 py-6 relative" onClick={handleUserInteraction}>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column - Avatar and Progress */}
         <div className="lg:col-span-1">
@@ -355,7 +398,7 @@ const HomePage: React.FC<HomePageProps> = ({
       </div>
       
       {/* VOICE INTEGRATION - HIGHEST PRIORITY */}
-      {voiceText && (
+      {voiceText && hasUserInteractedForAudio && (
         <ElevenLabsVoice 
           key={voiceKey}
           text={voiceText} 
