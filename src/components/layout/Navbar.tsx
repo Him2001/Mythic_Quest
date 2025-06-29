@@ -3,7 +3,7 @@ import { User, Quest } from '../../types';
 import { Menu, X, Bell, MessageCircle, Map, Award, Scroll, Home, LogOut, User as UserIcon, Menu as MenuIcon } from 'lucide-react';
 import Button from '../ui/Button';
 import NotificationBadge from '../ui/NotificationBadge';
-import { NotificationCountService } from '../../utils/notificationCountService';
+import { NotificationService } from '../../utils/notificationService';
 import { SoundEffects } from '../../utils/soundEffects';
 
 interface NavbarProps {
@@ -29,7 +29,7 @@ const Navbar: React.FC<NavbarProps> = ({ user, activeTab, onTabChange, onSignOut
   // Get notification counts
   useEffect(() => {
     if (user) {
-      const count = NotificationCountService.getUnreadNotificationCount(user.id);
+      const count = NotificationService.getUnreadNotificationCount(user.id);
       setUnreadNotifications(count);
     }
   }, [user]);
