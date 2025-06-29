@@ -63,7 +63,7 @@ export class SupabaseService {
     }
 
     try {
-      // First delete from auth.users (this will cascade to user_profiles)
+      // First try to delete from auth.users (this will cascade to user_profiles)
       const { error: authError } = await supabase.auth.admin.deleteUser(userId);
       
       if (authError) {
@@ -860,6 +860,34 @@ export class SupabaseService {
     }
   }
 
+  // Analytics and Stats
+  static async getUserStats(userId: string) {
+    if (!this.isAvailable()) {
+      return { profile: null, totalQuests: 0, totalPosts: 0 };
+    }
+
+    try {
+      const [profile, questsCount, postsCount] = await Promise.all([
+        this.getUserProfile(userId),
+        supabase.from('quests_completed').select('*', { count: 'exact' }).eq('user_id', userId),
+        supabase.from('posts').select('*', { count: 'exact' }).eq('user_id', userId)
+      ]);
+
+      return {
+        profile,
+        totalQuests: questsCount.count || 0,
+        totalPosts: postsCount.count || 0
+      };
+    } catch (error) {
+      console.error('Error in getUserStats:', error);
+      return {
+        profile: null,
+        totalQuests: 0,
+        totalPosts: 0
+      };
+    }
+  }
+
   // Real-time subscriptions with error handling
   static subscribeToUserUpdates(userId: string, callback: (payload: any) => void) {
     if (!this.isAvailable()) {
@@ -920,34 +948,6 @@ export class SupabaseService {
     } catch (error) {
       console.warn('Failed to subscribe to feed updates:', error);
       return { unsubscribe: () => {} };
-    }
-  }
-
-  // Analytics and Stats
-  static async getUserStats(userId: string) {
-    if (!this.isAvailable()) {
-      return { profile: null, totalQuests: 0, totalPosts: 0 };
-    }
-
-    try {
-      const [profile, questsCount, postsCount] = await Promise.all([
-        this.getUserProfile(userId),
-        supabase.from('quests_completed').select('*', { count: 'exact' }).eq('user_id', userId),
-        supabase.from('posts').select('*', { count: 'exact' }).eq('user_id', userId)
-      ]);
-
-      return {
-        profile,
-        totalQuests: questsCount.count || 0,
-        totalPosts: postsCount.count || 0
-      };
-    } catch (error) {
-      console.error('Error in getUserStats:', error);
-      return {
-        profile: null,
-        totalQuests: 0,
-        totalPosts: 0
-      };
     }
   }
 }
