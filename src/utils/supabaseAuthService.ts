@@ -16,16 +16,24 @@ export class SupabaseAuthService {
 
     try {
       // First, check if username is already taken
-      const { data: existingUser } = await supabase
+      const { data: existingUser, error: usernameError } = await supabase
         .from('user_profiles')
         .select('username')
         .eq('username', username)
         .single();
 
+      // If we get data back, username is taken
       if (existingUser) {
         return { user: null, error: 'Username is already taken. Please choose a different one.' };
       }
 
+      // If error is not PGRST116 (no rows returned), then it's a real error
+      if (usernameError && usernameError.code !== 'PGRST116') {
+        console.error('Username check error:', usernameError);
+        return { user: null, error: 'Failed to check username availability. Please try again.' };
+      }
+
+      // If error is PGRST116 or no error with no data, username is available
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
