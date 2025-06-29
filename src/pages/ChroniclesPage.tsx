@@ -125,29 +125,29 @@ const ChroniclesPage: React.FC<ChroniclesPageProps> = ({ user, onUserUpdate }) =
   const friendsCount = friendsChronicles.length;
 
   return (
-    <div className="container mx-auto px-4 py-6">
+    <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6">
       {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
+      <div className="mb-4 sm:mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 space-y-3 sm:space-y-0">
           <div className="flex items-center">
-            <ScrollText className="text-amber-600 mr-3 magical-glow" size={28} />
+            <ScrollText className="text-amber-600 mr-2 sm:mr-3 magical-glow" size={24} sm:size={28} />
             <div>
-              <h1 className="text-2xl font-cinzel font-bold text-amber-800 magical-glow">
+              <h1 className="text-xl sm:text-2xl font-cinzel font-bold text-amber-800 magical-glow">
                 Chronicles of Eldoria
               </h1>
-              <p className="text-amber-700 font-merriweather">
+              <p className="text-amber-700 font-merriweather text-sm">
                 Epic tales of your wellness journey, woven by the mystical realm
               </p>
             </div>
           </div>
           
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center">
             <Button
               variant="primary"
               onClick={generateFantasyTale}
               disabled={isGenerating}
-              icon={<PenTool size={16} />}
-              className="magical-glow"
+              icon={<PenTool size={14} sm:size={16} />}
+              className="magical-glow text-sm sm:text-base"
             >
               {isGenerating ? 'Weaving Tale...' : 'Generate Epic Tale'}
             </Button>
@@ -158,24 +158,24 @@ const ChroniclesPage: React.FC<ChroniclesPageProps> = ({ user, onUserUpdate }) =
         <div className="flex space-x-1 bg-gray-100 rounded-lg p-1 max-w-md">
           <button
             onClick={() => setActiveTab('my-chronicles')}
-            className={`flex-1 py-2 px-4 rounded-md font-cinzel font-bold transition-all duration-200 flex items-center justify-center ${
+            className={`flex-1 py-2 px-3 sm:px-4 rounded-md font-cinzel font-bold transition-all duration-200 flex items-center justify-center text-sm ${
               activeTab === 'my-chronicles'
                 ? 'bg-white text-amber-800 shadow-md'
                 : 'text-gray-600 hover:text-amber-700'
             }`}
           >
-            <BookOpen size={16} className="mr-2" />
+            <BookOpen size={14} sm:size={16} className="mr-1 sm:mr-2" />
             My Chronicles
           </button>
           <button
             onClick={() => setActiveTab('friends-chronicles')}
-            className={`flex-1 py-2 px-4 rounded-md font-cinzel font-bold transition-all duration-200 flex items-center justify-center ${
+            className={`flex-1 py-2 px-3 sm:px-4 rounded-md font-cinzel font-bold transition-all duration-200 flex items-center justify-center text-sm ${
               activeTab === 'friends-chronicles'
                 ? 'bg-white text-amber-800 shadow-md'
                 : 'text-gray-600 hover:text-amber-700'
             }`}
           >
-            <Users size={16} className="mr-2" />
+            <Users size={14} sm:size={16} className="mr-1 sm:mr-2" />
             Fellow Adventurers ({friendsCount})
           </button>
         </div>
@@ -186,13 +186,14 @@ const ChroniclesPage: React.FC<ChroniclesPageProps> = ({ user, onUserUpdate }) =
         <div>
           {/* Month Filter */}
           {months.length > 0 && (
-            <div className="mb-6 flex items-center gap-4">
-              <Calendar size={20} className="text-amber-600" />
-              <div className="flex gap-2 flex-wrap">
+            <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+              <Calendar size={16} sm:size={20} className="text-amber-600" />
+              <div className="flex flex-wrap gap-2">
                 <Button
                   variant={selectedMonth === 'all' ? 'primary' : 'ghost'}
                   size="sm"
                   onClick={() => setSelectedMonth('all')}
+                  className="text-xs sm:text-sm"
                 >
                   All Time
                 </Button>
@@ -202,6 +203,7 @@ const ChroniclesPage: React.FC<ChroniclesPageProps> = ({ user, onUserUpdate }) =
                     variant={selectedMonth === month.key ? 'primary' : 'ghost'}
                     size="sm"
                     onClick={() => setSelectedMonth(month.key)}
+                    className="text-xs sm:text-sm"
                   >
                     {month.label}
                   </Button>
@@ -214,31 +216,31 @@ const ChroniclesPage: React.FC<ChroniclesPageProps> = ({ user, onUserUpdate }) =
           {isLoading ? (
             <div className="flex items-center justify-center h-64">
               <div className="text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-600 mx-auto mb-4"></div>
+                <div className="animate-spin rounded-full h-10 sm:h-12 w-10 sm:w-12 border-b-2 border-amber-600 mx-auto mb-4"></div>
                 <p className="text-amber-800 font-cinzel">Loading your chronicles...</p>
               </div>
             </div>
           ) : filteredChronicles.length === 0 ? (
-            <div className="text-center py-12 bg-white rounded-lg shadow-md">
-              <ScrollText className="mx-auto mb-4 text-gray-400" size={48} />
-              <h3 className="text-xl font-cinzel font-bold text-gray-600 mb-2">
+            <div className="text-center py-8 sm:py-12 bg-white rounded-lg shadow-md">
+              <ScrollText className="mx-auto mb-4 text-gray-400" size={36} sm:size={48} />
+              <h3 className="text-lg sm:text-xl font-cinzel font-bold text-gray-600 mb-2">
                 No Chronicles Yet
               </h3>
-              <p className="text-gray-500 font-merriweather mb-4">
+              <p className="text-gray-500 font-merriweather mb-4 text-sm">
                 Your epic wellness adventures await chronicling by the mystical realm!
               </p>
               <Button
                 variant="primary"
                 onClick={generateFantasyTale}
                 disabled={isGenerating}
-                icon={<PenTool size={16} />}
-                className="magical-glow"
+                icon={<PenTool size={14} sm:size={16} />}
+                className="magical-glow text-sm sm:text-base"
               >
                 {isGenerating ? 'Weaving Tale...' : 'Create Your First Epic Tale'}
               </Button>
             </div>
           ) : (
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               {filteredChronicles.map(chronicle => (
                 <div key={chronicle.id} className="relative">
                   <ChronicleEntry chronicle={{
@@ -257,22 +259,22 @@ const ChroniclesPage: React.FC<ChroniclesPageProps> = ({ user, onUserUpdate }) =
                   }} />
                   
                   {/* Chronicle Controls */}
-                  <div className="absolute top-4 right-4 flex items-center space-x-2">
+                  <div className="absolute top-2 sm:top-4 right-2 sm:right-4 flex items-center space-x-1 sm:space-x-2">
                     <button
                       onClick={() => handleTogglePrivacy(chronicle.id, !chronicle.is_private)}
-                      className={`p-2 rounded-full transition-colors ${
+                      className={`p-1 sm:p-2 rounded-full transition-colors ${
                         chronicle.is_private 
                           ? 'bg-red-100 text-red-600 hover:bg-red-200' 
                           : 'bg-green-100 text-green-600 hover:bg-green-200'
                       }`}
                       title={chronicle.is_private ? 'Make public' : 'Make private'}
                     >
-                      {chronicle.is_private ? <EyeOff size={16} /> : <Eye size={16} />}
+                      {chronicle.is_private ? <EyeOff size={14} sm:size={16} /> : <Eye size={14} sm:size={16} />}
                     </button>
                     
                     <button
                       onClick={() => handleDeleteChronicle(chronicle.id)}
-                      className="p-2 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
+                      className="p-1 sm:p-2 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
                       title="Delete chronicle"
                     >
                       ✕
@@ -280,8 +282,8 @@ const ChroniclesPage: React.FC<ChroniclesPageProps> = ({ user, onUserUpdate }) =
                   </div>
 
                   {/* Week Info */}
-                  <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
-                    <div className="flex items-center space-x-4">
+                  <div className="mt-3 sm:mt-4 flex flex-col sm:flex-row sm:items-center justify-between text-xs sm:text-sm text-gray-600 space-y-2 sm:space-y-0">
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-4">
                       <span className="font-cinzel">
                         {ChronicleService.formatTimeAgo(new Date(chronicle.date_created))}
                       </span>
@@ -296,7 +298,7 @@ const ChroniclesPage: React.FC<ChroniclesPageProps> = ({ user, onUserUpdate }) =
                       )}
                     </div>
                     
-                    <div className="flex items-center space-x-3">
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                       {chronicle.xp_gained && chronicle.xp_gained > 0 && (
                         <Badge color="primary" size="sm">
                           +{chronicle.xp_gained} XP
@@ -308,7 +310,7 @@ const ChroniclesPage: React.FC<ChroniclesPageProps> = ({ user, onUserUpdate }) =
                         </Badge>
                       )}
                       <Badge color={chronicle.is_private ? 'error' : 'success'} size="sm">
-                        {chronicle.is_private ? <Lock size={12} className="mr-1" /> : <Unlock size={12} className="mr-1" />}
+                        {chronicle.is_private ? <Lock size={10} sm:size={12} className="mr-1" /> : <Unlock size={10} sm:size={12} className="mr-1" />}
                         {chronicle.is_private ? 'Private' : 'Public'}
                       </Badge>
                     </div>
@@ -322,36 +324,36 @@ const ChroniclesPage: React.FC<ChroniclesPageProps> = ({ user, onUserUpdate }) =
         /* Friends Chronicles */
         <div>
           {friendsCount === 0 ? (
-            <div className="text-center py-12 bg-white rounded-lg shadow-md">
-              <Users className="mx-auto mb-4 text-gray-400" size={48} />
-              <h3 className="text-xl font-cinzel font-bold text-gray-600 mb-2">
+            <div className="text-center py-8 sm:py-12 bg-white rounded-lg shadow-md">
+              <Users className="mx-auto mb-4 text-gray-400" size={36} sm:size={48} />
+              <h3 className="text-lg sm:text-xl font-cinzel font-bold text-gray-600 mb-2">
                 No Friend Chronicles Available
               </h3>
-              <p className="text-gray-500 font-merriweather">
+              <p className="text-gray-500 font-merriweather text-sm">
                 Your friends haven't shared any public chronicles yet, or they're still writing their first adventures!
               </p>
             </div>
           ) : (
-            <div className="space-y-8">
+            <div className="space-y-6 sm:space-y-8">
               {friendsChronicles.map(chronicle => (
-                <div key={chronicle.id} className="bg-white rounded-lg shadow-md p-6">
+                <div key={chronicle.id} className="bg-white rounded-lg shadow-md p-4 sm:p-6">
                   {/* Friend Header */}
-                  <div className="flex items-center mb-6 pb-4 border-b border-gray-200">
+                  <div className="flex items-center mb-4 sm:mb-6 pb-3 sm:pb-4 border-b border-gray-200">
                     <Avatar
                       src={chronicle.user_profiles?.avatar_url}
                       alt={chronicle.user_profiles?.username}
-                      size="lg"
-                      className="mr-4"
+                      size="md"
+                      className="mr-3 sm:mr-4"
                     />
                     <div className="flex-1">
-                      <h3 className="text-xl font-cinzel font-bold text-amber-800">
+                      <h3 className="text-base sm:text-xl font-cinzel font-bold text-amber-800">
                         {chronicle.user_profiles?.username}'s Chronicle
                       </h3>
                       <div className="flex items-center space-x-3 mt-1">
                         <Badge color="accent" size="sm">
                           Level {chronicle.user_profiles?.level}
                         </Badge>
-                        <span className="text-sm text-gray-600 font-merriweather">
+                        <span className="text-xs sm:text-sm text-gray-600 font-merriweather">
                           {ChronicleService.formatTimeAgo(new Date(chronicle.date_created))}
                         </span>
                       </div>
@@ -359,13 +361,13 @@ const ChroniclesPage: React.FC<ChroniclesPageProps> = ({ user, onUserUpdate }) =
                   </div>
 
                   {/* Chronicle Content */}
-                  <div className="border-l-4 border-amber-300 pl-4">
-                    <h4 className="font-cinzel font-bold text-amber-800 text-lg mb-2">
+                  <div className="border-l-4 border-amber-300 pl-3 sm:pl-4">
+                    <h4 className="font-cinzel font-bold text-amber-800 text-base sm:text-lg mb-2">
                       {chronicle.title}
                     </h4>
                     
                     <div className="prose prose-amber max-w-none">
-                      <p className="font-merriweather text-gray-700 leading-relaxed">
+                      <p className="font-merriweather text-gray-700 leading-relaxed text-sm sm:text-base">
                         {chronicle.content}
                       </p>
                     </div>
@@ -375,13 +377,13 @@ const ChroniclesPage: React.FC<ChroniclesPageProps> = ({ user, onUserUpdate }) =
                         <img 
                           src={chronicle.image_url} 
                           alt={chronicle.title}
-                          className="w-full h-48 object-cover rounded-lg"
+                          className="w-full h-36 sm:h-48 object-cover rounded-lg"
                         />
                       </div>
                     )}
 
-                    <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
-                      <div className="flex items-center space-x-3">
+                    <div className="flex flex-wrap items-center justify-between mt-3 pt-3 border-t border-gray-100 gap-2">
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                         {chronicle.xp_gained && chronicle.xp_gained > 0 && (
                           <Badge color="primary" size="sm">
                             +{chronicle.xp_gained} XP
@@ -393,7 +395,7 @@ const ChroniclesPage: React.FC<ChroniclesPageProps> = ({ user, onUserUpdate }) =
                           </Badge>
                         )}
                         {chronicle.mood && (
-                          <div className="flex items-center text-sm text-gray-600">
+                          <div className="flex items-center text-xs sm:text-sm text-gray-600">
                             <span className="mr-1">{ChronicleService.getMoodEmoji(chronicle.mood)}</span>
                             <span className="font-merriweather capitalize">{chronicle.mood}</span>
                           </div>

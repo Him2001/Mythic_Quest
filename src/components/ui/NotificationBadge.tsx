@@ -2,38 +2,21 @@ import React from 'react';
 
 interface NotificationBadgeProps {
   count: number;
+  max?: number;
   className?: string;
-  size?: 'sm' | 'md';
 }
 
-const NotificationBadge: React.FC<NotificationBadgeProps> = ({ 
-  count, 
-  className = '', 
-  size = 'sm' 
+const NotificationBadge: React.FC<NotificationBadgeProps> = ({
+  count,
+  max = 99,
+  className = ''
 }) => {
-  if (count <= 0) return null;
-
-  const sizeClasses = {
-    sm: 'w-5 h-5 text-xs',
-    md: 'w-6 h-6 text-sm'
-  };
-
+  const displayCount = count > max ? `${max}+` : count.toString();
+  
   return (
-    <div className={`
-      absolute -top-2 -right-2 
-      ${sizeClasses[size]}
-      bg-gradient-to-r from-amber-500 to-orange-500 
-      text-white 
-      rounded-full 
-      flex items-center justify-center 
-      font-bold 
-      shadow-lg 
-      border-2 border-white
-      magical-glow
-      ${className}
-    `}>
-      {count > 99 ? '99+' : count}
-    </div>
+    <span className={`absolute -top-1 -right-1 flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full text-xs font-bold bg-red-500 text-white ${className}`}>
+      {displayCount}
+    </span>
   );
 };
 

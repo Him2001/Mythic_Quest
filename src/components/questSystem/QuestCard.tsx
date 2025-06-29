@@ -83,30 +83,30 @@ const QuestCard: React.FC<QuestCardProps> = ({ quest, onComplete, onStart, onUpd
       } fantasy-card`}
     >
       {quest.completed && (
-        <div className="absolute top-6 right-6 magical-glow">
-          <CheckCircle className="text-green-500" size={24} />
+        <div className="absolute top-3 sm:top-6 right-3 sm:right-6 magical-glow">
+          <CheckCircle className="text-green-500" size={20} sm:size={24} />
         </div>
       )}
       
-      <div className="flex flex-col h-full p-5">
-        <div className="mb-3 flex items-start justify-between">
+      <div className="flex flex-col h-full p-3 sm:p-5">
+        <div className="mb-2 sm:mb-3 flex items-start justify-between">
           <Badge 
             color={getQuestTypeColor(quest.type)} 
             variant="default"
             className="mb-2 magical-glow"
           >
-            <Scroll size={14} className="mr-1" />
+            <Scroll size={12} sm:size={14} className="mr-1" />
             {quest.type.charAt(0).toUpperCase() + quest.type.slice(1)}
           </Badge>
           {getDifficultyBadge(quest.difficulty)}
         </div>
         
-        <h3 className="text-lg font-cinzel font-bold text-mystic-dark mb-3">{quest.title}</h3>
-        <p className="text-sm text-gray-700 mb-4 font-merriweather">{quest.description}</p>
+        <h3 className="text-base sm:text-lg font-cinzel font-bold text-mystic-dark mb-2 sm:mb-3">{quest.title}</h3>
+        <p className="text-xs sm:text-sm text-gray-700 mb-3 sm:mb-4 font-merriweather">{quest.description}</p>
         
         {quest.progress !== undefined && quest.totalRequired !== undefined && (
-          <div className="mb-4">
-            <div className="flex justify-between text-xs text-gray-600 mb-2 font-cinzel">
+          <div className="mb-3 sm:mb-4">
+            <div className="flex justify-between text-xs text-gray-600 mb-1 sm:mb-2 font-cinzel">
               <span>Progress</span>
               <span>{quest.progress}/{quest.totalRequired}</span>
             </div>
@@ -119,23 +119,23 @@ const QuestCard: React.FC<QuestCardProps> = ({ quest, onComplete, onStart, onUpd
           </div>
         )}
         
-        <div className="mt-auto pt-4 flex items-center justify-between">
-          <div className="flex items-center space-x-4">
+        <div className="mt-auto pt-3 sm:pt-4 flex items-center justify-between">
+          <div className="flex items-center space-x-2 sm:space-x-4">
             <div className="flex items-center text-amber-700">
-              <Award size={16} className="mr-1 magical-glow" />
-              <span className="text-sm font-cinzel">{quest.xpReward} XP</span>
+              <Award size={14} sm:size={16} className="mr-1 magical-glow" />
+              <span className="text-xs sm:text-sm font-cinzel">{quest.xpReward} XP</span>
             </div>
             
             <div className="flex items-center text-amber-600 bg-amber-50 px-2 py-1 rounded-full border border-amber-200">
-              <Coins size={14} className="mr-1 magical-glow" />
-              <Plus size={10} className="mr-1" />
-              <span className="text-sm font-cinzel font-bold">{coinReward}</span>
+              <Coins size={12} sm:size={14} className="mr-1 magical-glow" />
+              <Plus size={8} sm:size={10} className="mr-1" />
+              <span className="text-xs sm:text-sm font-cinzel font-bold">{coinReward}</span>
             </div>
           </div>
           
           {quest.deadline && (
             <div className="flex items-center text-gray-600 text-xs">
-              <Clock size={14} className="mr-1" />
+              <Clock size={12} sm:size={14} className="mr-1" />
               <span className="font-merriweather">
                 {new Date(quest.deadline).toLocaleDateString()}
               </span>
@@ -143,14 +143,14 @@ const QuestCard: React.FC<QuestCardProps> = ({ quest, onComplete, onStart, onUpd
           )}
         </div>
         
-        <div className="mt-4">
+        <div className="mt-3 sm:mt-4">
           {quest.completed ? (
-            <div className="flex items-center justify-center p-3 bg-green-50 border border-green-200 rounded-lg">
-              <CheckCircle className="text-green-600 mr-2" size={16} />
-              <span className="font-cinzel text-green-800 font-bold">Quest Completed!</span>
+            <div className="flex items-center justify-center p-2 sm:p-3 bg-green-50 border border-green-200 rounded-lg">
+              <CheckCircle className="text-green-600 mr-2" size={14} sm:size={16} />
+              <span className="font-cinzel text-green-800 font-bold text-xs sm:text-sm">Quest Completed!</span>
               <div className="ml-2 flex items-center text-green-600">
-                <Coins size={14} className="mr-1" />
-                <span className="text-sm font-cinzel">+{coinReward} earned</span>
+                <Coins size={12} sm:size={14} className="mr-1" />
+                <span className="text-xs sm:text-sm font-cinzel">+{coinReward} earned</span>
               </div>
             </div>
           ) : (
@@ -158,15 +158,15 @@ const QuestCard: React.FC<QuestCardProps> = ({ quest, onComplete, onStart, onUpd
               variant="primary" 
               fullWidth
               onClick={handleQuestComplete}
-              className="font-cinzel magical-glow"
+              className="font-cinzel magical-glow text-xs sm:text-sm"
               soundEffect="quest-complete"
             >
               <div className="flex items-center justify-center">
                 <span>Complete Quest</span>
                 <div className="ml-2 flex items-center text-amber-200">
-                  <Plus size={12} className="mr-1" />
-                  <Coins size={14} className="mr-1" />
-                  <span className="text-sm">{coinReward}</span>
+                  <Plus size={10} sm:size={12} className="mr-1" />
+                  <Coins size={12} sm:size={14} className="mr-1" />
+                  <span className="text-xs">{coinReward}</span>
                 </div>
               </div>
             </Button>

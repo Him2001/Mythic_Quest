@@ -749,7 +749,7 @@ function App() {
       {/* Connection status banner */}
       {connectionError && (
         <div className="fixed top-0 left-0 right-0 bg-orange-600 text-white text-center py-2 z-50">
-          <p className="text-sm font-cinzel">
+          <p className="text-xs sm:text-sm font-cinzel px-2">
             ⚠️ {connectionError}
           </p>
         </div>
@@ -758,9 +758,9 @@ function App() {
       {/* Demo mode banner */}
       {!hasSupabase && !connectionError && (
         <div className="fixed top-0 left-0 right-0 bg-amber-600 text-white text-center py-2 z-50">
-          <p className="text-sm font-cinzel">
+          <p className="text-xs sm:text-sm font-cinzel px-2">
             🎮 Demo Mode - Experience the full Mythic Quest adventure! 
-            <span className="ml-2 text-amber-200">Connect Supabase for full functionality</span>
+            <span className="ml-2 text-amber-200 hidden sm:inline">Connect Supabase for full functionality</span>
           </p>
         </div>
       )}
@@ -773,12 +773,12 @@ function App() {
         quests={quests}
       />
       
-      <main className={`relative ${(!hasSupabase || connectionError) ? 'pt-28' : 'pt-20'} pb-6`}>
-        <div className="container mx-auto px-4">
-          <div className="relative backdrop-blur-sm bg-white/80 rounded-2xl shadow-xl border border-amber-100/20 overflow-hidden">
-            <div className="absolute inset-0 border-4 border-amber-500/10 rounded-2xl pointer-events-none" />
+      <main className={`relative ${(!hasSupabase || connectionError) ? 'pt-20 sm:pt-28' : 'pt-16 sm:pt-20'} pb-4 sm:pb-6`}>
+        <div className="container mx-auto px-2 sm:px-4">
+          <div className="relative backdrop-blur-sm bg-white/80 rounded-lg sm:rounded-2xl shadow-xl border border-amber-100/20 overflow-hidden">
+            <div className="absolute inset-0 border-2 sm:border-4 border-amber-500/10 rounded-lg sm:rounded-2xl pointer-events-none" />
             <div className="absolute inset-0 bg-gradient-to-b from-amber-500/5 to-purple-500/5 pointer-events-none" />
-            <div className="relative p-6">
+            <div className="relative p-3 sm:p-6">
               {renderPage()}
             </div>
           </div>
@@ -813,7 +813,7 @@ function App() {
       )}
       
       {/* Bolt.new Badge - Fixed position in bottom-right corner */}
-      <div className="fixed bottom-4 right-4 z-50">
+      <div className="fixed bottom-2 right-2 sm:bottom-4 sm:right-4 z-50">
         <a
           href="https://bolt.new/"
           target="_blank"
@@ -823,7 +823,7 @@ function App() {
           <img
             src="/white_circle_360x360.png"
             alt="Built with Bolt.new"
-            className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 lg:w-18 lg:h-18 xl:w-20 xl:h-20 rounded-full shadow-md hover:shadow-lg transition-shadow duration-200"
+            className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 lg:w-16 lg:h-16 xl:w-18 xl:h-18 2xl:w-20 2xl:h-20 rounded-full shadow-md hover:shadow-lg transition-shadow duration-200"
           />
         </a>
       </div>

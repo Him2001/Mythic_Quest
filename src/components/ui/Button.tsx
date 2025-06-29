@@ -1,18 +1,18 @@
-import React from 'react';
-import { DivideIcon as LucideIcon } from 'lucide-react';
+import React, { ReactNode } from 'react';
 import { SoundEffects } from '../../utils/soundEffects';
 
 interface ButtonProps {
-  children: React.ReactNode;
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
+  children?: ReactNode;
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'link';
   size?: 'sm' | 'md' | 'lg';
   fullWidth?: boolean;
   disabled?: boolean;
-  icon?: React.ReactNode;
-  onClick?: () => void;
   type?: 'button' | 'submit' | 'reset';
+  icon?: ReactNode;
+  iconPosition?: 'left' | 'right';
   className?: string;
-  soundEffect?: string; // Custom sound effect
+  onClick?: () => void;
+  soundEffect?: string;
 }
 
 const Button: React.FC<ButtonProps> = ({
@@ -21,47 +21,64 @@ const Button: React.FC<ButtonProps> = ({
   size = 'md',
   fullWidth = false,
   disabled = false,
-  icon,
-  onClick,
   type = 'button',
+  icon,
+  iconPosition = 'left',
   className = '',
-  soundEffect = 'click'
+  onClick,
+  soundEffect = 'click',
+  ...props
 }) => {
-  const baseClasses = 'inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
-  
-  const variantClasses = {
-    primary: 'bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white shadow-lg hover:shadow-xl focus:ring-amber-500',
-    secondary: 'bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white shadow-lg hover:shadow-xl focus:ring-purple-500',
-    outline: 'border-2 border-amber-500 text-amber-700 hover:bg-amber-50 focus:ring-amber-500',
-    ghost: 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 focus:ring-gray-500',
-    danger: 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-lg hover:shadow-xl focus:ring-red-500'
-  };
-  
-  const sizeClasses = {
-    sm: 'px-3 py-1.5 text-sm',
-    md: 'px-4 py-2 text-base',
-    lg: 'px-6 py-3 text-lg'
-  };
-  
-  const widthClass = fullWidth ? 'w-full' : '';
-  
   const handleClick = () => {
-    if (!disabled && onClick) {
-      // Play sound effect
+    if (disabled) return;
+    
+    // Play sound effect
+    if (soundEffect) {
       SoundEffects.playSound(soundEffect);
+    }
+    
+    // Call the original onClick handler
+    if (onClick) {
       onClick();
     }
   };
+
+  // Base classes
+  const baseClasses = 'font-cinzel font-medium transition-all duration-200 flex items-center justify-center';
+  
+  // Size classes
+  const sizeClasses = {
+    sm: 'text-xs px-2 py-1 rounded',
+    md: 'text-sm px-3 py-1.5 rounded-md',
+    lg: 'text-base px-4 py-2 rounded-lg'
+  };
+  
+  // Variant classes
+  const variantClasses = {
+    primary: 'bg-gradient-to-r from-amber-500 to-yellow-500 text-white shadow hover:shadow-md hover:from-amber-600 hover:to-yellow-600 active:shadow-inner disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-amber-500 disabled:hover:to-yellow-500',
+    secondary: 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow hover:shadow-md hover:from-purple-600 hover:to-indigo-600 active:shadow-inner disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-purple-500 disabled:hover:to-indigo-500',
+    outline: 'border border-gray-300 text-gray-700 hover:bg-gray-50 active:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent',
+    ghost: 'text-gray-600 hover:bg-gray-100 active:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent',
+    link: 'text-amber-600 hover:text-amber-700 underline hover:no-underline disabled:opacity-50 disabled:cursor-not-allowed'
+  };
+  
+  // Full width class
+  const widthClass = fullWidth ? 'w-full' : '';
+  
+  // Combine all classes
+  const buttonClasses = `${baseClasses} ${sizeClasses[size]} ${variantClasses[variant]} ${widthClass} ${className}`;
   
   return (
     <button
       type={type}
+      className={buttonClasses}
       disabled={disabled}
       onClick={handleClick}
-      className={`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${widthClass} ${className}`}
+      {...props}
     >
-      {icon && <span className="mr-2">{icon}</span>}
+      {icon && iconPosition === 'left' && <span className={`${children ? 'mr-1.5' : ''}`}>{icon}</span>}
       {children}
+      {icon && iconPosition === 'right' && <span className={`${children ? 'ml-1.5' : ''}`}>{icon}</span>}
     </button>
   );
 };

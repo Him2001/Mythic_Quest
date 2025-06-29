@@ -290,23 +290,23 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 pt-8 overflow-y-auto">
-      <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto my-8">
+    <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-2 sm:p-4 pt-4 sm:pt-8 overflow-y-auto">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto my-4 sm:my-8">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 sticky top-0 bg-white rounded-t-xl z-10">
-          <h2 className="text-xl font-cinzel font-bold text-gray-800">
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 sticky top-0 bg-white rounded-t-xl z-10">
+          <h2 className="text-lg sm:text-xl font-cinzel font-bold text-gray-800">
             {prefilledPost ? 'Share Your Achievement' : 'Create New Post'}
           </h2>
           <button
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700 transition-colors p-1 rounded-full hover:bg-gray-100"
           >
-            <X size={24} />
+            <X size={20} sm:size={24} />
           </button>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-6">
           {/* Caption */}
           <div>
             <label className="block text-sm font-cinzel font-bold text-gray-700 mb-2">
@@ -317,7 +317,7 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({
               onChange={(e) => setCaption(e.target.value)}
               placeholder="What's happening on your wellness adventure?"
               rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-amber-500 font-merriweather resize-none"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-amber-500 font-merriweather resize-none text-sm sm:text-base"
               required
             />
           </div>
@@ -341,7 +341,7 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({
             {!mediaFile && !mediaPreview ? (
               <div className="space-y-3">
                 {/* File Upload Area */}
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-amber-500 transition-colors">
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 sm:p-6 text-center hover:border-amber-500 transition-colors">
                   <input
                     type="file"
                     accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,video/mp4,video/webm,video/ogg"
@@ -356,14 +356,14 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({
                   >
                     {isProcessingMedia ? (
                       <>
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-600"></div>
+                        <div className="animate-spin rounded-full h-6 sm:h-8 w-6 sm:w-8 border-b-2 border-amber-600"></div>
                         <span className="text-sm text-gray-600 font-merriweather">Processing media...</span>
                       </>
                     ) : (
                       <>
                         <div className="flex space-x-2">
-                          <Camera className="text-gray-400" size={24} />
-                          <FileImage className="text-gray-400" size={24} />
+                          <Camera className="text-gray-400" size={20} sm:size={24} />
+                          <FileImage className="text-gray-400" size={20} sm:size={24} />
                         </div>
                         <span className="text-sm text-gray-600 font-merriweather">
                           Click to upload image or video
@@ -383,9 +383,9 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({
                     variant="outline"
                     size="sm"
                     onClick={() => document.getElementById('media-upload')?.click()}
-                    icon={<Image size={16} />}
+                    icon={<Image size={14} sm:size={16} />}
                     disabled={isProcessingMedia}
-                    className="flex-1"
+                    className="flex-1 text-xs sm:text-sm"
                   >
                     Upload Image
                   </Button>
@@ -394,9 +394,9 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({
                     variant="outline"
                     size="sm"
                     onClick={() => document.getElementById('media-upload')?.click()}
-                    icon={<Video size={16} />}
+                    icon={<Video size={14} sm:size={16} />}
                     disabled={isProcessingMedia}
-                    className="flex-1"
+                    className="flex-1 text-xs sm:text-sm"
                   >
                     Upload Video
                   </Button>
@@ -413,8 +413,8 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({
                       variant="outline"
                       size="sm"
                       onClick={removeMedia}
-                      icon={<Trash2 size={14} />}
-                      className="text-red-600 hover:text-red-700"
+                      icon={<Trash2 size={12} sm:size={14} />}
+                      className="text-red-600 hover:text-red-700 text-xs sm:text-sm"
                     >
                       Remove
                     </Button>
@@ -461,7 +461,8 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({
                   variant="outline"
                   size="sm"
                   onClick={() => setShowQuestSelector(!showQuestSelector)}
-                  icon={<Tag size={14} />}
+                  icon={<Tag size={12} sm:size={14} />}
+                  className="text-xs sm:text-sm"
                 >
                   {selectedQuest ? 'Change Quest' : 'Add Quest'}
                 </Button>
@@ -476,7 +477,7 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({
                     onClick={() => setSelectedQuest(null)}
                     className="ml-2 text-white/70 hover:text-white"
                   >
-                    <X size={12} />
+                    <X size={10} sm:size={12} />
                   </button>
                 </Badge>
               )}
@@ -518,7 +519,8 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({
                   variant="outline"
                   size="sm"
                   onClick={() => setShowAchievementSelector(!showAchievementSelector)}
-                  icon={<Award size={14} />}
+                  icon={<Award size={12} sm:size={14} />}
+                  className="text-xs sm:text-sm"
                 >
                   {selectedAchievement ? 'Change Achievement' : 'Add Achievement'}
                 </Button>
@@ -533,7 +535,7 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({
                     onClick={() => setSelectedAchievement(null)}
                     className="ml-2 text-white/70 hover:text-white"
                   >
-                    <X size={12} />
+                    <X size={10} sm:size={12} />
                   </button>
                 </Badge>
               )}
@@ -567,7 +569,7 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({
               type="button"
               variant="outline"
               onClick={onClose}
-              className="flex-1"
+              className="flex-1 text-sm sm:text-base"
               disabled={isSubmitting || isProcessingMedia}
             >
               Cancel
@@ -575,7 +577,7 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({
             <Button
               type="submit"
               variant="primary"
-              className="flex-1 magical-glow"
+              className="flex-1 magical-glow text-sm sm:text-base"
               disabled={!caption.trim() || isSubmitting || isProcessingMedia}
             >
               {isSubmitting ? 'Posting...' : 'Share Post'}

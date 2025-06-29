@@ -16,7 +16,7 @@ const QuestsPage: React.FC<QuestsPageProps> = ({
   onUpdateProgress 
 }) => {
   return (
-    <div className="container mx-auto px-4 py-6">
+    <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6">
       <QuestLog 
         quests={quests} 
         onCompleteQuest={onCompleteQuest} 

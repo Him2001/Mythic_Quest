@@ -232,26 +232,26 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
     const avatarUrl = user.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`;
 
     return (
-      <div key={user.id} className="bg-white rounded-lg shadow-md p-4 border border-amber-100">
-        <div className="flex items-center justify-between">
+      <div key={user.id} className="bg-white rounded-lg shadow-md p-3 sm:p-4 border border-amber-100">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between space-y-3 sm:space-y-0">
           <div className="flex items-center">
             <Avatar
               src={avatarUrl}
               alt={displayName}
-              size="lg"
-              className="mr-4"
+              size="md"
+              className="mr-3 sm:mr-4"
             />
             <div>
               <div className="flex items-center mb-1">
-                <h3 className="font-cinzel font-bold text-gray-800">{displayName}</h3>
+                <h3 className="font-cinzel font-bold text-gray-800 text-sm sm:text-base">{displayName}</h3>
                 {user.level && (
                   <Badge color="accent" size="sm" className="ml-2">
                     Level {user.level}
                   </Badge>
                 )}
               </div>
-              <p className="text-sm text-amber-700 font-merriweather mb-1">{user.email}</p>
-              <div className="flex items-center mt-2 space-x-4 text-xs text-gray-500">
+              <p className="text-xs sm:text-sm text-amber-700 font-merriweather mb-1">{user.email}</p>
+              <div className="flex flex-wrap items-center mt-1 sm:mt-2 space-x-2 sm:space-x-4 text-xs text-gray-500">
                 {user.total_quests_completed !== undefined && (
                   <span>{user.total_quests_completed} quests</span>
                 )}
@@ -264,14 +264,14 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
           </div>
           
           {showActions && (
-            <div className="flex flex-col space-y-2">
+            <div className="flex flex-row sm:flex-col space-x-2 sm:space-x-0 sm:space-y-2">
               {status === 'none' && (
                 <Button
                   variant="primary"
                   size="sm"
                   onClick={() => handleSendFriendRequest(user.id)}
                   icon={<UserPlus size={14} />}
-                  className="magical-glow"
+                  className="magical-glow text-xs sm:text-sm"
                 >
                   Add Friend
                 </Button>
@@ -283,6 +283,7 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
                   size="sm"
                   disabled
                   icon={<Clock size={14} />}
+                  className="text-xs sm:text-sm"
                 >
                   Request Sent
                 </Button>
@@ -295,7 +296,7 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
                     size="sm"
                     onClick={() => onStartConversation(user.id)}
                     icon={<MessageCircle size={14} />}
-                    className="magical-glow"
+                    className="magical-glow text-xs sm:text-sm"
                   >
                     Message
                   </Button>
@@ -304,6 +305,7 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
                     size="sm"
                     onClick={() => handleRemoveFriend(user.id)}
                     icon={<UserMinus size={14} />}
+                    className="text-xs sm:text-sm"
                   >
                     Remove
                   </Button>
@@ -328,8 +330,8 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
     const avatarUrl = user.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`;
 
     return (
-      <div key={request.id} className="bg-white rounded-lg shadow-md p-4 border border-amber-100">
-        <div className="flex items-center justify-between">
+      <div key={request.id} className="bg-white rounded-lg shadow-md p-3 sm:p-4 border border-amber-100">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between space-y-3 sm:space-y-0">
           <div className="flex items-center">
             <Avatar
               src={avatarUrl}
@@ -338,9 +340,9 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
               className="mr-3"
             />
             <div>
-              <h3 className="font-cinzel font-bold text-gray-800">{displayName}</h3>
-              <p className="text-sm text-gray-600 font-merriweather">{user.email}</p>
-              <p className="text-xs text-gray-500 font-merriweather">
+              <h3 className="font-cinzel font-bold text-gray-800 text-sm sm:text-base">{displayName}</h3>
+              <p className="text-xs sm:text-sm text-gray-600 font-merriweather">{user.email}</p>
+              <p className="text-xs text-gray-500 font-merriweather mt-1">
                 {type === 'sent' ? 'Request sent' : 'Request received'} {formatTimeAgo(request.createdAt)}
               </p>
             </div>
@@ -354,7 +356,7 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
                   size="sm"
                   onClick={() => handleAcceptRequest(request.id)}
                   icon={<UserCheck size={14} />}
-                  className="magical-glow"
+                  className="magical-glow text-xs sm:text-sm"
                 >
                   Accept
                 </Button>
@@ -363,6 +365,7 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
                   size="sm"
                   onClick={() => handleRejectRequest(request.id)}
                   icon={<UserX size={14} />}
+                  className="text-xs sm:text-sm"
                 >
                   Reject
                 </Button>
@@ -386,7 +389,7 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-600 mx-auto mb-4"></div>
+            <div className="animate-spin rounded-full h-10 sm:h-12 w-10 sm:w-12 border-b-2 border-amber-600 mx-auto mb-4"></div>
             <p className="text-amber-800 font-cinzel">Loading community...</p>
           </div>
         </div>
@@ -397,14 +400,14 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
   return (
     <div className="max-w-4xl mx-auto">
       {/* Header */}
-      <div className="mb-6">
+      <div className="mb-4 sm:mb-6">
         <div className="flex items-center mb-4">
-          <Users className="text-amber-600 mr-3 magical-glow" size={28} />
+          <Users className="text-amber-600 mr-2 sm:mr-3 magical-glow" size={24} sm:size={28} />
           <div>
-            <h1 className="text-2xl font-cinzel font-bold text-amber-800 magical-glow">
+            <h1 className="text-lg sm:text-2xl font-cinzel font-bold text-amber-800 magical-glow">
               Friends & Community
             </h1>
-            <p className="text-amber-700 font-merriweather">
+            <p className="text-amber-700 font-merriweather text-sm">
               Connect with fellow adventurers on their wellness journey
             </p>
           </div>
@@ -414,7 +417,7 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
         <div className="flex space-x-1 bg-gray-100 rounded-lg p-1">
           <button
             onClick={() => setActiveTab('friends')}
-            className={`flex-1 py-2 px-4 rounded-md font-cinzel font-bold transition-all duration-200 ${
+            className={`flex-1 py-2 px-3 sm:px-4 rounded-md font-cinzel font-bold transition-all duration-200 text-xs sm:text-sm ${
               activeTab === 'friends'
                 ? 'bg-white text-amber-800 shadow-md'
                 : 'text-gray-600 hover:text-amber-700'
@@ -424,7 +427,7 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
           </button>
           <button
             onClick={() => setActiveTab('requests')}
-            className={`flex-1 py-2 px-4 rounded-md font-cinzel font-bold transition-all duration-200 ${
+            className={`flex-1 py-2 px-3 sm:px-4 rounded-md font-cinzel font-bold transition-all duration-200 text-xs sm:text-sm ${
               activeTab === 'requests'
                 ? 'bg-white text-amber-800 shadow-md'
                 : 'text-gray-600 hover:text-amber-700'
@@ -434,7 +437,7 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
           </button>
           <button
             onClick={() => setActiveTab('search')}
-            className={`flex-1 py-2 px-4 rounded-md font-cinzel font-bold transition-all duration-200 ${
+            className={`flex-1 py-2 px-3 sm:px-4 rounded-md font-cinzel font-bold transition-all duration-200 text-xs sm:text-sm ${
               activeTab === 'search'
                 ? 'bg-white text-amber-800 shadow-md'
                 : 'text-gray-600 hover:text-amber-700'
@@ -447,29 +450,29 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
 
       {/* Search Bar (for search tab) */}
       {activeTab === 'search' && (
-        <div className="relative mb-6">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+        <div className="relative mb-4 sm:mb-6">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} sm:size={20} />
           <input
             type="text"
             placeholder="Search by name or email..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 border-2 border-amber-200 rounded-lg focus:border-amber-500 focus:outline-none font-merriweather bg-white/80 backdrop-blur-sm"
+            className="w-full pl-8 sm:pl-10 pr-4 py-2 sm:py-3 border-2 border-amber-200 rounded-lg focus:border-amber-500 focus:outline-none font-merriweather bg-white/80 backdrop-blur-sm text-sm sm:text-base"
           />
         </div>
       )}
 
       {/* Content */}
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         {activeTab === 'friends' && (
           <>
             {friends.length === 0 ? (
-              <div className="text-center py-12 bg-white rounded-lg shadow-md">
-                <Users className="mx-auto mb-4 text-gray-400" size={48} />
-                <h3 className="text-xl font-cinzel font-bold text-gray-600 mb-2">
+              <div className="text-center py-8 sm:py-12 bg-white rounded-lg shadow-md">
+                <Users className="mx-auto mb-4 text-gray-400" size={36} sm:size={48} />
+                <h3 className="text-lg sm:text-xl font-cinzel font-bold text-gray-600 mb-2">
                   No Friends Yet
                 </h3>
-                <p className="text-gray-500 font-merriweather">
+                <p className="text-gray-500 font-merriweather text-sm">
                   Search for adventurers to add as friends!
                 </p>
               </div>
@@ -483,10 +486,10 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
           <>
             {friendRequests.received.length > 0 && (
               <div>
-                <h3 className="text-lg font-cinzel font-bold text-amber-800 mb-3">
+                <h3 className="text-base sm:text-lg font-cinzel font-bold text-amber-800 mb-3">
                   Received Requests ({friendRequests.received.length})
                 </h3>
-                <div className="space-y-3 mb-6">
+                <div className="space-y-3 mb-4 sm:mb-6">
                   {friendRequests.received.map(request => renderFriendRequestCard(request, 'received'))}
                 </div>
               </div>
@@ -494,7 +497,7 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
 
             {friendRequests.sent.length > 0 && (
               <div>
-                <h3 className="text-lg font-cinzel font-bold text-amber-800 mb-3">
+                <h3 className="text-base sm:text-lg font-cinzel font-bold text-amber-800 mb-3">
                   Sent Requests ({friendRequests.sent.length})
                 </h3>
                 <div className="space-y-3">
@@ -504,12 +507,12 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
             )}
 
             {friendRequests.received.length === 0 && friendRequests.sent.length === 0 && (
-              <div className="text-center py-12 bg-white rounded-lg shadow-md">
-                <UserPlus className="mx-auto mb-4 text-gray-400" size={48} />
-                <h3 className="text-xl font-cinzel font-bold text-gray-600 mb-2">
+              <div className="text-center py-8 sm:py-12 bg-white rounded-lg shadow-md">
+                <UserPlus className="mx-auto mb-4 text-gray-400" size={36} sm:size={48} />
+                <h3 className="text-lg sm:text-xl font-cinzel font-bold text-gray-600 mb-2">
                   No Friend Requests
                 </h3>
-                <p className="text-gray-500 font-merriweather">
+                <p className="text-gray-500 font-merriweather text-sm">
                   Send friend requests to connect with other adventurers!
                 </p>
               </div>
@@ -520,39 +523,41 @@ const FriendsTab: React.FC<FriendsTabProps> = ({ currentUser, onStartConversatio
         {activeTab === 'search' && (
           <>
             {isSearching ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-600 mx-auto mb-2"></div>
+              <div className="text-center py-6 sm:py-8">
+                <div className="animate-spin rounded-full h-6 sm:h-8 w-6 sm:w-8 border-b-2 border-amber-600 mx-auto mb-2"></div>
                 <p className="text-amber-800 font-cinzel">Searching...</p>
               </div>
             ) : searchResults.length > 0 ? (
               <>
-                <div className="mb-4">
-                  <h3 className="text-lg font-cinzel font-bold text-amber-800">
+                <div className="mb-3 sm:mb-4">
+                  <h3 className="text-base sm:text-lg font-cinzel font-bold text-amber-800">
                     Search Results ({searchResults.length})
                   </h3>
-                  <p className="text-sm text-gray-600 font-merriweather">
+                  <p className="text-xs sm:text-sm text-gray-600 font-merriweather">
                     Showing registered users from Supabase
                   </p>
                 </div>
-                {searchResults.map(user => renderUserCard(user))}
+                <div className="space-y-3">
+                  {searchResults.map(user => renderUserCard(user))}
+                </div>
               </>
             ) : searchQuery.trim() ? (
-              <div className="text-center py-12 bg-white rounded-lg shadow-md">
-                <Search className="mx-auto mb-4 text-gray-400" size={48} />
-                <h3 className="text-xl font-cinzel font-bold text-gray-600 mb-2">
+              <div className="text-center py-8 sm:py-12 bg-white rounded-lg shadow-md">
+                <Search className="mx-auto mb-4 text-gray-400" size={36} sm:size={48} />
+                <h3 className="text-lg sm:text-xl font-cinzel font-bold text-gray-600 mb-2">
                   No Users Found
                 </h3>
-                <p className="text-gray-500 font-merriweather">
+                <p className="text-gray-500 font-merriweather text-sm">
                   Try searching with a different name or email address.
                 </p>
               </div>
             ) : (
-              <div className="text-center py-12 bg-white rounded-lg shadow-md">
-                <Search className="mx-auto mb-4 text-gray-400" size={48} />
-                <h3 className="text-xl font-cinzel font-bold text-gray-600 mb-2">
+              <div className="text-center py-8 sm:py-12 bg-white rounded-lg shadow-md">
+                <Search className="mx-auto mb-4 text-gray-400" size={36} sm:size={48} />
+                <h3 className="text-lg sm:text-xl font-cinzel font-bold text-gray-600 mb-2">
                   Find New Friends
                 </h3>
-                <p className="text-gray-500 font-merriweather mb-4">
+                <p className="text-gray-500 font-merriweather mb-4 text-sm">
                   Search for other adventurers by name or email address to send friend requests.
                 </p>
                 <p className="text-xs text-gray-400 font-merriweather">

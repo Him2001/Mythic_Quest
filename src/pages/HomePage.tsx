@@ -223,11 +223,11 @@ const HomePage: React.FC<HomePageProps> = ({
   };
   
   return (
-    <div className="container mx-auto px-4 py-6 relative" onClick={handleUserInteraction}>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6 relative" onClick={handleUserInteraction}>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-8">
         {/* Left Column - Avatar and Progress */}
-        <div className="lg:col-span-1">
-          <div className="bg-gradient-to-b from-purple-50 to-white rounded-2xl p-6 shadow-md mb-6">
+        <div className="lg:col-span-1 space-y-4 sm:space-y-6">
+          <div className="bg-gradient-to-b from-purple-50 to-white rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-md">
             <AvatarDisplay 
               avatar={avatar} 
               message={avatarMessage}
@@ -245,7 +245,7 @@ const HomePage: React.FC<HomePageProps> = ({
           />
           
           {/* Coin Treasury Stats */}
-          <div className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-lg shadow-md p-5 mb-6 border-2 border-amber-200 magical-glow">
+          <div className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-lg shadow-md p-4 sm:p-5 border-2 border-amber-200 magical-glow">
             <div className="flex items-center mb-3">
               <Coins className="text-amber-600 mr-2 magical-glow" size={20} />
               <h3 className="font-cinzel font-bold text-amber-800">Coin Treasury</h3>
@@ -254,7 +254,7 @@ const HomePage: React.FC<HomePageProps> = ({
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-amber-700 font-cinzel text-sm">Current Balance</span>
-                <span className="font-cinzel font-bold text-amber-800 text-lg">
+                <span className="font-cinzel font-bold text-amber-800 text-base sm:text-lg">
                   {CoinSystem.formatCoins(user.mythicCoins)} Coins
                 </span>
               </div>
@@ -284,7 +284,7 @@ const HomePage: React.FC<HomePageProps> = ({
             </div>
           </div>
           
-          <div className="bg-white rounded-lg shadow-md p-5 mb-6">
+          <div className="bg-white rounded-lg shadow-md p-4 sm:p-5">
             <div className="flex items-center mb-3">
               <Sparkles className="text-amber-500 mr-2" size={18} />
               <h3 className="font-bold text-gray-800">Your Journey</h3>
@@ -315,7 +315,7 @@ const HomePage: React.FC<HomePageProps> = ({
           </div>
 
           {/* Walking Stats */}
-          <div className="bg-white rounded-lg shadow-md p-5">
+          <div className="bg-white rounded-lg shadow-md p-4 sm:p-5">
             <div className="flex items-center mb-3">
               <MapPin className="text-blue-500 mr-2" size={18} />
               <h3 className="font-bold text-gray-800">Walking Progress</h3>
@@ -337,10 +337,10 @@ const HomePage: React.FC<HomePageProps> = ({
         {/* Right Column - Quests */}
         <div className="lg:col-span-2">
           {/* Active Quests Section */}
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-4">
+          <div className="mb-6 sm:mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 space-y-2 sm:space-y-0">
               <div className="flex items-center">
-                <h2 className="text-xl font-bold text-purple-900 mr-3">Active Quests</h2>
+                <h2 className="text-lg sm:text-xl font-bold text-purple-900 mr-3">Active Quests</h2>
                 <div className="flex items-center bg-amber-100 px-2 py-1 rounded-full border border-amber-300">
                   <Coins size={14} className="text-amber-600 mr-1" />
                   <span className="text-xs font-cinzel text-amber-700">+20 coins each</span>
@@ -351,13 +351,14 @@ const HomePage: React.FC<HomePageProps> = ({
                 size="sm"
                 icon={<ArrowRight size={16} />}
                 onClick={onViewAllQuests}
+                className="self-start sm:self-auto"
               >
                 View All
               </Button>
             </div>
             
             {activeQuests.length === 0 ? (
-              <div className="bg-white rounded-lg p-6 text-center text-gray-500">
+              <div className="bg-white rounded-lg p-4 sm:p-6 text-center text-gray-500">
                 <p>You've completed all your quests! Check back later for more adventures.</p>
                 <div className="mt-2 flex items-center justify-center text-amber-600">
                   <TrendingUp size={16} className="mr-1" />
@@ -365,7 +366,7 @@ const HomePage: React.FC<HomePageProps> = ({
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-6">
+              <div className="grid grid-cols-1 gap-4 sm:gap-6">
                 {activeQuests.map(quest => (
                   <QuestCard
                     key={quest.id}

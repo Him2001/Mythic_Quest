@@ -1,32 +1,33 @@
-import React from 'react';
+import React, { ReactNode } from 'react';
 
 interface CardProps {
-  children: React.ReactNode;
+  children: ReactNode;
+  variant?: 'default' | 'hover' | 'interactive';
   className?: string;
   onClick?: () => void;
-  variant?: 'default' | 'hover' | 'interactive';
 }
 
 const Card: React.FC<CardProps> = ({
   children,
+  variant = 'default',
   className = '',
-  onClick,
-  variant = 'default'
+  onClick
 }) => {
-  const baseStyles = 'fantasy-card';
+  // Base classes
+  const baseClasses = 'bg-white rounded-lg shadow-md overflow-hidden';
   
-  const variantStyles = {
+  // Variant classes
+  const variantClasses = {
     default: '',
-    hover: 'transform-gpu transition-all duration-300 hover:scale-[1.02]',
-    interactive: 'transform-gpu transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1 cursor-pointer'
+    hover: 'transition-all duration-200 hover:shadow-lg hover:translate-y-[-2px]',
+    interactive: 'transition-all duration-200 hover:shadow-lg hover:translate-y-[-2px] cursor-pointer active:shadow-md active:translate-y-[-1px]'
   };
   
   return (
     <div 
-      className={`${baseStyles} ${variantStyles[variant]} ${className}`}
+      className={`${baseClasses} ${variantClasses[variant]} ${className}`}
       onClick={onClick}
     >
-      <div className="magical-particles" />
       {children}
     </div>
   );
