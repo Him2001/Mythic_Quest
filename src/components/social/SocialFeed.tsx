@@ -148,7 +148,7 @@ const SocialFeed: React.FC<SocialFeedProps> = ({
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <Users className="animate-spin mx-auto mb-3 text-amber-600" size={32} />
+          <Users className="animate-spin mx-auto mb-3 text-amber-600" size={28} sm:size={32} />
           <p className="text-amber-800 font-cinzel">Loading social feed...</p>
         </div>
       </div>
@@ -158,15 +158,15 @@ const SocialFeed: React.FC<SocialFeedProps> = ({
   return (
     <div className="max-w-2xl mx-auto">
       {/* Feed Header */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
+      <div className="mb-4 sm:mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 space-y-3 sm:space-y-0">
           <div className="flex items-center">
-            <Users className="text-amber-600 mr-3 magical-glow" size={28} />
+            <Users className="text-amber-600 mr-2 sm:mr-3 magical-glow" size={24} sm:size={28} />
             <div>
-              <h1 className="text-2xl font-cinzel font-bold text-amber-800 magical-glow">
+              <h1 className="text-lg sm:text-2xl font-cinzel font-bold text-amber-800 magical-glow">
                 Social Feed
               </h1>
-              <p className="text-amber-700 font-merriweather">
+              <p className="text-amber-700 font-merriweather text-sm">
                 Share your wellness journey with friends
               </p>
             </div>
@@ -176,8 +176,8 @@ const SocialFeed: React.FC<SocialFeedProps> = ({
             <Button
               variant="primary"
               onClick={() => setInternalShowCreateModal(true)}
-              icon={<Plus size={20} />}
-              className="magical-glow"
+              icon={<Plus size={16} sm:size={20} />}
+              className="magical-glow self-start sm:self-auto text-sm sm:text-base"
             >
               Create Post
             </Button>
@@ -186,14 +186,14 @@ const SocialFeed: React.FC<SocialFeedProps> = ({
       </div>
 
       {/* Posts Feed */}
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         {posts.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-lg shadow-md">
-            <Users className="mx-auto mb-4 text-gray-400" size={48} />
-            <h3 className="text-xl font-cinzel font-bold text-gray-600 mb-2">
+          <div className="text-center py-8 sm:py-12 bg-white rounded-lg shadow-md">
+            <Users className="mx-auto mb-4 text-gray-400" size={36} sm:size={48} />
+            <h3 className="text-lg sm:text-xl font-cinzel font-bold text-gray-600 mb-2">
               No Posts Yet
             </h3>
-            <p className="text-gray-500 font-merriweather mb-4">
+            <p className="text-gray-500 font-merriweather mb-4 text-sm">
               {friendsCount === 0 
                 ? "Add friends to see their posts in your feed!" 
                 : "Be the first to share your wellness journey!"
@@ -203,7 +203,8 @@ const SocialFeed: React.FC<SocialFeedProps> = ({
               <Button
                 variant="primary"
                 onClick={() => setInternalShowCreateModal(true)}
-                icon={<Plus size={16} />}
+                icon={<Plus size={14} sm:size={16} />}
+                className="text-sm sm:text-base"
               >
                 Create Your First Post
               </Button>
@@ -213,20 +214,20 @@ const SocialFeed: React.FC<SocialFeedProps> = ({
           posts.map(post => (
             <div key={post.id} className="bg-white rounded-xl shadow-lg border border-amber-100 overflow-hidden fantasy-card">
               {/* Post content would be rendered here */}
-              <div className="p-4">
+              <div className="p-3 sm:p-4">
                 <div className="flex items-center mb-3">
                   <img 
                     src={post.user_profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${post.user_profiles?.username}`}
                     alt={post.user_profiles?.username}
-                    className="w-10 h-10 rounded-full mr-3"
+                    className="w-8 h-8 sm:w-10 sm:h-10 rounded-full mr-3"
                   />
                   <div>
-                    <h4 className="font-cinzel font-bold text-gray-800">{post.user_profiles?.username}</h4>
-                    <p className="text-sm text-gray-500 font-merriweather">Level {post.user_profiles?.level}</p>
+                    <h4 className="font-cinzel font-bold text-gray-800 text-sm sm:text-base">{post.user_profiles?.username}</h4>
+                    <p className="text-xs sm:text-sm text-gray-500 font-merriweather">Level {post.user_profiles?.level}</p>
                   </div>
                 </div>
                 
-                <p className="text-gray-800 font-merriweather mb-4">{post.content}</p>
+                <p className="text-gray-800 font-merriweather mb-4 text-sm sm:text-base">{post.content}</p>
                 
                 {post.media_url && (
                   <div className="mb-4">
@@ -238,7 +239,7 @@ const SocialFeed: React.FC<SocialFeedProps> = ({
                   </div>
                 )}
                 
-                <div className="flex items-center justify-between text-sm text-gray-500">
+                <div className="flex items-center justify-between text-xs sm:text-sm text-gray-500">
                   <span>{post.likes_count} likes</span>
                   <span>{post.comments_count} comments</span>
                   <span>{new Date(post.timestamp).toLocaleDateString()}</span>

@@ -50,7 +50,7 @@ const AvatarDisplay: React.FC<AvatarDisplayProps> = ({
   return (
     <div className={`relative flex flex-col items-center ${className}`}>
       {/* 3D Avatar with speaking animation */}
-      <div className={`relative mb-4 transition-all duration-500 ${isAnimating ? 'scale-105' : 'scale-100'}`}>
+      <div className={`relative mb-3 sm:mb-4 transition-all duration-500 ${isAnimating ? 'scale-105' : 'scale-100'}`}>
         {/* Magical particle effects around the avatar */}
         <div className="absolute inset-0 magical-particles pointer-events-none"></div>
         
@@ -91,7 +91,7 @@ const AvatarDisplay: React.FC<AvatarDisplayProps> = ({
       </div>
       
       {/* Avatar name with enhanced styling when speaking */}
-      <h3 className={`text-xl font-cinzel font-bold mb-2 transition-all duration-300 ${
+      <h3 className={`text-base sm:text-xl font-cinzel font-bold mb-1 sm:mb-2 transition-all duration-300 ${
         isSpeaking 
           ? 'text-amber-700 magical-glow animate-pulse' 
           : 'text-amber-800 magical-glow'
@@ -99,21 +99,21 @@ const AvatarDisplay: React.FC<AvatarDisplayProps> = ({
         {avatar.name}
       </h3>
       
-      <p className={`text-sm mb-4 font-cinzel flex items-center transition-all duration-300 ${
+      <p className={`text-xs sm:text-sm mb-3 sm:mb-4 font-cinzel flex items-center transition-all duration-300 ${
         isSpeaking ? 'text-amber-600' : 'text-purple-700'
       }`}>
-        <Sparkles size={14} className={`mr-1 ${isSpeaking ? 'text-amber-500 animate-pulse' : 'text-amber-500'}`} />
+        <Sparkles size={12} sm:size={14} className={`mr-1 ${isSpeaking ? 'text-amber-500 animate-pulse' : 'text-amber-500'}`} />
         {avatar.type.charAt(0).toUpperCase() + avatar.type.slice(1)} Guide
         {isSpeaking && <span className="ml-2 text-amber-500 animate-pulse">• Speaking</span>}
       </p>
       
       {/* Message scroll with enhanced styling when speaking */}
       {message && (
-        <div className={`relative fantasy-border p-4 mb-4 w-full max-w-sm mx-auto transition-all duration-300 ${
+        <div className={`relative fantasy-border p-3 sm:p-4 mb-3 sm:mb-4 w-full max-w-sm mx-auto transition-all duration-300 ${
           isSpeaking ? 'border-amber-300 bg-amber-50/50' : ''
         }`}>
           <div className="absolute top-0 left-6 transform -translate-y-2 rotate-45 w-3 h-3 bg-parchment-light"></div>
-          <p className={`font-merriweather transition-all duration-300 ${
+          <p className={`font-merriweather text-sm sm:text-base transition-all duration-300 ${
             isSpeaking ? 'text-amber-800' : 'text-gray-700'
           }`}>
             {displayMessage}

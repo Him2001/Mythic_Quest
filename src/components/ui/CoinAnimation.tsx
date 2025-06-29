@@ -1,131 +1,120 @@
-import React, { useEffect, useState } from 'react';
-import { Coins, Plus } from 'lucide-react';
-import { SoundEffects } from '../../utils/soundEffects';
+import React, { useState, useEffect } from 'react';
+import { Coins } from 'lucide-react';
 
 interface CoinAnimationProps {
   amount: number;
   trigger: boolean;
-  onComplete: () => void;
-  position?: 'top-right' | 'center' | 'top-left';
+  position?: 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left' | 'center';
   type?: 'quest' | 'level_up' | 'bonus';
+  onComplete?: () => void;
 }
 
 const CoinAnimation: React.FC<CoinAnimationProps> = ({
   amount,
   trigger,
-  onComplete,
   position = 'top-right',
-  type = 'quest'
+  type = 'quest',
+  onComplete
 }) => {
   const [isVisible, setIsVisible] = useState(false);
-  const [animationPhase, setAnimationPhase] = useState<'enter' | 'float' | 'exit'>('enter');
-
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [coins, setCoins] = useState<{ id: number; x: number; y: number; delay: number; size: number }[]>([]);
+  
+  // Position classes
+  const positionClasses = {
+    'top-right': 'top-16 sm:top-20 right-4 sm:right-8',
+    'top-left': 'top-16 sm:top-20 left-4 sm:left-8',
+    'bottom-right': 'bottom-4 sm:bottom-8 right-4 sm:right-8',
+    'bottom-left': 'bottom-4 sm:bottom-8 left-4 sm:left-8',
+    'center': 'top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2'
+  };
+  
+  // Type classes
+  const typeClasses = {
+    quest: 'bg-amber-500 text-white',
+    level_up: 'bg-purple-500 text-white',
+    bonus: 'bg-green-500 text-white'
+  };
+  
+  // Generate coins when triggered
   useEffect(() => {
     if (trigger && amount > 0) {
-      // Play coin sound effect
-      SoundEffects.playSound('coin');
+      // Generate random coins
+      const numCoins = Math.min(Math.max(5, Math.floor(amount / 10)), 20);
+      const newCoins = Array.from({ length: numCoins }, (_, i) => ({
+        id: i,
+        x: Math.random() * 100 - 50, // -50 to 50
+        y: Math.random() * 100 - 50, // -50 to 50
+        delay: Math.random() * 500, // 0 to 500ms
+        size: Math.random() * 0.5 + 0.75 // 0.75 to 1.25
+      }));
       
+      setCoins(newCoins);
       setIsVisible(true);
-      setAnimationPhase('enter');
-
-      // Enter phase
-      const enterTimer = setTimeout(() => {
-        setAnimationPhase('float');
-      }, 300);
-
-      // Float phase
-      const floatTimer = setTimeout(() => {
-        setAnimationPhase('exit');
-      }, 1500);
-
-      // Exit phase
-      const exitTimer = setTimeout(() => {
-        setIsVisible(false);
-        onComplete();
+      setIsAnimating(true);
+      
+      // Hide after animation completes
+      const timer = setTimeout(() => {
+        setIsAnimating(false);
+        
+        // Call onComplete after animation ends
+        setTimeout(() => {
+          setIsVisible(false);
+          if (onComplete) {
+            onComplete();
+          }
+        }, 500);
       }, 2000);
-
-      return () => {
-        clearTimeout(enterTimer);
-        clearTimeout(floatTimer);
-        clearTimeout(exitTimer);
-      };
+      
+      return () => clearTimeout(timer);
     }
   }, [trigger, amount, onComplete]);
-
-  if (!isVisible || amount <= 0) return null;
-
-  const positionClasses = {
-    'top-right': 'top-4 right-4',
-    'center': 'top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2',
-    'top-left': 'top-4 left-4'
-  };
-
-  const typeColors = {
-    quest: 'from-amber-400 to-yellow-500',
-    level_up: 'from-purple-400 to-pink-500',
-    bonus: 'from-green-400 to-emerald-500'
-  };
-
-  const animationClasses = {
-    enter: 'scale-0 opacity-0 translate-y-4',
-    float: 'scale-100 opacity-100 translate-y-0',
-    exit: 'scale-110 opacity-0 -translate-y-8'
-  };
-
+  
+  if (!isVisible) return null;
+  
   return (
     <div className={`fixed ${positionClasses[position]} z-50 pointer-events-none`}>
-      <div className={`
-        transform transition-all duration-500 ease-out
-        ${animationClasses[animationPhase]}
-      `}>
-        <div className={`
-          bg-gradient-to-r ${typeColors[type]} 
-          text-white px-4 py-2 rounded-full shadow-lg
-          flex items-center space-x-2 font-cinzel font-bold
-          border-2 border-white/20 magical-glow
-        `}>
-          <Plus size={16} className="animate-pulse" />
-          <Coins size={18} className="animate-bounce" />
-          <span className="text-lg">{amount}</span>
-          
-          {/* Sparkle effects */}
-          <div className="absolute inset-0 pointer-events-none">
-            {[...Array(6)].map((_, i) => (
-              <div
-                key={i}
-                className="absolute w-1 h-1 bg-white rounded-full animate-ping"
-                style={{
-                  top: `${20 + Math.random() * 60}%`,
-                  left: `${20 + Math.random() * 60}%`,
-                  animationDelay: `${i * 100}ms`,
-                  animationDuration: '1s'
-                }}
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* Floating coins effect */}
-        {animationPhase === 'float' && (
-          <div className="absolute inset-0 pointer-events-none">
-            {[...Array(3)].map((_, i) => (
-              <div
-                key={i}
-                className={`
-                  absolute animate-bounce
-                  ${i === 0 ? '-top-2 -left-2' : i === 1 ? '-top-2 -right-2' : '-bottom-2 left-1/2'}
-                `}
-                style={{
-                  animationDelay: `${i * 200}ms`,
-                  animationDuration: '1.5s'
-                }}
-              >
-                <Coins size={12} className="text-yellow-300 drop-shadow-lg" />
-              </div>
-            ))}
-          </div>
-        )}
+      {/* Main coin display */}
+      <div className={`flex items-center ${typeClasses[type]} px-3 py-2 rounded-full shadow-lg ${isAnimating ? 'animate-bounce' : 'animate-fadeOut'} transition-opacity duration-500`}>
+        <Coins className="mr-2" size={20} />
+        <span className="font-cinzel font-bold">+{amount}</span>
       </div>
+      
+      {/* Flying coins */}
+      {isAnimating && coins.map(coin => (
+        <div
+          key={coin.id}
+          className="absolute top-1/2 left-1/2 text-amber-500"
+          style={{
+            animation: `coinFly 1.5s ease-out forwards ${coin.delay}ms`,
+            transform: `translate(-50%, -50%) scale(${coin.size})`,
+            opacity: 0
+          }}
+        >
+          <Coins size={16} className="animate-spin" />
+        </div>
+      ))}
+      
+      <style jsx>{`
+        @keyframes coinFly {
+          0% {
+            transform: translate(-50%, -50%) scale(0);
+            opacity: 0;
+          }
+          20% {
+            opacity: 1;
+          }
+          100% {
+            transform: translate(calc(-50% + ${coins[0]?.x}px), calc(-50% + ${coins[0]?.y}px)) scale(${coins[0]?.size});
+            opacity: 0;
+          }
+        }
+        
+        @keyframes fadeOut {
+          from { opacity: 1; }
+          to { opacity: 0; }
+        }
+      `}</style>
     </div>
   );
 };

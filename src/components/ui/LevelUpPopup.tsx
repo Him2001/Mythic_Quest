@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User } from '../../types';
+import { Sparkles, Award, Share2, X, Coins, TrendingUp } from 'lucide-react';
 import Button from './Button';
-import { Trophy, Star, Coins, Share2, X } from 'lucide-react';
 import { SoundEffects } from '../../utils/soundEffects';
 
 interface LevelUpPopupProps {
@@ -23,136 +23,137 @@ const LevelUpPopup: React.FC<LevelUpPopupProps> = ({
   onClose,
   onShareAchievement
 }) => {
-  const [showAnimation, setShowAnimation] = useState(false);
-
+  const [animationStage, setAnimationStage] = useState(0);
+  
+  // Play level up sound when popup becomes visible
   useEffect(() => {
     if (isVisible) {
-      // Play level up sound
       SoundEffects.playSound('level-up');
       
-      // Start animation after a short delay
-      setTimeout(() => {
-        setShowAnimation(true);
-      }, 100);
-
-      // Play achievement sound after level up sound
-      setTimeout(() => {
-        SoundEffects.playSound('achievement');
-      }, 1000);
-    } else {
-      setShowAnimation(false);
+      // Start animation sequence
+      setAnimationStage(1);
+      
+      // Advance animation stages
+      const timer1 = setTimeout(() => setAnimationStage(2), 1000);
+      const timer2 = setTimeout(() => setAnimationStage(3), 2000);
+      
+      return () => {
+        clearTimeout(timer1);
+        clearTimeout(timer2);
+      };
     }
   }, [isVisible]);
-
-  const handleShare = () => {
-    SoundEffects.playSound('sparkle');
-    onShareAchievement();
-  };
-
-  const handleClose = () => {
-    SoundEffects.playSound('click');
-    onClose();
-  };
-
+  
   if (!isVisible) return null;
-
+  
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className={`bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden transform transition-all duration-500 ${
-        showAnimation ? 'scale-100 opacity-100' : 'scale-95 opacity-0'
-      }`}>
-        {/* Header with magical background */}
-        <div className="relative bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-500 p-6 text-center">
-          <div className="absolute inset-0 magical-particles"></div>
-          <button
-            onClick={handleClose}
-            className="absolute top-4 right-4 text-white/80 hover:text-white transition-colors"
-          >
-            <X size={20} />
-          </button>
-          
-          <div className={`relative z-10 transform transition-all duration-700 delay-300 ${
-            showAnimation ? 'scale-100 rotate-0' : 'scale-0 rotate-180'
-          }`}>
-            <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg magical-glow">
-              <Trophy className="text-amber-500" size={40} />
-            </div>
-            
-            <h2 className="text-2xl font-cinzel font-bold text-white mb-2 magical-glow">
-              Level Up!
-            </h2>
-            
-            <div className="flex items-center justify-center space-x-2 mb-2">
-              <Star className="text-yellow-200" size={20} />
-              <span className="text-xl font-cinzel font-bold text-white">
-                Level {newLevel}
-              </span>
-              <Star className="text-yellow-200" size={20} />
-            </div>
-            
-            <p className="text-amber-100 font-merriweather">
-              Congratulations, {user.name}!
-            </p>
-          </div>
-        </div>
-
+    <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      
+      {/* Popup */}
+      <div className="relative bg-gradient-to-b from-amber-50 to-amber-100 rounded-xl shadow-2xl border-2 border-amber-300 max-w-md w-full overflow-hidden">
+        {/* Close button */}
+        <button
+          onClick={onClose}
+          className="absolute top-2 right-2 text-amber-700 hover:text-amber-900 p-1 rounded-full hover:bg-amber-200/50 transition-colors z-10"
+        >
+          <X size={20} />
+        </button>
+        
+        {/* Magical particles */}
+        <div className="absolute inset-0 magical-particles opacity-30 pointer-events-none" />
+        
         {/* Content */}
-        <div className="p-6">
-          <div className={`transform transition-all duration-700 delay-500 ${
-            showAnimation ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
-          }`}>
-            <p className="text-gray-700 font-merriweather text-center mb-6">
-              Your dedication to wellness has elevated you to new heights! 
-              The mystical realm of Eldoria celebrates your achievement.
-            </p>
-
-            {/* Rewards */}
-            <div className="bg-gradient-to-r from-amber-50 to-yellow-50 rounded-lg p-4 mb-6 border border-amber-200">
-              <h3 className="font-cinzel font-bold text-amber-800 mb-3 text-center">
-                Level Up Rewards
-              </h3>
+        <div className="p-6 sm:p-8 text-center relative z-0">
+          {/* Level badge */}
+          <div className="relative mx-auto mb-4 sm:mb-6">
+            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center mx-auto magical-glow">
+              <span className="text-amber-100 font-cinzel font-bold text-3xl sm:text-4xl">{newLevel}</span>
+            </div>
+            
+            {/* Animated rays */}
+            <div className="absolute inset-0 w-20 h-20 sm:w-24 sm:h-24 mx-auto rounded-full bg-amber-500/20 animate-ping" />
+            
+            {/* Sparkles */}
+            <Sparkles 
+              className={`absolute -top-2 -left-2 text-amber-400 animate-bounce ${animationStage >= 1 ? 'opacity-100' : 'opacity-0'} transition-opacity duration-500`} 
+              size={24} 
+            />
+            <Sparkles 
+              className={`absolute -top-2 -right-2 text-amber-400 animate-bounce delay-100 ${animationStage >= 1 ? 'opacity-100' : 'opacity-0'} transition-opacity duration-500`} 
+              size={24} 
+            />
+            <Sparkles 
+              className={`absolute -bottom-2 -left-2 text-amber-400 animate-bounce delay-200 ${animationStage >= 1 ? 'opacity-100' : 'opacity-0'} transition-opacity duration-500`} 
+              size={24} 
+            />
+            <Sparkles 
+              className={`absolute -bottom-2 -right-2 text-amber-400 animate-bounce delay-300 ${animationStage >= 1 ? 'opacity-100' : 'opacity-0'} transition-opacity duration-500`} 
+              size={24} 
+            />
+          </div>
+          
+          {/* Title */}
+          <h2 className={`text-2xl sm:text-3xl font-cinzel font-bold text-amber-800 mb-2 sm:mb-3 magical-glow ${animationStage >= 1 ? 'animate-pulse' : ''}`}>
+            Level Up!
+          </h2>
+          
+          {/* Congratulations message */}
+          <p className={`text-amber-700 font-merriweather mb-4 sm:mb-6 ${animationStage >= 2 ? 'opacity-100' : 'opacity-0'} transition-opacity duration-500`}>
+            Congratulations, {user.name}! Your dedication to wellness has elevated you to new heights!
+          </p>
+          
+          {/* Rewards */}
+          <div className={`bg-white/70 rounded-lg p-4 sm:p-5 mb-4 sm:mb-6 ${animationStage >= 3 ? 'opacity-100' : 'opacity-0'} transition-opacity duration-500`}>
+            <h3 className="font-cinzel font-bold text-amber-800 mb-3 flex items-center justify-center">
+              <Award className="mr-2 text-amber-600" size={20} />
+              Rewards Earned
+            </h3>
+            
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-700 font-merriweather">New Level</span>
+                <span className="font-cinzel font-bold text-amber-800 flex items-center">
+                  <TrendingUp size={16} className="mr-1 text-amber-600" />
+                  Level {newLevel}
+                </span>
+              </div>
               
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <Trophy className="text-amber-600 mr-2" size={16} />
-                    <span className="font-cinzel text-amber-700">Experience Points</span>
-                  </div>
-                  <span className="font-cinzel font-bold text-amber-800">+{xpEarned} XP</span>
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <Coins className="text-amber-600 mr-2 magical-glow" size={16} />
-                    <span className="font-cinzel text-amber-700">Mythic Coins</span>
-                  </div>
-                  <span className="font-cinzel font-bold text-amber-800">+{coinsEarned} Coins</span>
-                </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-700 font-merriweather">XP Gained</span>
+                <span className="font-cinzel font-bold text-purple-700">+{xpEarned} XP</span>
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <span className="text-gray-700 font-merriweather">Coins Earned</span>
+                <span className="font-cinzel font-bold text-amber-600 flex items-center">
+                  <Coins size={16} className="mr-1" />
+                  +{coinsEarned}
+                </span>
               </div>
             </div>
-
-            {/* Action Buttons */}
-            <div className="space-y-3">
-              <Button
-                variant="primary"
-                fullWidth
-                onClick={handleShare}
-                icon={<Share2 size={16} />}
-                className="magical-glow"
-                soundEffect="sparkle"
-              >
-                Share Achievement
-              </Button>
-              
-              <Button
-                variant="outline"
-                fullWidth
-                onClick={handleClose}
-                soundEffect="click"
-              >
-                Continue Adventure
-              </Button>
-            </div>
+          </div>
+          
+          {/* Action buttons */}
+          <div className={`flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3 ${animationStage >= 3 ? 'opacity-100' : 'opacity-0'} transition-opacity duration-500`}>
+            <Button
+              variant="primary"
+              fullWidth
+              onClick={onShareAchievement}
+              icon={<Share2 size={16} />}
+              className="magical-glow"
+            >
+              Share Achievement
+            </Button>
+            
+            <Button
+              variant="outline"
+              fullWidth
+              onClick={onClose}
+            >
+              Continue Journey
+            </Button>
           </div>
         </div>
       </div>

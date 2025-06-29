@@ -30,28 +30,28 @@ const QuestLog: React.FC<QuestLogProps> = ({
   }, [quests, filter]);
   
   return (
-    <div className="bg-gray-50 rounded-xl p-5 shadow-inner">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-purple-900 flex items-center">
+    <div className="bg-gray-50 rounded-xl p-3 sm:p-5 shadow-inner">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-6 space-y-3 sm:space-y-0">
+        <h2 className="text-xl sm:text-2xl font-bold text-purple-900 flex items-center">
           <Sparkles className="mr-2 text-purple-500" size={20} />
           Quest Log
         </h2>
         
         <div className="flex space-x-2 text-sm">
           <button 
-            className={`px-3 py-1 rounded-full ${filter === 'all' ? 'bg-purple-100 text-purple-700' : 'text-gray-500 hover:bg-gray-100'}`}
+            className={`px-3 py-1 rounded-full transition-colors ${filter === 'all' ? 'bg-purple-100 text-purple-700' : 'text-gray-500 hover:bg-gray-100'}`}
             onClick={() => setFilter('all')}
           >
             All
           </button>
           <button 
-            className={`px-3 py-1 rounded-full ${filter === 'active' ? 'bg-purple-100 text-purple-700' : 'text-gray-500 hover:bg-gray-100'}`}
+            className={`px-3 py-1 rounded-full transition-colors ${filter === 'active' ? 'bg-purple-100 text-purple-700' : 'text-gray-500 hover:bg-gray-100'}`}
             onClick={() => setFilter('active')}
           >
             Active
           </button>
           <button 
-            className={`px-3 py-1 rounded-full ${filter === 'completed' ? 'bg-purple-100 text-purple-700' : 'text-gray-500 hover:bg-gray-100'}`}
+            className={`px-3 py-1 rounded-full transition-colors ${filter === 'completed' ? 'bg-purple-100 text-purple-700' : 'text-gray-500 hover:bg-gray-100'}`}
             onClick={() => setFilter('completed')}
           >
             Completed
@@ -65,7 +65,7 @@ const QuestLog: React.FC<QuestLogProps> = ({
           <p>No quests found for the selected filter.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
           {filteredQuests.map(quest => (
             <QuestCard
               key={quest.id}

@@ -114,17 +114,17 @@ const HeroesPage: React.FC<HeroesPageProps> = ({
   };
 
   return (
-    <div className="container mx-auto px-4 py-6">
+    <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6">
       {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
+      <div className="mb-4 sm:mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 space-y-3 sm:space-y-0">
           <div className="flex items-center">
-            <Users className="text-amber-600 mr-3 magical-glow" size={28} />
+            <Users className="text-amber-600 mr-3 magical-glow" size={24} sm:size={28} />
             <div>
-              <h1 className="text-2xl font-cinzel font-bold text-amber-800 magical-glow">
+              <h1 className="text-xl sm:text-2xl font-cinzel font-bold text-amber-800 magical-glow">
                 Hero's Hall
               </h1>
-              <p className="text-amber-700 font-merriweather">
+              <p className="text-amber-700 font-merriweather text-sm sm:text-base">
                 Connect, share, and inspire your wellness community
               </p>
             </div>
@@ -132,9 +132,9 @@ const HeroesPage: React.FC<HeroesPageProps> = ({
           
           <button
             onClick={handleMessagesClick}
-            className="relative bg-gradient-to-r from-amber-500 to-yellow-500 text-white px-4 py-2 rounded-lg font-cinzel font-bold shadow-lg hover:shadow-xl transition-all duration-300 magical-glow flex items-center"
+            className="relative bg-gradient-to-r from-amber-500 to-yellow-500 text-white px-3 sm:px-4 py-2 rounded-lg font-cinzel font-bold shadow-lg hover:shadow-xl transition-all duration-300 magical-glow flex items-center text-sm sm:text-base"
           >
-            <MessageCircle size={20} className="mr-2" />
+            <MessageCircle size={16} sm:size={20} className="mr-2" />
             Messages
             {unreadMessagesCount > 0 && (
               <NotificationBadge count={unreadMessagesCount} />
@@ -146,24 +146,24 @@ const HeroesPage: React.FC<HeroesPageProps> = ({
         <div className="flex space-x-1 bg-gray-100 rounded-lg p-1 max-w-md">
           <button
             onClick={() => handleTabClick('feed')}
-            className={`relative flex-1 py-2 px-4 rounded-md font-cinzel font-bold transition-all duration-200 flex items-center justify-center ${
+            className={`relative flex-1 py-2 px-3 sm:px-4 rounded-md font-cinzel font-bold transition-all duration-200 flex items-center justify-center text-sm sm:text-base ${
               activeTab === 'feed'
                 ? 'bg-white text-amber-800 shadow-md'
                 : 'text-gray-600 hover:text-amber-700'
             }`}
           >
-            <Heart size={16} className="mr-2" />
+            <Heart size={14} sm:size={16} className="mr-1 sm:mr-2" />
             Social Feed
           </button>
           <button
             onClick={() => handleTabClick('friends')}
-            className={`relative flex-1 py-2 px-4 rounded-md font-cinzel font-bold transition-all duration-200 flex items-center justify-center ${
+            className={`relative flex-1 py-2 px-3 sm:px-4 rounded-md font-cinzel font-bold transition-all duration-200 flex items-center justify-center text-sm sm:text-base ${
               activeTab === 'friends'
                 ? 'bg-white text-amber-800 shadow-md'
                 : 'text-gray-600 hover:text-amber-700'
             }`}
           >
-            <Users size={16} className="mr-2" />
+            <Users size={14} sm:size={16} className="mr-1 sm:mr-2" />
             Friends
             {pendingFriendRequestsCount > 0 && activeTab !== 'friends' && (
               <NotificationBadge count={pendingFriendRequestsCount} />
