@@ -1,273 +1,407 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Quest } from '../../types';
-import Avatar from '../ui/Avatar';
-import CoinDisplay from '../ui/CoinDisplay';
-import { 
-  Home, 
-  Scroll, 
-  Map, 
-  Users, 
-  ShoppingBag, 
-  BookOpen, 
-  LogOut, 
-  Menu,
-  X,
-  Sparkles
-} from 'lucide-react';
+import { Menu, X, Bell, MessageCircle, Map, Award, Scroll, Home, LogOut, User as UserIcon, Menu as MenuIcon } from 'lucide-react';
+import Button from '../ui/Button';
+import NotificationBadge from '../ui/NotificationBadge';
+import { NotificationCountService } from '../../utils/notificationCountService';
+import { SoundEffects } from '../../utils/soundEffects';
 
 interface NavbarProps {
-  user: User;
+  user: User | null;
   activeTab: string;
   onTabChange: (tab: string) => void;
   onSignOut: () => void;
   quests: Quest[];
 }
 
-const Navbar: React.FC<NavbarProps> = ({ 
-  user, 
-  activeTab, 
-  onTabChange, 
-  onSignOut, 
-  quests 
-}) => {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+const Navbar: React.FC<NavbarProps> = ({ user, activeTab, onTabChange, onSignOut, quests }) => {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [activeQuestsCount, setActiveQuestsCount] = useState(0);
   
-  const activeQuests = quests.filter(quest => !quest.completed);
-
-  const navItems = [
-    { id: 'home', label: 'Home', icon: Home },
-    { id: 'quests', label: 'Quests', icon: Scroll, badge: activeQuests.length },
-    { id: 'map', label: 'Map', icon: Map },
-    { id: 'heroes', label: 'Heroes', icon: Users },
-    { id: 'marketplace', label: 'Shop', icon: ShoppingBag },
-    { id: 'chronicles', label: 'Chronicles', icon: BookOpen }
-  ];
-
-  const handleTabClick = (tabId: string) => {
-    onTabChange(tabId);
-    setIsMobileMenuOpen(false); // Close mobile menu when tab is selected
+  // Calculate active quests count
+  useEffect(() => {
+    const activeCount = quests.filter(quest => !quest.completed).length;
+    setActiveQuestsCount(activeCount);
+  }, [quests]);
+  
+  // Get notification counts
+  useEffect(() => {
+    if (user) {
+      const count = NotificationCountService.getUnreadNotificationCount(user.id);
+      setUnreadNotifications(count);
+    }
+  }, [user]);
+  
+  const handleTabClick = (tab: string) => {
+    onTabChange(tab);
+    setIsMenuOpen(false);
+    
+    // Play sound effect
+    SoundEffects.playSound('tab');
   };
-
-  const toggleMobileMenu = () => {
-    setIsMobileMenuOpen(!isMobileMenuOpen);
+  
+  const handleSignOut = () => {
+    onSignOut();
+    setIsProfileOpen(false);
+    
+    // Play sound effect
+    SoundEffects.playSound('portal');
   };
-
+  
   return (
-    <>
-      {/* Desktop Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-40 bg-gradient-to-r from-purple-900/95 via-indigo-900/95 to-purple-900/95 backdrop-blur-md border-b border-amber-500/20 shadow-lg hidden md:block">
-        <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between h-16">
-            {/* Logo */}
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center magical-glow">
-                <Sparkles className="text-amber-100" size={20} />
-              </div>
-              <div>
-                <h1 className="text-xl font-cinzel font-bold text-amber-100 magical-glow">
-                  Mythic Quest
-                </h1>
-                <p className="text-xs text-amber-200/80 font-merriweather">
-                  Wellness Adventure
-                </p>
-              </div>
-            </div>
-
-            {/* Navigation Items */}
-            <div className="flex items-center space-x-1">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = activeTab === item.id;
-                
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => handleTabClick(item.id)}
-                    className={`relative flex items-center px-4 py-2 rounded-lg font-cinzel font-medium transition-all duration-200 ${
-                      isActive
-                        ? 'bg-amber-500/20 text-amber-100 magical-glow'
-                        : 'text-amber-200/80 hover:text-amber-100 hover:bg-white/10'
-                    }`}
-                  >
-                    <Icon size={18} className="mr-2" />
-                    <span className="text-sm">{item.label}</span>
-                    {item.badge && item.badge > 0 && (
-                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
-                        {item.badge}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* User Info */}
-            <div className="flex items-center space-x-4">
-              <CoinDisplay coins={user.mythicCoins} size="sm" />
-              
-              <div className="flex items-center space-x-3">
-                <div className="text-right">
-                  <p className="text-sm font-cinzel font-bold text-amber-100">
-                    {user.name}
-                  </p>
-                  <p className="text-xs text-amber-200/80 font-merriweather">
-                    Level {user.level}
-                  </p>
-                </div>
-                
-                <Avatar
-                  src={user.avatarUrl}
-                  alt={user.name}
-                  size="md"
-                  className="border-2 border-amber-400/50"
-                />
-                
-                <button
-                  onClick={onSignOut}
-                  className="p-2 text-amber-200/80 hover:text-amber-100 hover:bg-white/10 rounded-lg transition-all duration-200"
-                  title="Sign Out"
-                >
-                  <LogOut size={18} />
-                </button>
-              </div>
-            </div>
+    <nav className="fixed top-0 left-0 right-0 z-40 bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-md">
+      <div className="container mx-auto px-4">
+        <div className="flex items-center justify-between h-16">
+          {/* Logo */}
+          <div className="flex items-center">
+            <span className="font-cinzel font-bold text-xl sm:text-2xl magical-glow">Mythic Quest</span>
           </div>
-        </div>
-      </nav>
-
-      {/* Mobile Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-40 bg-gradient-to-r from-purple-900/95 via-indigo-900/95 to-purple-900/95 backdrop-blur-md border-b border-amber-500/20 shadow-lg md:hidden">
-        <div className="px-4">
-          <div className="flex items-center justify-between h-16">
-            {/* Logo */}
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center magical-glow">
-                <Sparkles className="text-amber-100" size={16} />
+          
+          {/* Desktop Navigation */}
+          <div className="hidden md:flex items-center space-x-1">
+            <button
+              onClick={() => handleTabClick('home')}
+              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'home'
+                  ? 'bg-amber-700 text-white'
+                  : 'text-amber-100 hover:bg-amber-600 hover:text-white'
+              }`}
+            >
+              <div className="flex items-center">
+                <Home size={18} className="mr-1" />
+                <span>Home</span>
               </div>
-              <div>
-                <h1 className="text-lg font-cinzel font-bold text-amber-100 magical-glow">
-                  Mythic Quest
-                </h1>
-              </div>
-            </div>
-
-            {/* Mobile User Info & Menu */}
-            <div className="flex items-center space-x-3">
-              <CoinDisplay coins={user.mythicCoins} size="sm" />
-              
-              <Avatar
-                src={user.avatarUrl}
-                alt={user.name}
-                size="sm"
-                className="border-2 border-amber-400/50"
-              />
-              
-              <button
-                onClick={toggleMobileMenu}
-                className="p-2 text-amber-200/80 hover:text-amber-100 hover:bg-white/10 rounded-lg transition-all duration-200"
-              >
-                {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Mobile Menu Overlay */}
-        {isMobileMenuOpen && (
-          <div className="absolute top-full left-0 right-0 bg-gradient-to-b from-purple-900/98 to-indigo-900/98 backdrop-blur-md border-b border-amber-500/20 shadow-xl">
-            <div className="px-4 py-4">
-              {/* User Info */}
-              <div className="flex items-center space-x-3 mb-6 p-3 bg-white/10 rounded-lg">
-                <Avatar
-                  src={user.avatarUrl}
-                  alt={user.name}
-                  size="md"
-                  className="border-2 border-amber-400/50"
-                />
-                <div>
-                  <p className="text-sm font-cinzel font-bold text-amber-100">
-                    {user.name}
-                  </p>
-                  <p className="text-xs text-amber-200/80 font-merriweather">
-                    Level {user.level} • {user.xp} XP
-                  </p>
-                </div>
-              </div>
-
-              {/* Navigation Items */}
-              <div className="space-y-2 mb-6">
-                {navItems.map((item) => {
-                  const Icon = item.icon;
-                  const isActive = activeTab === item.id;
-                  
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => handleTabClick(item.id)}
-                      className={`relative w-full flex items-center px-4 py-3 rounded-lg font-cinzel font-medium transition-all duration-200 ${
-                        isActive
-                          ? 'bg-amber-500/20 text-amber-100 magical-glow'
-                          : 'text-amber-200/80 hover:text-amber-100 hover:bg-white/10'
-                      }`}
-                    >
-                      <Icon size={20} className="mr-3" />
-                      <span>{item.label}</span>
-                      {item.badge && item.badge > 0 && (
-                        <span className="ml-auto bg-red-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold">
-                          {item.badge}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Sign Out */}
-              <button
-                onClick={() => {
-                  onSignOut();
-                  setIsMobileMenuOpen(false);
-                }}
-                className="w-full flex items-center px-4 py-3 text-amber-200/80 hover:text-amber-100 hover:bg-white/10 rounded-lg transition-all duration-200 font-cinzel font-medium"
-              >
-                <LogOut size={20} className="mr-3" />
-                <span>Sign Out</span>
-              </button>
-            </div>
-          </div>
-        )}
-      </nav>
-
-      {/* Bottom Navigation for Mobile (Alternative) */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-gradient-to-t from-purple-900/98 to-indigo-900/95 backdrop-blur-md border-t border-amber-500/20 shadow-lg md:hidden">
-        <div className="flex items-center justify-around py-2">
-          {navItems.slice(0, 5).map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
+            </button>
             
-            return (
-              <button
-                key={item.id}
-                onClick={() => handleTabClick(item.id)}
-                className={`relative flex flex-col items-center p-2 rounded-lg transition-all duration-200 ${
-                  isActive
-                    ? 'text-amber-100'
-                    : 'text-amber-200/60 hover:text-amber-100'
-                }`}
-              >
-                <Icon size={20} className={isActive ? 'magical-glow' : ''} />
-                <span className="text-xs font-cinzel mt-1">{item.label}</span>
-                {item.badge && item.badge > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-bold">
-                    {item.badge > 9 ? '9+' : item.badge}
-                  </span>
+            <button
+              onClick={() => handleTabClick('quests')}
+              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'quests'
+                  ? 'bg-amber-700 text-white'
+                  : 'text-amber-100 hover:bg-amber-600 hover:text-white'
+              }`}
+            >
+              <div className="flex items-center">
+                <Award size={18} className="mr-1" />
+                <span>Quests</span>
+                {activeQuestsCount > 0 && (
+                  <div className="ml-1 bg-amber-800 text-amber-100 rounded-full w-5 h-5 flex items-center justify-center text-xs">
+                    {activeQuestsCount}
+                  </div>
                 )}
+              </div>
+            </button>
+            
+            <button
+              onClick={() => handleTabClick('map')}
+              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'map'
+                  ? 'bg-amber-700 text-white'
+                  : 'text-amber-100 hover:bg-amber-600 hover:text-white'
+              }`}
+            >
+              <div className="flex items-center">
+                <Map size={18} className="mr-1" />
+                <span>Map</span>
+              </div>
+            </button>
+            
+            <button
+              onClick={() => handleTabClick('heroes')}
+              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'heroes'
+                  ? 'bg-amber-700 text-white'
+                  : 'text-amber-100 hover:bg-amber-600 hover:text-white'
+              }`}
+            >
+              <div className="flex items-center">
+                <MessageCircle size={18} className="mr-1" />
+                <span>Heroes</span>
+                {unreadNotifications > 0 && (
+                  <NotificationBadge count={unreadNotifications} />
+                )}
+              </div>
+            </button>
+            
+            <button
+              onClick={() => handleTabClick('marketplace')}
+              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'marketplace'
+                  ? 'bg-amber-700 text-white'
+                  : 'text-amber-100 hover:bg-amber-600 hover:text-white'
+              }`}
+            >
+              <div className="flex items-center">
+                <Bell size={18} className="mr-1" />
+                <span>Market</span>
+              </div>
+            </button>
+            
+            <button
+              onClick={() => handleTabClick('chronicles')}
+              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'chronicles'
+                  ? 'bg-amber-700 text-white'
+                  : 'text-amber-100 hover:bg-amber-600 hover:text-white'
+              }`}
+            >
+              <div className="flex items-center">
+                <Scroll size={18} className="mr-1" />
+                <span>Chronicles</span>
+              </div>
+            </button>
+          </div>
+          
+          {/* User Menu */}
+          <div className="hidden md:flex items-center">
+            <div className="relative">
+              <button
+                onClick={() => setIsProfileOpen(!isProfileOpen)}
+                className="flex items-center text-sm font-medium text-amber-100 hover:text-white focus:outline-none"
+              >
+                <img
+                  className="h-8 w-8 rounded-full border-2 border-amber-300"
+                  src={user?.avatarUrl || "https://api.dicebear.com/7.x/avataaars/svg?seed=default"}
+                  alt="User avatar"
+                />
+                <span className="ml-2 mr-1">{user?.name}</span>
+                <span className="bg-amber-700 px-2 py-0.5 rounded-full text-xs">
+                  Lvl {user?.level}
+                </span>
               </button>
-            );
-          })}
+              
+              {isProfileOpen && (
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
+                  <div className="px-4 py-2 border-b border-gray-100">
+                    <p className="text-sm font-medium text-gray-900">{user?.name}</p>
+                    <p className="text-xs text-gray-500">{user?.email}</p>
+                  </div>
+                  <button
+                    onClick={handleSignOut}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                  >
+                    <LogOut size={16} className="mr-2" />
+                    Sign out
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          {/* Mobile menu button */}
+          <div className="md:hidden flex items-center">
+            <button
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className="inline-flex items-center justify-center p-2 rounded-md text-amber-100 hover:text-white hover:bg-amber-600 focus:outline-none"
+            >
+              {isMenuOpen ? (
+                <X size={24} />
+              ) : (
+                <MenuIcon size={24} />
+              )}
+            </button>
+          </div>
         </div>
-      </nav>
-    </>
+      </div>
+      
+      {/* Mobile menu */}
+      {isMenuOpen && (
+        <div className="md:hidden bg-amber-600">
+          <div className="px-2 pt-2 pb-3 space-y-1">
+            <button
+              onClick={() => handleTabClick('home')}
+              className={`w-full text-left px-3 py-2 rounded-md text-base font-medium ${
+                activeTab === 'home'
+                  ? 'bg-amber-700 text-white'
+                  : 'text-amber-100 hover:bg-amber-700 hover:text-white'
+              }`}
+            >
+              <div className="flex items-center">
+                <Home size={20} className="mr-2" />
+                <span>Home</span>
+              </div>
+            </button>
+            
+            <button
+              onClick={() => handleTabClick('quests')}
+              className={`w-full text-left px-3 py-2 rounded-md text-base font-medium ${
+                activeTab === 'quests'
+                  ? 'bg-amber-700 text-white'
+                  : 'text-amber-100 hover:bg-amber-700 hover:text-white'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <Award size={20} className="mr-2" />
+                  <span>Quests</span>
+                </div>
+                {activeQuestsCount > 0 && (
+                  <div className="bg-amber-800 text-amber-100 rounded-full w-5 h-5 flex items-center justify-center text-xs">
+                    {activeQuestsCount}
+                  </div>
+                )}
+              </div>
+            </button>
+            
+            <button
+              onClick={() => handleTabClick('map')}
+              className={`w-full text-left px-3 py-2 rounded-md text-base font-medium ${
+                activeTab === 'map'
+                  ? 'bg-amber-700 text-white'
+                  : 'text-amber-100 hover:bg-amber-700 hover:text-white'
+              }`}
+            >
+              <div className="flex items-center">
+                <Map size={20} className="mr-2" />
+                <span>Adventure Map</span>
+              </div>
+            </button>
+            
+            <button
+              onClick={() => handleTabClick('heroes')}
+              className={`w-full text-left px-3 py-2 rounded-md text-base font-medium ${
+                activeTab === 'heroes'
+                  ? 'bg-amber-700 text-white'
+                  : 'text-amber-100 hover:bg-amber-700 hover:text-white'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <MessageCircle size={20} className="mr-2" />
+                  <span>Heroes</span>
+                </div>
+                {unreadNotifications > 0 && (
+                  <NotificationBadge count={unreadNotifications} />
+                )}
+              </div>
+            </button>
+            
+            <button
+              onClick={() => handleTabClick('marketplace')}
+              className={`w-full text-left px-3 py-2 rounded-md text-base font-medium ${
+                activeTab === 'marketplace'
+                  ? 'bg-amber-700 text-white'
+                  : 'text-amber-100 hover:bg-amber-700 hover:text-white'
+              }`}
+            >
+              <div className="flex items-center">
+                <Bell size={20} className="mr-2" />
+                <span>Marketplace</span>
+              </div>
+            </button>
+            
+            <button
+              onClick={() => handleTabClick('chronicles')}
+              className={`w-full text-left px-3 py-2 rounded-md text-base font-medium ${
+                activeTab === 'chronicles'
+                  ? 'bg-amber-700 text-white'
+                  : 'text-amber-100 hover:bg-amber-700 hover:text-white'
+              }`}
+            >
+              <div className="flex items-center">
+                <Scroll size={20} className="mr-2" />
+                <span>Chronicles</span>
+              </div>
+            </button>
+            
+            {/* Mobile profile section */}
+            <div className="pt-4 pb-3 border-t border-amber-700">
+              <div className="flex items-center px-3">
+                <div className="flex-shrink-0">
+                  <img
+                    className="h-10 w-10 rounded-full border-2 border-amber-300"
+                    src={user?.avatarUrl || "https://api.dicebear.com/7.x/avataaars/svg?seed=default"}
+                    alt="User avatar"
+                  />
+                </div>
+                <div className="ml-3">
+                  <div className="text-base font-medium text-white">{user?.name}</div>
+                  <div className="text-sm font-medium text-amber-200">Level {user?.level}</div>
+                </div>
+              </div>
+              <div className="mt-3 px-2">
+                <Button
+                  variant="outline"
+                  fullWidth
+                  onClick={handleSignOut}
+                  icon={<LogOut size={16} />}
+                  className="border-amber-300 text-amber-100 hover:bg-amber-700"
+                >
+                  Sign out
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Mobile bottom navigation */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-gradient-to-r from-amber-500 to-amber-600 border-t border-amber-700 z-40">
+        <div className="grid grid-cols-5 h-16">
+          <button
+            onClick={() => handleTabClick('home')}
+            className={`flex flex-col items-center justify-center ${
+              activeTab === 'home' ? 'text-white' : 'text-amber-200'
+            }`}
+          >
+            <Home size={20} />
+            <span className="text-xs mt-1">Home</span>
+          </button>
+          
+          <button
+            onClick={() => handleTabClick('quests')}
+            className={`flex flex-col items-center justify-center relative ${
+              activeTab === 'quests' ? 'text-white' : 'text-amber-200'
+            }`}
+          >
+            <Award size={20} />
+            <span className="text-xs mt-1">Quests</span>
+            {activeQuestsCount > 0 && (
+              <div className="absolute top-0 right-1/4 bg-amber-800 text-amber-100 rounded-full w-5 h-5 flex items-center justify-center text-xs">
+                {activeQuestsCount}
+              </div>
+            )}
+          </button>
+          
+          <button
+            onClick={() => handleTabClick('map')}
+            className={`flex flex-col items-center justify-center ${
+              activeTab === 'map' ? 'text-white' : 'text-amber-200'
+            }`}
+          >
+            <Map size={20} />
+            <span className="text-xs mt-1">Map</span>
+          </button>
+          
+          <button
+            onClick={() => handleTabClick('heroes')}
+            className={`flex flex-col items-center justify-center relative ${
+              activeTab === 'heroes' ? 'text-white' : 'text-amber-200'
+            }`}
+          >
+            <MessageCircle size={20} />
+            <span className="text-xs mt-1">Heroes</span>
+            {unreadNotifications > 0 && (
+              <div className="absolute top-0 right-1/4 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
+                {unreadNotifications}
+              </div>
+            )}
+          </button>
+          
+          <button
+            onClick={() => handleTabClick('chronicles')}
+            className={`flex flex-col items-center justify-center ${
+              activeTab === 'chronicles' ? 'text-white' : 'text-amber-200'
+            }`}
+          >
+            <Scroll size={20} />
+            <span className="text-xs mt-1">Chronicles</span>
+          </button>
+        </div>
+      </div>
+    </nav>
   );
 };
 

@@ -63,9 +63,10 @@ export class SupabaseService {
         totalUsers: 0,
         activeUsers: 0,
         newUsersThisWeek: 0,
-        totalQuests: 0,
+        totalQuestsCompleted: 0,
+        totalXPEarned: 0,
+        totalCoinsEarned: 0,
         totalPosts: 0,
-        totalCoins: 0,
         averageLevel: 0
       };
     }
@@ -99,7 +100,8 @@ export class SupabaseService {
         new Date(user.date_created) > oneWeekAgo
       ).length;
 
-      const totalCoins = users.reduce((sum, user) => sum + (user.coins || 0), 0);
+      const totalXPEarned = users.reduce((sum, user) => sum + (user.xp || 0), 0);
+      const totalCoinsEarned = users.reduce((sum, user) => sum + (user.coins || 0), 0);
       const averageLevel = users.length > 0 
         ? users.reduce((sum, user) => sum + (user.level || 1), 0) / users.length 
         : 0;
@@ -108,9 +110,10 @@ export class SupabaseService {
         totalUsers: users.length,
         activeUsers,
         newUsersThisWeek,
-        totalQuests: quests.length,
+        totalQuestsCompleted: quests.length,
+        totalXPEarned,
+        totalCoinsEarned,
         totalPosts: posts.length,
-        totalCoins,
         averageLevel: Math.round(averageLevel * 10) / 10
       };
     } catch (error) {
@@ -119,9 +122,10 @@ export class SupabaseService {
         totalUsers: 0,
         activeUsers: 0,
         newUsersThisWeek: 0,
-        totalQuests: 0,
+        totalQuestsCompleted: 0,
+        totalXPEarned: 0,
+        totalCoinsEarned: 0,
         totalPosts: 0,
-        totalCoins: 0,
         averageLevel: 0
       };
     }
