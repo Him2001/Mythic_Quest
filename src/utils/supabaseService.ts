@@ -32,7 +32,7 @@ export class SupabaseService {
     }
   }
 
-  // Admin: Get all user profiles
+  // Admin: Get all user profiles with comprehensive stats
   static async getAllUserProfiles() {
     if (!this.isAvailable()) {
       return [];
@@ -42,7 +42,7 @@ export class SupabaseService {
       const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('date_created', { ascending: false });
 
       if (error) {
         console.error('Error fetching all user profiles:', error);
@@ -56,6 +56,77 @@ export class SupabaseService {
     }
   }
 
+  // Admin: Get comprehensive platform statistics
+  static async getAdminStats() {
+    if (!this.isAvailable()) {
+      return {
+        totalUsers: 0,
+        activeUsers: 0,
+        newUsersThisWeek: 0,
+        totalQuests: 0,
+        totalPosts: 0,
+        totalCoins: 0,
+        averageLevel: 0
+      };
+    }
+
+    try {
+      // Get all counts in parallel
+      const [
+        usersResult,
+        questsResult,
+        postsResult
+      ] = await Promise.all([
+        supabase.from('user_profiles').select('*'),
+        supabase.from('quests_completed').select('*'),
+        supabase.from('posts').select('*')
+      ]);
+
+      const users = usersResult.data || [];
+      const quests = questsResult.data || [];
+      const posts = postsResult.data || [];
+
+      // Calculate stats
+      const now = new Date();
+      const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+      const activeUsers = users.filter(user => 
+        user.is_active && new Date(user.updated_at) > oneMonthAgo
+      ).length;
+
+      const newUsersThisWeek = users.filter(user => 
+        new Date(user.date_created) > oneWeekAgo
+      ).length;
+
+      const totalCoins = users.reduce((sum, user) => sum + (user.coins || 0), 0);
+      const averageLevel = users.length > 0 
+        ? users.reduce((sum, user) => sum + (user.level || 1), 0) / users.length 
+        : 0;
+
+      return {
+        totalUsers: users.length,
+        activeUsers,
+        newUsersThisWeek,
+        totalQuests: quests.length,
+        totalPosts: posts.length,
+        totalCoins,
+        averageLevel: Math.round(averageLevel * 10) / 10
+      };
+    } catch (error) {
+      console.error('Error in getAdminStats:', error);
+      return {
+        totalUsers: 0,
+        activeUsers: 0,
+        newUsersThisWeek: 0,
+        totalQuests: 0,
+        totalPosts: 0,
+        totalCoins: 0,
+        averageLevel: 0
+      };
+    }
+  }
+
   // Admin: Delete user (cascading delete will handle related data)
   static async deleteUser(userId: string) {
     if (!this.isAvailable()) {
@@ -63,28 +134,138 @@ export class SupabaseService {
     }
 
     try {
-      // First try to delete from auth.users (this will cascade to user_profiles)
-      const { error: authError } = await supabase.auth.admin.deleteUser(userId);
-      
-      if (authError) {
-        console.error('Error deleting user from auth:', authError);
-        
-        // If auth deletion fails, try deleting just the profile
-        const { error: profileError } = await supabase
-          .from('user_profiles')
-          .delete()
-          .eq('id', userId);
+      // Delete from user_profiles (this will cascade to related tables)
+      const { error } = await supabase
+        .from('user_profiles')
+        .delete()
+        .eq('id', userId);
 
-        if (profileError) {
-          console.error('Error deleting user profile:', profileError);
-          return false;
-        }
+      if (error) {
+        console.error('Error deleting user profile:', error);
+        return false;
       }
 
       return true;
     } catch (error) {
       console.error('Error in deleteUser:', error);
       return false;
+    }
+  }
+
+  // Admin: Update user profile
+  static async adminUpdateUserProfile(userId: string, updates: any) {
+    if (!this.isAvailable()) {
+      return true; // Success in demo mode
+    }
+
+    try {
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq('id', userId);
+
+      if (error) {
+        console.error('Error updating user profile:', error);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error in adminUpdateUserProfile:', error);
+      return false;
+    }
+  }
+
+  // Admin: Assign special quest to user
+  static async assignSpecialQuest(userId: string, questData: {
+    questName: string;
+    questType: string;
+    xpReward: number;
+    coinsReward: number;
+    description?: string;
+  }) {
+    if (!this.isAvailable()) {
+      return true; // Success in demo mode
+    }
+
+    try {
+      const { error } = await supabase
+        .from('quests_completed')
+        .insert({
+          user_id: userId,
+          quest_name: questData.questName,
+          quest_type: questData.questType,
+          xp_earned: questData.xpReward,
+          coins_earned: questData.coinsReward,
+          date_completed: new Date().toISOString()
+        });
+
+      if (error) {
+        console.error('Error assigning special quest:', error);
+        return false;
+      }
+
+      // Update user's stats
+      const profile = await this.getUserProfile(userId);
+      if (profile) {
+        await this.adminUpdateUserProfile(userId, {
+          xp: (profile.xp || 0) + questData.xpReward,
+          coins: (profile.coins || 0) + questData.coinsReward,
+          total_quests_completed: (profile.total_quests_completed || 0) + 1
+        });
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error in assignSpecialQuest:', error);
+      return false;
+    }
+  }
+
+  // Admin: Get user's detailed activity
+  static async getUserActivity(userId: string) {
+    if (!this.isAvailable()) {
+      return {
+        quests: [],
+        posts: [],
+        chronicles: []
+      };
+    }
+
+    try {
+      const [questsResult, postsResult, chroniclesResult] = await Promise.all([
+        supabase
+          .from('quests_completed')
+          .select('*')
+          .eq('user_id', userId)
+          .order('date_completed', { ascending: false })
+          .limit(10),
+        supabase
+          .from('posts')
+          .select('*')
+          .eq('user_id', userId)
+          .order('timestamp', { ascending: false })
+          .limit(10),
+        supabase
+          .from('chronicles')
+          .select('*')
+          .eq('user_id', userId)
+          .order('date_created', { ascending: false })
+          .limit(10)
+      ]);
+
+      return {
+        quests: questsResult.data || [],
+        posts: postsResult.data || [],
+        chronicles: chroniclesResult.data || []
+      };
+    } catch (error) {
+      console.error('Error in getUserActivity:', error);
+      return {
+        quests: [],
+        posts: [],
+        chronicles: []
+      };
     }
   }
 
@@ -830,7 +1011,7 @@ export class SupabaseService {
             xp,
             coins,
             total_quests_completed,
-            created_at,
+            date_created,
             is_active
           ),
           user2:user_profiles!friendships_user2_id_fkey (
@@ -842,7 +1023,7 @@ export class SupabaseService {
             xp,
             coins,
             total_quests_completed,
-            created_at,
+            date_created,
             is_active
           )
         `)
