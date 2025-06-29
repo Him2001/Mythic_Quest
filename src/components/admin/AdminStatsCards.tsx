@@ -1,130 +1,142 @@
-import React from 'react';
-import { AdminStats } from '../../types';
-import { Users, TrendingUp, Award, Coins, UserPlus, BarChart3 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { SupabaseService } from '../../utils/supabaseService';
+import { Users, TrendingUp, Award, Coins, UserPlus, Activity } from 'lucide-react';
 
 interface AdminStatsCardsProps {
-  stats: AdminStats;
+  className?: string;
 }
 
-const AdminStatsCards: React.FC<AdminStatsCardsProps> = ({ stats }) => {
-  const statCards = [
-    {
-      title: 'Total Users',
-      value: stats.totalUsers.toLocaleString(),
-      icon: <Users size={24} />,
-      color: 'from-blue-500 to-cyan-500',
-      textColor: 'text-blue-700',
-      bgColor: 'bg-blue-50',
-      borderColor: 'border-blue-200'
-    },
-    {
-      title: 'Active Users',
-      value: stats.activeUsers.toLocaleString(),
-      icon: <TrendingUp size={24} />,
-      color: 'from-green-500 to-emerald-500',
-      textColor: 'text-green-700',
-      bgColor: 'bg-green-50',
-      borderColor: 'border-green-200'
-    },
-    {
-      title: 'Quests Completed',
-      value: stats.totalQuestsCompleted.toLocaleString(),
-      icon: <Award size={24} />,
-      color: 'from-amber-500 to-yellow-500',
-      textColor: 'text-amber-700',
-      bgColor: 'bg-amber-50',
-      borderColor: 'border-amber-200'
-    },
-    {
-      title: 'Total XP Earned',
-      value: stats.totalXPEarned.toLocaleString(),
-      icon: <BarChart3 size={24} />,
-      color: 'from-purple-500 to-violet-500',
-      textColor: 'text-purple-700',
-      bgColor: 'bg-purple-50',
-      borderColor: 'border-purple-200'
-    },
-    {
-      title: 'Mythic Coins',
-      value: stats.totalCoinsEarned.toLocaleString(),
-      icon: <Coins size={24} />,
-      color: 'from-orange-500 to-red-500',
-      textColor: 'text-orange-700',
-      bgColor: 'bg-orange-50',
-      borderColor: 'border-orange-200'
-    },
-    {
-      title: 'New This Week',
-      value: stats.newUsersThisWeek.toLocaleString(),
-      icon: <UserPlus size={24} />,
-      color: 'from-indigo-500 to-blue-500',
-      textColor: 'text-indigo-700',
-      bgColor: 'bg-indigo-50',
-      borderColor: 'border-indigo-200'
+const AdminStatsCards: React.FC<AdminStatsCardsProps> = ({ className = '' }) => {
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    activeUsers: 0,
+    totalQuests: 0,
+    totalCoins: 0,
+    newUsersThisWeek: 0,
+    averageLevel: 0
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadStats();
+  }, []);
+
+  const loadStats = async () => {
+    setLoading(true);
+    try {
+      const users = await SupabaseService.getAllUserProfiles();
+      
+      const now = new Date();
+      const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      
+      // Calculate stats
+      const totalUsers = users.length;
+      const activeUsers = users.filter(user => user.is_active !== false).length;
+      const totalQuests = users.reduce((sum, user) => sum + (user.total_quests_completed || 0), 0);
+      const totalCoins = users.reduce((sum, user) => sum + (user.coins || 0), 0);
+      const newUsersThisWeek = users.filter(user => {
+        const userDate = new Date(user.date_created || user.created_at);
+        return userDate > oneWeekAgo;
+      }).length;
+      const averageLevel = totalUsers > 0 
+        ? users.reduce((sum, user) => sum + (user.level || 1), 0) / totalUsers 
+        : 0;
+
+      setStats({
+        totalUsers,
+        activeUsers,
+        totalQuests,
+        totalCoins,
+        newUsersThisWeek,
+        averageLevel: Math.round(averageLevel * 10) / 10
+      });
+    } catch (error) {
+      console.error('Failed to load admin stats:', error);
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
+
+  const StatCard = ({ 
+    title, 
+    value, 
+    icon: Icon, 
+    color, 
+    subtitle 
+  }: { 
+    title: string; 
+    value: string | number; 
+    icon: any; 
+    color: string; 
+    subtitle?: string;
+  }) => (
+    <div className="bg-white rounded-lg shadow-md p-6 border-l-4" style={{ borderLeftColor: color }}>
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-cinzel text-gray-600 uppercase tracking-wide">{title}</p>
+          <p className="text-2xl font-bold text-gray-900 font-cinzel mt-1">
+            {loading ? '...' : value}
+          </p>
+          {subtitle && (
+            <p className="text-xs text-gray-500 font-merriweather mt-1">{subtitle}</p>
+          )}
+        </div>
+        <div className="p-3 rounded-full" style={{ backgroundColor: `${color}20` }}>
+          <Icon size={24} style={{ color }} />
+        </div>
+      </div>
+    </div>
+  );
 
   return (
-    <div>
-      <div className="flex items-center mb-6">
-        <BarChart3 className="text-amber-600 mr-3 magical-glow" size={24} />
-        <h2 className="text-xl font-cinzel font-bold text-amber-800 magical-glow">
-          Platform Statistics
-        </h2>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-        {statCards.map((card, index) => (
-          <div
-            key={index}
-            className={`${card.bgColor} ${card.borderColor} border-2 rounded-lg p-6 magical-glow transition-transform duration-300 hover:scale-105`}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className={`p-3 rounded-lg bg-gradient-to-r ${card.color} text-white magical-glow`}>
-                {card.icon}
-              </div>
-            </div>
-            
-            <div>
-              <h3 className={`text-2xl font-cinzel font-bold ${card.textColor} mb-1`}>
-                {card.value}
-              </h3>
-              <p className={`text-sm font-merriweather ${card.textColor}/80`}>
-                {card.title}
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Additional Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border-2 border-amber-200 rounded-lg p-6">
-          <h3 className="font-cinzel font-bold text-amber-800 mb-2 flex items-center">
-            <Award className="mr-2 magical-glow" size={20} />
-            Average User Level
-          </h3>
-          <p className="text-3xl font-cinzel font-bold text-amber-700">
-            {stats.averageLevel}
-          </p>
-          <p className="text-sm text-amber-600 font-merriweather">
-            Community progression metric
-          </p>
-        </div>
-
-        <div className="bg-gradient-to-r from-purple-50 to-violet-50 border-2 border-purple-200 rounded-lg p-6">
-          <h3 className="font-cinzel font-bold text-purple-800 mb-2 flex items-center">
-            <Users className="mr-2 magical-glow" size={20} />
-            Social Posts
-          </h3>
-          <p className="text-3xl font-cinzel font-bold text-purple-700">
-            {stats.totalPosts}
-          </p>
-          <p className="text-sm text-purple-600 font-merriweather">
-            Community engagement level
-          </p>
-        </div>
-      </div>
+    <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 ${className}`}>
+      <StatCard
+        title="Total Users"
+        value={stats.totalUsers}
+        icon={Users}
+        color="#3B82F6"
+        subtitle="Registered adventurers"
+      />
+      
+      <StatCard
+        title="Active Users"
+        value={stats.activeUsers}
+        icon={Activity}
+        color="#10B981"
+        subtitle="Currently active"
+      />
+      
+      <StatCard
+        title="New This Week"
+        value={stats.newUsersThisWeek}
+        icon={UserPlus}
+        color="#8B5CF6"
+        subtitle="Recent signups"
+      />
+      
+      <StatCard
+        title="Total Quests"
+        value={stats.totalQuests}
+        icon={Award}
+        color="#F59E0B"
+        subtitle="Completed by all users"
+      />
+      
+      <StatCard
+        title="Total Coins"
+        value={stats.totalCoins.toLocaleString()}
+        icon={Coins}
+        color="#EF4444"
+        subtitle="Earned across platform"
+      />
+      
+      <StatCard
+        title="Average Level"
+        value={stats.averageLevel}
+        icon={TrendingUp}
+        color="#06B6D4"
+        subtitle="User progression"
+      />
     </div>
   );
 };

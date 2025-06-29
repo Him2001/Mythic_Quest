@@ -1,85 +1,115 @@
 import React, { useState, useEffect } from 'react';
-import { User, SocialPost } from '../../types';
-import { AdminService } from '../../utils/adminService';
+import { User } from '../../types';
+import { SupabaseService } from '../../utils/supabaseService';
 import Avatar from '../ui/Avatar';
-import Button from '../ui/Button';
 import Badge from '../ui/Badge';
-import { X, User as UserIcon, Award, Coins, Calendar, Mail, Shield, Flag } from 'lucide-react';
+import Button from '../ui/Button';
+import { ArrowLeft, Mail, Calendar, Award, Coins, MapPin, Activity, Trash2, UserCheck, UserX } from 'lucide-react';
 
 interface AdminUserProfileProps {
   userId: string;
-  onClose: () => void;
+  onBack: () => void;
+  onDeleteUser: (userId: string) => void;
 }
 
-const AdminUserProfile: React.FC<AdminUserProfileProps> = ({ userId, onClose }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [userPosts, setUserPosts] = useState<SocialPost[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+const AdminUserProfile: React.FC<AdminUserProfileProps> = ({ userId, onBack, onDeleteUser }) => {
+  const [user, setUser] = useState<any | null>(null);
+  const [userStats, setUserStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadUserData();
+    loadUserProfile();
   }, [userId]);
 
-  const loadUserData = async () => {
-    setIsLoading(true);
+  const loadUserProfile = async () => {
+    setLoading(true);
+    setError(null);
+    
     try {
-      const userData = AdminService.getUserProfile(userId);
-      const posts = AdminService.getUserPosts(userId);
-      
-      setUser(userData);
-      setUserPosts(posts);
+      const [profile, stats] = await Promise.all([
+        SupabaseService.getUserProfile(userId),
+        SupabaseService.getUserStats(userId)
+      ]);
+
+      if (!profile) {
+        setError('User not found');
+        return;
+      }
+
+      setUser(profile);
+      setUserStats(stats);
     } catch (error) {
-      console.error('Failed to load user data:', error);
+      console.error('Failed to load user profile:', error);
+      setError('Failed to load user profile');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  const handleToggleUserStatus = () => {
+  const handleDeleteUser = async () => {
     if (!user) return;
     
-    if (user.isActive) {
-      AdminService.deactivateUser(user.id);
-    } else {
-      AdminService.activateUser(user.id);
+    if (confirm(`Are you sure you want to delete user "${user.username}"? This action cannot be undone.`)) {
+      try {
+        const success = await SupabaseService.deleteUser(userId);
+        if (success) {
+          onDeleteUser(userId);
+          onBack();
+        } else {
+          alert('Failed to delete user. Please try again.');
+        }
+      } catch (error) {
+        console.error('Error deleting user:', error);
+        alert('Failed to delete user. Please try again.');
+      }
     }
-    
-    setUser({ ...user, isActive: !user.isActive });
   };
 
-  const handleFlagPost = (postId: string) => {
-    AdminService.flagPost(postId);
-    alert('Post has been flagged for review.');
+  const formatDate = (dateString: string) => {
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch {
+      return 'Unknown';
+    }
   };
 
-  const formatDate = (date: Date) => {
-    return new Date(date).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+  const formatDistance = (meters: number): string => {
+    if (meters >= 1000) {
+      return `${(meters / 1000).toFixed(2)} km`;
+    }
+    return `${Math.round(meters)} m`;
   };
 
-  if (isLoading) {
+  if (loading) {
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-xl p-8 text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-600 mx-auto mb-4"></div>
-          <p className="text-amber-800 font-cinzel">Loading user profile...</p>
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-600 mx-auto mb-4"></div>
+            <p className="text-amber-800 font-cinzel">Loading user profile...</p>
+          </div>
         </div>
       </div>
     );
   }
 
-  if (!user) {
+  if (error || !user) {
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-xl p-8 text-center">
-          <p className="text-red-600 font-cinzel">User not found.</p>
-          <Button variant="primary" onClick={onClose} className="mt-4">
-            Close
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="text-center py-8">
+          <UserX className="mx-auto mb-4 text-red-500" size={48} />
+          <h3 className="text-lg font-cinzel font-bold text-gray-600 mb-2">
+            {error || 'User Not Found'}
+          </h3>
+          <Button variant="primary" onClick={onBack} icon={<ArrowLeft size={16} />}>
+            Back to Users
           </Button>
         </div>
       </div>
@@ -87,175 +117,189 @@ const AdminUserProfile: React.FC<AdminUserProfileProps> = ({ userId, onClose }) 
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-amber-50 to-yellow-50">
-          <h2 className="text-xl font-cinzel font-bold text-amber-800 flex items-center">
-            <UserIcon className="mr-2" size={20} />
-            User Profile
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 transition-colors"
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="flex items-center justify-between mb-6">
+          <Button
+            variant="outline"
+            onClick={onBack}
+            icon={<ArrowLeft size={16} />}
+            className="font-cinzel"
           >
-            <X size={24} />
-          </button>
+            Back to Users
+          </Button>
+          
+          <Button
+            variant="outline"
+            onClick={handleDeleteUser}
+            icon={<Trash2 size={16} />}
+            className="text-red-600 hover:text-red-700 font-cinzel"
+          >
+            Delete User
+          </Button>
         </div>
 
-        <div className="p-6 space-y-6">
-          {/* User Info */}
-          <div className="flex items-start space-x-6">
-            <Avatar
-              src={user.avatarUrl}
-              alt={user.name}
-              size="xl"
-              className="border-4 border-amber-300"
-            />
+        {/* User Info */}
+        <div className="flex items-start space-x-6">
+          <Avatar
+            src={user.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`}
+            alt={user.username}
+            size="xl"
+          />
+          
+          <div className="flex-1">
+            <div className="flex items-center space-x-3 mb-2">
+              <h1 className="text-2xl font-cinzel font-bold text-gray-900">
+                {user.username || 'Unknown User'}
+              </h1>
+              <Badge 
+                color={user.is_active !== false ? 'success' : 'error'} 
+                size="sm"
+              >
+                {user.is_active !== false ? 'Active' : 'Inactive'}
+              </Badge>
+              <Badge color="accent" size="sm">
+                Level {user.level || 1}
+              </Badge>
+            </div>
             
-            <div className="flex-1">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="text-2xl font-cinzel font-bold text-gray-800">{user.name}</h3>
-                  <p className="text-gray-600 font-merriweather">{user.email}</p>
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  <Badge color={user.isActive ? 'success' : 'error'}>
-                    {user.isActive ? 'Active' : 'Inactive'}
-                  </Badge>
-                  <Badge color="accent">
-                    {user.authMethod.charAt(0).toUpperCase() + user.authMethod.slice(1)}
-                  </Badge>
-                </div>
-              </div>
-
-              {user.bio && (
-                <p className="text-gray-700 font-merriweather mb-4 italic">"{user.bio}"</p>
-              )}
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center">
-                  <p className="text-2xl font-cinzel font-bold text-amber-700">Level {user.level}</p>
-                  <p className="text-sm text-gray-600 font-merriweather">Current Level</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-cinzel font-bold text-purple-700">{user.xp}</p>
-                  <p className="text-sm text-gray-600 font-merriweather">Total XP</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-cinzel font-bold text-green-700">{user.questsCompleted}</p>
-                  <p className="text-sm text-gray-600 font-merriweather">Quests Done</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-cinzel font-bold text-amber-700">{user.mythicCoins}</p>
-                  <p className="text-sm text-gray-600 font-merriweather">Mythic Coins</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Account Details */}
-          <div className="bg-gray-50 rounded-lg p-4">
-            <h4 className="font-cinzel font-bold text-gray-800 mb-3 flex items-center">
-              <Shield className="mr-2" size={16} />
-              Account Information
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div className="space-y-2 text-sm text-gray-600">
               <div className="flex items-center">
-                <Calendar className="mr-2 text-gray-500" size={16} />
-                <span className="font-merriweather">
-                  <strong>Joined:</strong> {formatDate(user.joinDate)}
-                </span>
+                <Mail size={16} className="mr-2" />
+                <span className="font-merriweather">{user.email || 'No email'}</span>
               </div>
-              <div className="flex items-center">
-                <Calendar className="mr-2 text-gray-500" size={16} />
-                <span className="font-merriweather">
-                  <strong>Last Login:</strong> {formatDate(user.lastLoginDate)}
-                </span>
-              </div>
-              <div className="flex items-center">
-                <Mail className="mr-2 text-gray-500" size={16} />
-                <span className="font-merriweather">
-                  <strong>Auth Method:</strong> {user.authMethod}
-                </span>
-              </div>
-              <div className="flex items-center">
-                <UserIcon className="mr-2 text-gray-500" size={16} />
-                <span className="font-merriweather">
-                  <strong>User ID:</strong> {user.id}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Social Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
-              <p className="text-2xl font-cinzel font-bold text-blue-700">{user.posts.length}</p>
-              <p className="text-sm text-blue-600 font-merriweather">Posts Created</p>
-            </div>
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
-              <p className="text-2xl font-cinzel font-bold text-green-700">{user.followers.length}</p>
-              <p className="text-sm text-green-600 font-merriweather">Followers</p>
-            </div>
-            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 text-center">
-              <p className="text-2xl font-cinzel font-bold text-purple-700">{user.following.length}</p>
-              <p className="text-sm text-purple-600 font-merriweather">Following</p>
-            </div>
-          </div>
-
-          {/* Recent Posts */}
-          {userPosts.length > 0 && (
-            <div>
-              <h4 className="font-cinzel font-bold text-gray-800 mb-3">Recent Posts</h4>
-              <div className="space-y-3 max-h-64 overflow-y-auto">
-                {userPosts.slice(0, 5).map((post) => (
-                  <div key={post.id} className="bg-gray-50 rounded-lg p-3 border">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <p className="font-merriweather text-sm text-gray-800 mb-2">
-                          {post.content.caption}
-                        </p>
-                        <div className="flex items-center space-x-4 text-xs text-gray-500">
-                          <span>{post.likes.length} likes</span>
-                          <span>{post.comments.length} comments</span>
-                          <span>{formatDate(post.createdAt)}</span>
-                        </div>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleFlagPost(post.id)}
-                        icon={<Flag size={12} />}
-                      >
-                        Flag
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Admin Actions */}
-          <div className="border-t border-gray-200 pt-6">
-            <h4 className="font-cinzel font-bold text-gray-800 mb-3">Admin Actions</h4>
-            <div className="flex space-x-3">
-              <Button
-                variant={user.isActive ? "outline" : "primary"}
-                onClick={handleToggleUserStatus}
-                icon={user.isActive ? <UserIcon size={16} /> : <UserIcon size={16} />}
-              >
-                {user.isActive ? 'Deactivate Account' : 'Activate Account'}
-              </Button>
               
-              <Button
-                variant="ghost"
-                onClick={onClose}
-              >
-                Close Profile
-              </Button>
+              <div className="flex items-center">
+                <Calendar size={16} className="mr-2" />
+                <span className="font-merriweather">
+                  Joined {formatDate(user.date_created || user.created_at)}
+                </span>
+              </div>
+              
+              <div className="flex items-center">
+                <Activity size={16} className="mr-2" />
+                <span className="font-merriweather">
+                  Last updated {formatDate(user.updated_at || user.date_created || user.created_at)}
+                </span>
+              </div>
+            </div>
+
+            {user.bio && (
+              <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                <p className="text-sm text-gray-700 font-merriweather">{user.bio}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-cinzel text-gray-600 uppercase">Experience</p>
+              <p className="text-2xl font-bold text-blue-600 font-cinzel">{user.xp || 0}</p>
+              <p className="text-xs text-gray-500 font-merriweather">XP earned</p>
+            </div>
+            <Award className="text-blue-600" size={24} />
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-cinzel text-gray-600 uppercase">Coins</p>
+              <p className="text-2xl font-bold text-amber-600 font-cinzel">{user.coins || 0}</p>
+              <p className="text-xs text-gray-500 font-merriweather">Mythic coins</p>
+            </div>
+            <Coins className="text-amber-600" size={24} />
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-cinzel text-gray-600 uppercase">Quests</p>
+              <p className="text-2xl font-bold text-green-600 font-cinzel">{user.total_quests_completed || 0}</p>
+              <p className="text-xs text-gray-500 font-merriweather">Completed</p>
+            </div>
+            <Award className="text-green-600" size={24} />
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-cinzel text-gray-600 uppercase">Walking</p>
+              <p className="text-2xl font-bold text-purple-600 font-cinzel">
+                {formatDistance(user.total_walking_distance || 0)}
+              </p>
+              <p className="text-xs text-gray-500 font-merriweather">Total distance</p>
+            </div>
+            <MapPin className="text-purple-600" size={24} />
+          </div>
+        </div>
+      </div>
+
+      {/* Activity Details */}
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <h2 className="text-lg font-cinzel font-bold text-gray-800 mb-4">Activity Details</h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <h3 className="font-cinzel font-bold text-gray-700 mb-3">Wellness Progress</h3>
+            <div className="space-y-3">
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600 font-merriweather">Daily Walking Distance:</span>
+                <span className="text-sm font-bold text-gray-900 font-cinzel">
+                  {formatDistance(user.daily_walking_distance || 0)}
+                </span>
+              </div>
+              
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600 font-merriweather">Total Walking Distance:</span>
+                <span className="text-sm font-bold text-gray-900 font-cinzel">
+                  {formatDistance(user.total_walking_distance || 0)}
+                </span>
+              </div>
+              
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600 font-merriweather">Last Walking Date:</span>
+                <span className="text-sm font-bold text-gray-900 font-cinzel">
+                  {user.last_walking_date || 'Never'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="font-cinzel font-bold text-gray-700 mb-3">Platform Stats</h3>
+            <div className="space-y-3">
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600 font-merriweather">Total Posts:</span>
+                <span className="text-sm font-bold text-gray-900 font-cinzel">
+                  {userStats?.totalPosts || 0}
+                </span>
+              </div>
+              
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600 font-merriweather">Account Status:</span>
+                <Badge 
+                  color={user.is_active !== false ? 'success' : 'error'} 
+                  size="sm"
+                >
+                  {user.is_active !== false ? 'Active' : 'Inactive'}
+                </Badge>
+              </div>
+              
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600 font-merriweather">User ID:</span>
+                <span className="text-xs font-mono text-gray-500 break-all">
+                  {user.id}
+                </span>
+              </div>
             </div>
           </div>
         </div>
