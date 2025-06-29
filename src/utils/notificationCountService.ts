@@ -93,4 +93,13 @@ export class NotificationCountService {
   static getActiveQuestsCount(quests: any[]): number {
     return quests.filter(quest => !quest.completed).length;
   }
+
+  // Add the missing method that was causing the error
+  static getUnreadNotificationCount(userId: string): number {
+    // This method returns the total unread notification count
+    // For now, we'll combine messages and friend requests
+    const unreadMessages = this.getUnreadMessagesCount(userId);
+    const pendingRequests = this.getPendingFriendRequestsCount(userId);
+    return unreadMessages + pendingRequests;
+  }
 }
