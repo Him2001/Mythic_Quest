@@ -1,307 +1,666 @@
 import React, { useState, useEffect } from 'react';
-import { User } from '../../types';
 import { SupabaseService } from '../../utils/supabaseService';
 import Avatar from '../ui/Avatar';
-import Badge from '../ui/Badge';
 import Button from '../ui/Button';
-import { ArrowLeft, Mail, Calendar, Award, Coins, MapPin, Activity, Trash2, UserCheck, UserX } from 'lucide-react';
+import Badge from '../ui/Badge';
+import { 
+  ArrowLeft, 
+  Edit, 
+  Award, 
+  Coins, 
+  TrendingUp, 
+  Calendar, 
+  MapPin, 
+  MessageSquare,
+  Crown,
+  Activity,
+  Users,
+  BookOpen
+} from 'lucide-react';
 
 interface AdminUserProfileProps {
-  userId: string;
+  user: any;
   onBack: () => void;
-  onDeleteUser: (userId: string) => void;
+  onUserUpdate: () => void;
 }
 
-const AdminUserProfile: React.FC<AdminUserProfileProps> = ({ userId, onBack, onDeleteUser }) => {
-  const [user, setUser] = useState<any | null>(null);
-  const [userStats, setUserStats] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+const AdminUserProfile: React.FC<AdminUserProfileProps> = ({ user, onBack, onUserUpdate }) => {
+  const [userActivity, setUserActivity] = useState({
+    quests: [],
+    posts: [],
+    chronicles: []
+  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showQuestModal, setShowQuestModal] = useState(false);
 
   useEffect(() => {
-    loadUserProfile();
-  }, [userId]);
+    loadUserActivity();
+  }, [user.id]);
 
-  const loadUserProfile = async () => {
-    setLoading(true);
-    setError(null);
-    
+  const loadUserActivity = async () => {
+    setIsLoading(true);
     try {
-      const [profile, stats] = await Promise.all([
-        SupabaseService.getUserProfile(userId),
-        SupabaseService.getUserStats(userId)
-      ]);
-
-      if (!profile) {
-        setError('User not found');
-        return;
-      }
-
-      setUser(profile);
-      setUserStats(stats);
+      const activity = await SupabaseService.getUserActivity(user.id);
+      setUserActivity(activity);
     } catch (error) {
-      console.error('Failed to load user profile:', error);
-      setError('Failed to load user profile');
+      console.error('Failed to load user activity:', error);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  const handleDeleteUser = async () => {
-    if (!user) return;
-    
-    if (confirm(`Are you sure you want to delete user "${user.username}"? This action cannot be undone.`)) {
-      try {
-        const success = await SupabaseService.deleteUser(userId);
-        if (success) {
-          onDeleteUser(userId);
-          onBack();
-        } else {
-          alert('Failed to delete user. Please try again.');
-        }
-      } catch (error) {
-        console.error('Error deleting user:', error);
-        alert('Failed to delete user. Please try again.');
+  const handleEditUser = async (updates: any) => {
+    try {
+      const success = await SupabaseService.adminUpdateUserProfile(user.id, updates);
+      if (success) {
+        onUserUpdate();
+        setShowEditModal(false);
+        alert('User updated successfully');
+      } else {
+        alert('Failed to update user');
       }
+    } catch (error) {
+      console.error('Error updating user:', error);
+      alert('Error updating user');
+    }
+  };
+
+  const handleAssignQuest = async (questData: any) => {
+    try {
+      const success = await SupabaseService.assignSpecialQuest(user.id, questData);
+      if (success) {
+        loadUserActivity();
+        onUserUpdate();
+        setShowQuestModal(false);
+        alert('Special quest assigned successfully');
+      } else {
+        alert('Failed to assign quest');
+      }
+    } catch (error) {
+      console.error('Error assigning quest:', error);
+      alert('Error assigning quest');
     }
   };
 
   const formatDate = (dateString: string) => {
-    try {
-      return new Date(dateString).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } catch {
-      return 'Unknown';
-    }
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
-  const formatDistance = (meters: number): string => {
-    if (meters >= 1000) {
-      return `${(meters / 1000).toFixed(2)} km`;
-    }
-    return `${Math.round(meters)} m`;
+  const formatTimeAgo = (dateString: string) => {
+    const now = new Date();
+    const date = new Date(dateString);
+    const diffInDays = Math.floor((now.getTime() - date.getTime()) / (24 * 60 * 60 * 1000));
+
+    if (diffInDays === 0) return 'Today';
+    if (diffInDays === 1) return 'Yesterday';
+    if (diffInDays < 7) return `${diffInDays} days ago`;
+    if (diffInDays < 30) return `${Math.floor(diffInDays / 7)} weeks ago`;
+    return `${Math.floor(diffInDays / 30)} months ago`;
   };
 
-  if (loading) {
-    return (
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-600 mx-auto mb-4"></div>
-            <p className="text-amber-800 font-cinzel">Loading user profile...</p>
+  return (
+    <div className="bg-white rounded-lg shadow-md overflow-hidden">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-amber-500 to-yellow-500 p-6 text-white">
+        <div className="flex items-center justify-between mb-4">
+          <Button
+            variant="ghost"
+            onClick={onBack}
+            icon={<ArrowLeft size={20} />}
+            className="text-white hover:bg-white/20"
+          >
+            Back to Users
+          </Button>
+          <div className="flex space-x-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowEditModal(true)}
+              icon={<Edit size={16} />}
+              className="text-white border-white hover:bg-white hover:text-amber-600"
+            >
+              Edit User
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setShowQuestModal(true)}
+              icon={<Award size={16} />}
+              className="text-white border-white hover:bg-white hover:text-amber-600"
+            >
+              Assign Quest
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex items-center">
+          <Avatar
+            src={user.avatar_url}
+            alt={user.username}
+            size="xl"
+            className="mr-6 border-4 border-white/20"
+          />
+          <div>
+            <div className="flex items-center mb-2">
+              <h1 className="text-3xl font-cinzel font-bold mr-3">{user.username}</h1>
+              {user.level >= 10 && (
+                <Crown className="text-yellow-300" size={24} />
+              )}
+            </div>
+            <p className="text-amber-100 font-merriweather mb-2">{user.email}</p>
+            <div className="flex items-center space-x-4">
+              <Badge 
+                color={user.is_active ? 'success' : 'error'}
+                className="bg-white/20 text-white border-white/30"
+              >
+                {user.is_active ? 'Active' : 'Inactive'}
+              </Badge>
+              <span className="text-amber-100 font-merriweather text-sm">
+                Joined {formatTimeAgo(user.date_created)}
+              </span>
+            </div>
           </div>
         </div>
       </div>
-    );
-  }
 
-  if (error || !user) {
-    return (
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <div className="text-center py-8">
-          <UserX className="mx-auto mb-4 text-red-500" size={48} />
-          <h3 className="text-lg font-cinzel font-bold text-gray-600 mb-2">
-            {error || 'User Not Found'}
-          </h3>
-          <Button variant="primary" onClick={onBack} icon={<ArrowLeft size={16} />}>
-            Back to Users
-          </Button>
+      {/* Stats Grid */}
+      <div className="p-6 border-b border-gray-200">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="text-center">
+            <div className="flex items-center justify-center w-12 h-12 bg-blue-100 rounded-lg mx-auto mb-2">
+              <TrendingUp className="text-blue-600" size={24} />
+            </div>
+            <div className="text-2xl font-cinzel font-bold text-gray-800">{user.level}</div>
+            <div className="text-sm text-gray-600 font-merriweather">Level</div>
+            <div className="text-xs text-gray-500 font-merriweather">{user.xp || 0} XP</div>
+          </div>
+
+          <div className="text-center">
+            <div className="flex items-center justify-center w-12 h-12 bg-yellow-100 rounded-lg mx-auto mb-2">
+              <Coins className="text-yellow-600" size={24} />
+            </div>
+            <div className="text-2xl font-cinzel font-bold text-gray-800">{user.coins || 0}</div>
+            <div className="text-sm text-gray-600 font-merriweather">Coins</div>
+          </div>
+
+          <div className="text-center">
+            <div className="flex items-center justify-center w-12 h-12 bg-green-100 rounded-lg mx-auto mb-2">
+              <Award className="text-green-600" size={24} />
+            </div>
+            <div className="text-2xl font-cinzel font-bold text-gray-800">{user.total_quests_completed || 0}</div>
+            <div className="text-sm text-gray-600 font-merriweather">Quests</div>
+          </div>
+
+          <div className="text-center">
+            <div className="flex items-center justify-center w-12 h-12 bg-purple-100 rounded-lg mx-auto mb-2">
+              <MapPin className="text-purple-600" size={24} />
+            </div>
+            <div className="text-2xl font-cinzel font-bold text-gray-800">
+              {Math.round((user.total_walking_distance || 0) / 1000)}
+            </div>
+            <div className="text-sm text-gray-600 font-merriweather">KM Walked</div>
+          </div>
         </div>
       </div>
-    );
-  }
 
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <div className="flex items-center justify-between mb-6">
-          <Button
-            variant="outline"
-            onClick={onBack}
-            icon={<ArrowLeft size={16} />}
-            className="font-cinzel"
-          >
-            Back to Users
-          </Button>
-          
-          <Button
-            variant="outline"
-            onClick={handleDeleteUser}
-            icon={<Trash2 size={16} />}
-            className="text-red-600 hover:text-red-700 font-cinzel"
-          >
-            Delete User
-          </Button>
-        </div>
-
-        {/* User Info */}
-        <div className="flex items-start space-x-6">
-          <Avatar
-            src={user.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`}
-            alt={user.username}
-            size="xl"
-          />
-          
-          <div className="flex-1">
-            <div className="flex items-center space-x-3 mb-2">
-              <h1 className="text-2xl font-cinzel font-bold text-gray-900">
-                {user.username || 'Unknown User'}
-              </h1>
-              <Badge 
-                color={user.is_active !== false ? 'success' : 'error'} 
-                size="sm"
-              >
-                {user.is_active !== false ? 'Active' : 'Inactive'}
-              </Badge>
-              <Badge color="accent" size="sm">
-                Level {user.level || 1}
-              </Badge>
-            </div>
-            
-            <div className="space-y-2 text-sm text-gray-600">
-              <div className="flex items-center">
-                <Mail size={16} className="mr-2" />
-                <span className="font-merriweather">{user.email || 'No email'}</span>
-              </div>
-              
-              <div className="flex items-center">
-                <Calendar size={16} className="mr-2" />
-                <span className="font-merriweather">
-                  Joined {formatDate(user.date_created || user.created_at)}
-                </span>
-              </div>
-              
-              <div className="flex items-center">
-                <Activity size={16} className="mr-2" />
-                <span className="font-merriweather">
-                  Last updated {formatDate(user.updated_at || user.date_created || user.created_at)}
-                </span>
+      {/* User Info */}
+      <div className="p-6 border-b border-gray-200">
+        <h3 className="text-lg font-cinzel font-bold text-gray-800 mb-4">User Information</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-3">
+            <div className="flex items-center">
+              <Calendar className="text-gray-400 mr-3" size={16} />
+              <div>
+                <div className="text-sm font-medium text-gray-700 font-cinzel">Account Created</div>
+                <div className="text-sm text-gray-600 font-merriweather">{formatDate(user.date_created)}</div>
               </div>
             </div>
-
+            <div className="flex items-center">
+              <Activity className="text-gray-400 mr-3" size={16} />
+              <div>
+                <div className="text-sm font-medium text-gray-700 font-cinzel">Last Updated</div>
+                <div className="text-sm text-gray-600 font-merriweather">{formatDate(user.updated_at)}</div>
+              </div>
+            </div>
+          </div>
+          <div className="space-y-3">
             {user.bio && (
-              <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                <p className="text-sm text-gray-700 font-merriweather">{user.bio}</p>
+              <div>
+                <div className="text-sm font-medium text-gray-700 font-cinzel mb-1">Bio</div>
+                <div className="text-sm text-gray-600 font-merriweather">{user.bio}</div>
+              </div>
+            )}
+            {user.last_walking_date && (
+              <div className="flex items-center">
+                <MapPin className="text-gray-400 mr-3" size={16} />
+                <div>
+                  <div className="text-sm font-medium text-gray-700 font-cinzel">Last Walk</div>
+                  <div className="text-sm text-gray-600 font-merriweather">{user.last_walking_date}</div>
+                </div>
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-cinzel text-gray-600 uppercase">Experience</p>
-              <p className="text-2xl font-bold text-blue-600 font-cinzel">{user.xp || 0}</p>
-              <p className="text-xs text-gray-500 font-merriweather">XP earned</p>
+      {/* Activity Sections */}
+      {isLoading ? (
+        <div className="p-6">
+          <div className="animate-pulse space-y-4">
+            <div className="h-4 bg-gray-200 rounded w-1/4"></div>
+            <div className="space-y-2">
+              <div className="h-3 bg-gray-200 rounded"></div>
+              <div className="h-3 bg-gray-200 rounded w-5/6"></div>
             </div>
-            <Award className="text-blue-600" size={24} />
           </div>
         </div>
-
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-cinzel text-gray-600 uppercase">Coins</p>
-              <p className="text-2xl font-bold text-amber-600 font-cinzel">{user.coins || 0}</p>
-              <p className="text-xs text-gray-500 font-merriweather">Mythic coins</p>
+      ) : (
+        <div className="p-6 space-y-6">
+          {/* Recent Quests */}
+          <div>
+            <div className="flex items-center mb-4">
+              <Award className="text-green-600 mr-2" size={20} />
+              <h3 className="text-lg font-cinzel font-bold text-gray-800">Recent Quests</h3>
+              <span className="ml-2 text-sm text-gray-500 font-merriweather">
+                ({userActivity.quests.length} total)
+              </span>
             </div>
-            <Coins className="text-amber-600" size={24} />
+            {userActivity.quests.length > 0 ? (
+              <div className="space-y-3">
+                {userActivity.quests.slice(0, 5).map((quest: any) => (
+                  <div key={quest.id} className="bg-gray-50 rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium text-gray-800 font-cinzel">{quest.quest_name}</div>
+                        <div className="text-sm text-gray-600 font-merriweather capitalize">{quest.quest_type}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-medium text-green-600 font-cinzel">
+                          +{quest.xp_earned} XP, +{quest.coins_earned} coins
+                        </div>
+                        <div className="text-xs text-gray-500 font-merriweather">
+                          {formatTimeAgo(quest.date_completed)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-gray-500 font-merriweather text-sm">No quests completed yet</div>
+            )}
+          </div>
+
+          {/* Recent Posts */}
+          <div>
+            <div className="flex items-center mb-4">
+              <MessageSquare className="text-blue-600 mr-2" size={20} />
+              <h3 className="text-lg font-cinzel font-bold text-gray-800">Recent Posts</h3>
+              <span className="ml-2 text-sm text-gray-500 font-merriweather">
+                ({userActivity.posts.length} total)
+              </span>
+            </div>
+            {userActivity.posts.length > 0 ? (
+              <div className="space-y-3">
+                {userActivity.posts.slice(0, 3).map((post: any) => (
+                  <div key={post.id} className="bg-gray-50 rounded-lg p-4">
+                    <div className="text-sm text-gray-800 font-merriweather mb-2">
+                      {post.content.substring(0, 150)}
+                      {post.content.length > 150 && '...'}
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-gray-500">
+                      <span className="font-merriweather">{formatTimeAgo(post.timestamp)}</span>
+                      <div className="flex items-center space-x-3">
+                        <span>{post.likes_count} likes</span>
+                        <span>{post.comments_count} comments</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-gray-500 font-merriweather text-sm">No posts created yet</div>
+            )}
+          </div>
+
+          {/* Recent Chronicles */}
+          <div>
+            <div className="flex items-center mb-4">
+              <BookOpen className="text-purple-600 mr-2" size={20} />
+              <h3 className="text-lg font-cinzel font-bold text-gray-800">Recent Chronicles</h3>
+              <span className="ml-2 text-sm text-gray-500 font-merriweather">
+                ({userActivity.chronicles.length} total)
+              </span>
+            </div>
+            {userActivity.chronicles.length > 0 ? (
+              <div className="space-y-3">
+                {userActivity.chronicles.slice(0, 3).map((chronicle: any) => (
+                  <div key={chronicle.id} className="bg-gray-50 rounded-lg p-4">
+                    <div className="font-medium text-gray-800 font-cinzel mb-1">{chronicle.title}</div>
+                    <div className="text-sm text-gray-600 font-merriweather mb-2">
+                      {chronicle.content.substring(0, 100)}
+                      {chronicle.content.length > 100 && '...'}
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-gray-500">
+                      <span className="font-merriweather">{formatTimeAgo(chronicle.date_created)}</span>
+                      <div className="flex items-center space-x-2">
+                        {chronicle.mood && (
+                          <span className="capitalize">{chronicle.mood}</span>
+                        )}
+                        <Badge color={chronicle.is_private ? 'error' : 'success'} size="sm">
+                          {chronicle.is_private ? 'Private' : 'Public'}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-gray-500 font-merriweather text-sm">No chronicles created yet</div>
+            )}
           </div>
         </div>
+      )}
 
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-cinzel text-gray-600 uppercase">Quests</p>
-              <p className="text-2xl font-bold text-green-600 font-cinzel">{user.total_quests_completed || 0}</p>
-              <p className="text-xs text-gray-500 font-merriweather">Completed</p>
-            </div>
-            <Award className="text-green-600" size={24} />
-          </div>
-        </div>
+      {/* Edit User Modal */}
+      {showEditModal && (
+        <EditUserModal
+          user={user}
+          onSave={handleEditUser}
+          onClose={() => setShowEditModal(false)}
+        />
+      )}
 
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center justify-between">
+      {/* Assign Quest Modal */}
+      {showQuestModal && (
+        <AssignQuestModal
+          user={user}
+          onAssign={handleAssignQuest}
+          onClose={() => setShowQuestModal(false)}
+        />
+      )}
+    </div>
+  );
+};
+
+// Edit User Modal Component (same as in AdminUserTable)
+const EditUserModal: React.FC<{
+  user: any;
+  onSave: (updates: any) => void;
+  onClose: () => void;
+}> = ({ user, onSave, onClose }) => {
+  const [formData, setFormData] = useState({
+    username: user.username || '',
+    email: user.email || '',
+    level: user.level || 1,
+    xp: user.xp || 0,
+    coins: user.coins || 0,
+    bio: user.bio || '',
+    is_active: user.is_active !== false
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave(formData);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6">
+          <h3 className="text-lg font-cinzel font-bold text-gray-800 mb-4">
+            Edit User: {user.username}
+          </h3>
+          
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <p className="text-sm font-cinzel text-gray-600 uppercase">Walking</p>
-              <p className="text-2xl font-bold text-purple-600 font-cinzel">
-                {formatDistance(user.total_walking_distance || 0)}
-              </p>
-              <p className="text-xs text-gray-500 font-merriweather">Total distance</p>
+              <label className="block text-sm font-medium text-gray-700 font-cinzel mb-1">
+                Username
+              </label>
+              <input
+                type="text"
+                value={formData.username}
+                onChange={(e) => setFormData(prev => ({ ...prev, username: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-amber-500 font-merriweather"
+                required
+              />
             </div>
-            <MapPin className="text-purple-600" size={24} />
-          </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 font-cinzel mb-1">
+                Email
+              </label>
+              <input
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-amber-500 font-merriweather"
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 font-cinzel mb-1">
+                  Level
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={formData.level}
+                  onChange={(e) => setFormData(prev => ({ ...prev, level: parseInt(e.target.value) }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-amber-500 font-merriweather"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 font-cinzel mb-1">
+                  XP
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={formData.xp}
+                  onChange={(e) => setFormData(prev => ({ ...prev, xp: parseInt(e.target.value) }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-amber-500 font-merriweather"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 font-cinzel mb-1">
+                  Coins
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={formData.coins}
+                  onChange={(e) => setFormData(prev => ({ ...prev, coins: parseInt(e.target.value) }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-amber-500 font-merriweather"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 font-cinzel mb-1">
+                Bio
+              </label>
+              <textarea
+                value={formData.bio}
+                onChange={(e) => setFormData(prev => ({ ...prev, bio: e.target.value }))}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-amber-500 font-merriweather"
+              />
+            </div>
+
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="is_active"
+                checked={formData.is_active}
+                onChange={(e) => setFormData(prev => ({ ...prev, is_active: e.target.checked }))}
+                className="mr-2"
+              />
+              <label htmlFor="is_active" className="text-sm font-medium text-gray-700 font-cinzel">
+                Active Account
+              </label>
+            </div>
+
+            <div className="flex space-x-3 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                className="flex-1"
+              >
+                Save Changes
+              </Button>
+            </div>
+          </form>
         </div>
       </div>
+    </div>
+  );
+};
 
-      {/* Activity Details */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h2 className="text-lg font-cinzel font-bold text-gray-800 mb-4">Activity Details</h2>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <h3 className="font-cinzel font-bold text-gray-700 mb-3">Wellness Progress</h3>
-            <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600 font-merriweather">Daily Walking Distance:</span>
-                <span className="text-sm font-bold text-gray-900 font-cinzel">
-                  {formatDistance(user.daily_walking_distance || 0)}
-                </span>
+// Assign Quest Modal Component (same as in AdminUserTable)
+const AssignQuestModal: React.FC<{
+  user: any;
+  onAssign: (questData: any) => void;
+  onClose: () => void;
+}> = ({ user, onAssign, onClose }) => {
+  const [questData, setQuestData] = useState({
+    questName: '',
+    questType: 'special',
+    xpReward: 100,
+    coinsReward: 50,
+    description: ''
+  });
+
+  const questTypes = [
+    { value: 'special', label: 'Special Quest' },
+    { value: 'bonus', label: 'Bonus Challenge' },
+    { value: 'achievement', label: 'Achievement Unlock' },
+    { value: 'milestone', label: 'Milestone Reward' }
+  ];
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!questData.questName.trim()) return;
+    onAssign(questData);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+        <div className="p-6">
+          <h3 className="text-lg font-cinzel font-bold text-gray-800 mb-4">
+            Assign Special Quest to {user.username}
+          </h3>
+          
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 font-cinzel mb-1">
+                Quest Name
+              </label>
+              <input
+                type="text"
+                value={questData.questName}
+                onChange={(e) => setQuestData(prev => ({ ...prev, questName: e.target.value }))}
+                placeholder="Enter quest name..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-amber-500 font-merriweather"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 font-cinzel mb-1">
+                Quest Type
+              </label>
+              <select
+                value={questData.questType}
+                onChange={(e) => setQuestData(prev => ({ ...prev, questType: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-amber-500 font-merriweather"
+              >
+                {questTypes.map(type => (
+                  <option key={type.value} value={type.value}>
+                    {type.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 font-cinzel mb-1">
+                  XP Reward
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={questData.xpReward}
+                  onChange={(e) => setQuestData(prev => ({ ...prev, xpReward: parseInt(e.target.value) }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-amber-500 font-merriweather"
+                />
               </div>
-              
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600 font-merriweather">Total Walking Distance:</span>
-                <span className="text-sm font-bold text-gray-900 font-cinzel">
-                  {formatDistance(user.total_walking_distance || 0)}
-                </span>
-              </div>
-              
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600 font-merriweather">Last Walking Date:</span>
-                <span className="text-sm font-bold text-gray-900 font-cinzel">
-                  {user.last_walking_date || 'Never'}
-                </span>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 font-cinzel mb-1">
+                  Coin Reward
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={questData.coinsReward}
+                  onChange={(e) => setQuestData(prev => ({ ...prev, coinsReward: parseInt(e.target.value) }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-amber-500 font-merriweather"
+                />
               </div>
             </div>
-          </div>
 
-          <div>
-            <h3 className="font-cinzel font-bold text-gray-700 mb-3">Platform Stats</h3>
-            <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600 font-merriweather">Total Posts:</span>
-                <span className="text-sm font-bold text-gray-900 font-cinzel">
-                  {userStats?.totalPosts || 0}
-                </span>
-              </div>
-              
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600 font-merriweather">Account Status:</span>
-                <Badge 
-                  color={user.is_active !== false ? 'success' : 'error'} 
-                  size="sm"
-                >
-                  {user.is_active !== false ? 'Active' : 'Inactive'}
-                </Badge>
-              </div>
-              
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600 font-merriweather">User ID:</span>
-                <span className="text-xs font-mono text-gray-500 break-all">
-                  {user.id}
-                </span>
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 font-cinzel mb-1">
+                Description (Optional)
+              </label>
+              <textarea
+                value={questData.description}
+                onChange={(e) => setQuestData(prev => ({ ...prev, description: e.target.value }))}
+                rows={3}
+                placeholder="Quest description..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-amber-500 font-merriweather"
+              />
             </div>
-          </div>
+
+            <div className="flex space-x-3 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                className="flex-1"
+              >
+                Assign Quest
+              </Button>
+            </div>
+          </form>
         </div>
       </div>
     </div>

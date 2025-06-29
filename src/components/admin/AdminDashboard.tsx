@@ -1,12 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { User } from '../../types';
-import { AdminService } from '../../utils/adminService';
 import AdminHeader from './AdminHeader';
 import AdminStatsCards from './AdminStatsCards';
 import AdminUserTable from './AdminUserTable';
-import AdminActivity from './AdminActivity';
 import AdminUserProfile from './AdminUserProfile';
-import { Users, Activity, Settings, BarChart3, Shield, Crown } from 'lucide-react';
+import AdminActivity from './AdminActivity';
+import { SupabaseService } from '../../utils/supabaseService';
+import { 
+  BarChart3, 
+  Users, 
+  Activity, 
+  Settings,
+  RefreshCw,
+  Database,
+  Shield
+} from 'lucide-react';
 
 interface AdminDashboardProps {
   currentUser: User;
@@ -15,40 +23,57 @@ interface AdminDashboardProps {
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, onSignOut }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'activity' | 'settings'>('overview');
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-  const [stats, setStats] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [isSupabaseConnected, setIsSupabaseConnected] = useState(false);
 
   useEffect(() => {
-    loadDashboardData();
+    checkSupabaseConnection();
   }, []);
 
-  const loadDashboardData = async () => {
-    setIsLoading(true);
+  const checkSupabaseConnection = async () => {
     try {
-      const adminStats = AdminService.getAdminStats();
-      setStats(adminStats);
+      // Try to fetch a simple query to test connection
+      const users = await SupabaseService.getAllUserProfiles();
+      setIsSupabaseConnected(true);
     } catch (error) {
-      console.error('Failed to load admin data:', error);
-    } finally {
-      setIsLoading(false);
+      console.warn('Supabase connection check failed:', error);
+      setIsSupabaseConnected(false);
     }
   };
 
-  const handleUserSelect = (userId: string) => {
-    setSelectedUserId(userId);
+  const handleRefresh = () => {
+    setRefreshTrigger(prev => prev + 1);
+    checkSupabaseConnection();
+  };
+
+  const handleUserSelect = (user: any) => {
+    setSelectedUser(user);
   };
 
   const handleBackToUsers = () => {
-    setSelectedUserId(null);
+    setSelectedUser(null);
+    setRefreshTrigger(prev => prev + 1); // Refresh data when going back
   };
 
-  const renderTabContent = () => {
-    if (selectedUserId) {
+  const handleUserUpdate = () => {
+    setRefreshTrigger(prev => prev + 1);
+  };
+
+  const tabs = [
+    { id: 'overview', label: 'Overview', icon: BarChart3 },
+    { id: 'users', label: 'Users', icon: Users },
+    { id: 'activity', label: 'Activity', icon: Activity },
+    { id: 'settings', label: 'Settings', icon: Settings }
+  ];
+
+  const renderContent = () => {
+    if (activeTab === 'users' && selectedUser) {
       return (
         <AdminUserProfile
-          userId={selectedUserId}
+          user={selectedUser}
           onBack={handleBackToUsers}
+          onUserUpdate={handleUserUpdate}
         />
       );
     }
@@ -57,190 +82,227 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, onSignOut 
       case 'overview':
         return (
           <div className="space-y-6">
-            {stats && <AdminStatsCards stats={stats} />}
-            <AdminActivity />
-          </div>
-        );
-      case 'users':
-        return (
-          <AdminUserTable onUserSelect={handleUserSelect} />
-        );
-      case 'activity':
-        return <AdminActivity />;
-      case 'settings':
-        return (
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex items-center mb-6">
-              <Settings className="text-amber-600 mr-3" size={24} />
-              <h2 className="text-xl font-cinzel font-bold text-gray-800">System Settings</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-cinzel font-bold text-gray-800">Platform Overview</h2>
+              <div className="flex items-center space-x-3">
+                <div className={`flex items-center px-3 py-1 rounded-full text-sm font-cinzel ${
+                  isSupabaseConnected 
+                    ? 'bg-green-100 text-green-700' 
+                    : 'bg-red-100 text-red-700'
+                }`}>
+                  <Database size={14} className="mr-1" />
+                  {isSupabaseConnected ? 'Database Connected' : 'Database Offline'}
+                </div>
+                <button
+                  onClick={handleRefresh}
+                  className="flex items-center px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-sm font-cinzel hover:bg-amber-200 transition-colors"
+                >
+                  <RefreshCw size={14} className="mr-1" />
+                  Refresh
+                </button>
+              </div>
             </div>
             
-            <div className="space-y-6">
-              <div className="border border-gray-200 rounded-lg p-4">
-                <h3 className="font-cinzel font-bold text-gray-800 mb-3">Application Configuration</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="font-medium text-gray-600">Environment:</span>
-                    <span className="ml-2 text-gray-800">Production</span>
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-600">Version:</span>
-                    <span className="ml-2 text-gray-800">1.0.0</span>
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-600">Database:</span>
-                    <span className="ml-2 text-gray-800">Supabase</span>
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-600">Storage:</span>
-                    <span className="ml-2 text-gray-800">Local + Cloud</span>
-                  </div>
+            <AdminStatsCards refreshTrigger={refreshTrigger} />
+            
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="bg-white rounded-lg shadow-md p-6">
+                <h3 className="text-lg font-cinzel font-bold text-gray-800 mb-4">Quick Actions</h3>
+                <div className="space-y-3">
+                  <button
+                    onClick={() => setActiveTab('users')}
+                    className="w-full text-left p-3 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                  >
+                    <div className="flex items-center">
+                      <Users className="text-blue-600 mr-3" size={20} />
+                      <div>
+                        <div className="font-medium text-blue-800 font-cinzel">Manage Users</div>
+                        <div className="text-sm text-blue-600 font-merriweather">View, edit, and manage user accounts</div>
+                      </div>
+                    </div>
+                  </button>
+                  
+                  <button
+                    onClick={() => setActiveTab('activity')}
+                    className="w-full text-left p-3 bg-green-50 hover:bg-green-100 rounded-lg transition-colors"
+                  >
+                    <div className="flex items-center">
+                      <Activity className="text-green-600 mr-3" size={20} />
+                      <div>
+                        <div className="font-medium text-green-800 font-cinzel">View Activity</div>
+                        <div className="text-sm text-green-600 font-merriweather">Monitor platform activity and engagement</div>
+                      </div>
+                    </div>
+                  </button>
                 </div>
               </div>
 
-              <div className="border border-gray-200 rounded-lg p-4">
-                <h3 className="font-cinzel font-bold text-gray-800 mb-3">System Health</h3>
-                <div className="space-y-2">
+              <div className="bg-white rounded-lg shadow-md p-6">
+                <h3 className="text-lg font-cinzel font-bold text-gray-800 mb-4">System Status</h3>
+                <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-gray-600">API Status</span>
-                    <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
-                      Operational
+                    <span className="text-sm font-medium text-gray-700 font-cinzel">Database</span>
+                    <span className={`text-sm font-cinzel ${
+                      isSupabaseConnected ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      {isSupabaseConnected ? 'Connected' : 'Offline'}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-gray-600">Database Connection</span>
-                    <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
-                      Connected
-                    </span>
+                    <span className="text-sm font-medium text-gray-700 font-cinzel">Authentication</span>
+                    <span className="text-sm text-green-600 font-cinzel">Active</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-gray-600">Authentication Service</span>
-                    <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
-                      Active
+                    <span className="text-sm font-medium text-gray-700 font-cinzel">Real-time Features</span>
+                    <span className={`text-sm font-cinzel ${
+                      isSupabaseConnected ? 'text-green-600' : 'text-yellow-600'
+                    }`}>
+                      {isSupabaseConnected ? 'Active' : 'Limited'}
                     </span>
                   </div>
                 </div>
-              </div>
-
-              <div className="border border-amber-200 rounded-lg p-4 bg-amber-50">
-                <div className="flex items-center mb-3">
-                  <Crown className="text-amber-600 mr-2" size={20} />
-                  <h3 className="font-cinzel font-bold text-amber-800">Administrator Privileges</h3>
-                </div>
-                <p className="text-amber-700 text-sm font-merriweather">
-                  You have full administrative access to the Mythic Quest platform. Use these powers wisely to maintain the wellness realm.
-                </p>
               </div>
             </div>
           </div>
         );
+
+      case 'users':
+        return (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-cinzel font-bold text-gray-800">User Management</h2>
+              <button
+                onClick={handleRefresh}
+                className="flex items-center px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-sm font-cinzel hover:bg-amber-200 transition-colors"
+              >
+                <RefreshCw size={14} className="mr-1" />
+                Refresh
+              </button>
+            </div>
+            <AdminUserTable 
+              onUserSelect={handleUserSelect} 
+              refreshTrigger={refreshTrigger}
+            />
+          </div>
+        );
+
+      case 'activity':
+        return (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-cinzel font-bold text-gray-800">Platform Activity</h2>
+              <button
+                onClick={handleRefresh}
+                className="flex items-center px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-sm font-cinzel hover:bg-amber-200 transition-colors"
+              >
+                <RefreshCw size={14} className="mr-1" />
+                Refresh
+              </button>
+            </div>
+            <AdminActivity refreshTrigger={refreshTrigger} />
+          </div>
+        );
+
+      case 'settings':
+        return (
+          <div className="space-y-6">
+            <h2 className="text-2xl font-cinzel font-bold text-gray-800">Admin Settings</h2>
+            
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <h3 className="text-lg font-cinzel font-bold text-gray-800 mb-4">System Configuration</h3>
+              
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center">
+                    <Shield className="text-blue-600 mr-3" size={20} />
+                    <div>
+                      <div className="font-medium text-gray-800 font-cinzel">Database Connection</div>
+                      <div className="text-sm text-gray-600 font-merriweather">
+                        {isSupabaseConnected ? 'Connected to Supabase' : 'Running in demo mode'}
+                      </div>
+                    </div>
+                  </div>
+                  <div className={`px-3 py-1 rounded-full text-sm font-cinzel ${
+                    isSupabaseConnected 
+                      ? 'bg-green-100 text-green-700' 
+                      : 'bg-yellow-100 text-yellow-700'
+                  }`}>
+                    {isSupabaseConnected ? 'Live' : 'Demo'}
+                  </div>
+                </div>
+
+                <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
+                  <h4 className="font-medium text-amber-800 font-cinzel mb-2">Admin Privileges</h4>
+                  <ul className="text-sm text-amber-700 font-merriweather space-y-1">
+                    <li>• View and manage all user accounts</li>
+                    <li>• Edit user information and stats</li>
+                    <li>• Assign special quests and rewards</li>
+                    <li>• Monitor platform activity and engagement</li>
+                    <li>• Access comprehensive analytics</li>
+                  </ul>
+                </div>
+
+                {!isSupabaseConnected && (
+                  <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <h4 className="font-medium text-blue-800 font-cinzel mb-2">Demo Mode Notice</h4>
+                    <p className="text-sm text-blue-700 font-merriweather">
+                      Currently running in demo mode. To enable full functionality with real user data, 
+                      connect to Supabase by clicking the "Connect to Supabase" button in the top navigation.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+
       default:
         return null;
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-fantasy bg-cover bg-fixed bg-center relative flex items-center justify-center">
-        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-black/40 pointer-events-none" />
-        <div className="relative z-10 text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-amber-500 mx-auto mb-4"></div>
-          <p className="text-amber-100 font-cinzel text-xl">Loading Admin Dashboard...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-fantasy bg-cover bg-fixed bg-center relative">
-      {/* Background overlay */}
-      <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-black/40 pointer-events-none" />
+    <div className="min-h-screen bg-gray-100">
+      <AdminHeader 
+        currentUser={currentUser} 
+        onSignOut={onSignOut}
+        isSupabaseConnected={isSupabaseConnected}
+      />
       
-      {/* Admin Header */}
-      <AdminHeader currentUser={currentUser} onSignOut={onSignOut} />
-      
-      <main className="relative pt-20 pb-6">
-        <div className="container mx-auto px-4">
-          {/* Admin Badge */}
-          <div className="mb-6 flex items-center justify-center">
-            <div className="bg-gradient-to-r from-amber-500 to-yellow-500 text-white px-6 py-3 rounded-full shadow-lg magical-glow">
-              <div className="flex items-center">
-                <Shield className="mr-2" size={20} />
-                <span className="font-cinzel font-bold">Administrator Dashboard</span>
-                <Crown className="ml-2" size={20} />
-              </div>
-            </div>
-          </div>
-
-          <div className="relative backdrop-blur-sm bg-white/90 rounded-2xl shadow-xl border border-amber-100/20 overflow-hidden">
-            <div className="absolute inset-0 border-4 border-amber-500/10 rounded-2xl pointer-events-none" />
-            <div className="absolute inset-0 bg-gradient-to-b from-amber-500/5 to-purple-500/5 pointer-events-none" />
-            
-            <div className="relative">
-              {/* Navigation Tabs */}
-              {!selectedUserId && (
-                <div className="border-b border-gray-200 bg-white/50">
-                  <nav className="flex space-x-8 px-6">
-                    <button
-                      onClick={() => setActiveTab('overview')}
-                      className={`py-4 px-2 border-b-2 font-cinzel font-bold text-sm transition-colors duration-200 flex items-center ${
-                        activeTab === 'overview'
-                          ? 'border-amber-500 text-amber-600'
-                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                      }`}
-                    >
-                      <BarChart3 size={16} className="mr-2" />
-                      Overview
-                    </button>
-                    <button
-                      onClick={() => setActiveTab('users')}
-                      className={`py-4 px-2 border-b-2 font-cinzel font-bold text-sm transition-colors duration-200 flex items-center ${
-                        activeTab === 'users'
-                          ? 'border-amber-500 text-amber-600'
-                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                      }`}
-                    >
-                      <Users size={16} className="mr-2" />
-                      Users
-                    </button>
-                    <button
-                      onClick={() => setActiveTab('activity')}
-                      className={`py-4 px-2 border-b-2 font-cinzel font-bold text-sm transition-colors duration-200 flex items-center ${
-                        activeTab === 'activity'
-                          ? 'border-amber-500 text-amber-600'
-                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                      }`}
-                    >
-                      <Activity size={16} className="mr-2" />
-                      Activity
-                    </button>
-                    <button
-                      onClick={() => setActiveTab('settings')}
-                      className={`py-4 px-2 border-b-2 font-cinzel font-bold text-sm transition-colors duration-200 flex items-center ${
-                        activeTab === 'settings'
-                          ? 'border-amber-500 text-amber-600'
-                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                      }`}
-                    >
-                      <Settings size={16} className="mr-2" />
-                      Settings
-                    </button>
-                  </nav>
-                </div>
-              )}
-
-              {/* Tab Content */}
-              <div className="p-6">
-                {renderTabContent()}
-              </div>
-            </div>
+      <div className="flex">
+        {/* Sidebar */}
+        <div className="w-64 bg-white shadow-md min-h-screen">
+          <div className="p-6">
+            <h2 className="text-lg font-cinzel font-bold text-gray-800 mb-4">Admin Panel</h2>
+            <nav className="space-y-2">
+              {tabs.map((tab) => {
+                const IconComponent = tab.icon;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => {
+                      setActiveTab(tab.id as any);
+                      setSelectedUser(null); // Clear selected user when changing tabs
+                    }}
+                    className={`w-full flex items-center px-3 py-2 rounded-lg text-left transition-colors font-cinzel ${
+                      activeTab === tab.id
+                        ? 'bg-amber-100 text-amber-800 font-bold'
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    <IconComponent size={18} className="mr-3" />
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </nav>
           </div>
         </div>
-      </main>
-      
-      {/* Magical particle effects */}
-      <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="magical-particles" />
+
+        {/* Main Content */}
+        <div className="flex-1 p-6">
+          {renderContent()}
+        </div>
       </div>
     </div>
   );
