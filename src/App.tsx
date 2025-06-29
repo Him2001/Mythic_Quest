@@ -629,6 +629,38 @@ function App() {
     );
   }
 
+  // Check for admin login
+  if (authView === 'signin' && !isAuthenticated) {
+    const adminEmail = 'admin@123';
+    const adminPassword = 'admin123';
+    
+    // Check if admin credentials were entered
+    const urlParams = new URLSearchParams(window.location.search);
+    const email = urlParams.get('email');
+    const password = urlParams.get('password');
+    
+    if (email === adminEmail && password === adminPassword) {
+      // Create admin user
+      const adminUser: User = {
+        ...mockUser,
+        id: 'admin-user',
+        name: 'Administrator',
+        email: adminEmail,
+        isAdmin: true
+      };
+      
+      // Store admin session
+      localStorage.setItem('mythic_admin_session', JSON.stringify({
+        user: adminUser,
+        timestamp: Date.now()
+      }));
+      
+      // Set admin user
+      setUser(adminUser);
+      setIsAuthenticated(true);
+    }
+  }
+
   // Authentication flow (skip if in demo mode)
   if (!isAuthenticated && hasSupabase) {
     switch (authView) {
