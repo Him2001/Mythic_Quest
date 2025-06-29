@@ -1,141 +1,124 @@
 import React, { useState, useEffect } from 'react';
 import { SupabaseService } from '../../utils/supabaseService';
-import Avatar from '../ui/Avatar';
-import Button from '../ui/Button';
-import Badge from '../ui/Badge';
-import { 
-  Search, 
-  Eye, 
-  Trash2, 
-  Edit, 
-  Award, 
-  ChevronLeft, 
-  ChevronRight,
-  UserX,
-  UserCheck,
-  Crown,
-  Coins,
-  TrendingUp
-} from 'lucide-react';
+import { User, Search, Edit, Trash2, UserPlus, Award, RefreshCw, Eye } from 'lucide-react';
 
 interface AdminUserTableProps {
-  onUserSelect: (user: any) => void;
-  refreshTrigger?: number;
+  hasSupabase: boolean;
+  onViewUser: (user: any) => void;
+  onEditUser: (user: any) => void;
+  onDeleteUser: (userId: string) => void;
 }
 
-const AdminUserTable: React.FC<AdminUserTableProps> = ({ onUserSelect, refreshTrigger = 0 }) => {
+const AdminUserTable: React.FC<AdminUserTableProps> = ({
+  hasSupabase,
+  onViewUser,
+  onEditUser,
+  onDeleteUser
+}) => {
   const [users, setUsers] = useState<any[]>([]);
-  const [filteredUsers, setFilteredUsers] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [isLoading, setIsLoading] = useState(true);
-  const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editingUser, setEditingUser] = useState<any>(null);
-  const [showQuestModal, setShowQuestModal] = useState(false);
-  const [questUser, setQuestUser] = useState<any>(null);
-
+  const [totalUsers, setTotalUsers] = useState(0);
   const usersPerPage = 10;
-
-  useEffect(() => {
-    loadUsers();
-  }, [refreshTrigger]);
-
-  useEffect(() => {
-    filterUsers();
-  }, [users, searchQuery]);
 
   const loadUsers = async () => {
     setIsLoading(true);
     try {
-      const allUsers = await SupabaseService.getAllUserProfiles();
-      setUsers(allUsers);
+      if (hasSupabase) {
+        console.log('🔄 Loading users from Supabase...');
+        const allUsers = await SupabaseService.getAllUserProfiles();
+        console.log('👥 Users loaded:', allUsers.length, 'users');
+        
+        // Filter users based on search query
+        let filteredUsers = allUsers;
+        if (searchQuery.trim()) {
+          const query = searchQuery.toLowerCase();
+          filteredUsers = allUsers.filter(user =>
+            (user.username && user.username.toLowerCase().includes(query)) ||
+            (user.email && user.email.toLowerCase().includes(query))
+          );
+        }
+
+        setTotalUsers(filteredUsers.length);
+        
+        // Paginate results
+        const startIndex = (currentPage - 1) * usersPerPage;
+        const endIndex = startIndex + usersPerPage;
+        const paginatedUsers = filteredUsers.slice(startIndex, endIndex);
+        
+        setUsers(paginatedUsers);
+      } else {
+        // Demo mode fallback
+        console.log('👥 Using demo mode users');
+        const demoUsers = [
+          {
+            id: 'demo-1',
+            username: 'demo_user_1',
+            email: 'demo1@example.com',
+            level: 5,
+            xp: 1250,
+            coins: 500,
+            total_quests_completed: 12,
+            is_active: true,
+            date_created: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+            updated_at: new Date().toISOString()
+          },
+          {
+            id: 'demo-2',
+            username: 'demo_user_2',
+            email: 'demo2@example.com',
+            level: 3,
+            xp: 750,
+            coins: 300,
+            total_quests_completed: 8,
+            is_active: true,
+            date_created: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+            updated_at: new Date().toISOString()
+          }
+        ];
+        setUsers(demoUsers);
+        setTotalUsers(demoUsers.length);
+      }
     } catch (error) {
-      console.error('Failed to load users:', error);
+      console.error('❌ Error loading users:', error);
+      setUsers([]);
+      setTotalUsers(0);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const filterUsers = () => {
-    if (!searchQuery.trim()) {
-      setFilteredUsers(users);
-    } else {
-      const query = searchQuery.toLowerCase();
-      const filtered = users.filter(user =>
-        user.username?.toLowerCase().includes(query) ||
-        user.email?.toLowerCase().includes(query)
-      );
-      setFilteredUsers(filtered);
-    }
-    setCurrentPage(1);
+  useEffect(() => {
+    loadUsers();
+  }, [hasSupabase, searchQuery, currentPage]);
+
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+    setCurrentPage(1); // Reset to first page when searching
   };
 
   const handleDeleteUser = async (userId: string, username: string) => {
     if (window.confirm(`Are you sure you want to delete user "${username}"? This action cannot be undone.`)) {
       try {
-        const success = await SupabaseService.deleteUser(userId);
-        if (success) {
-          setUsers(prev => prev.filter(user => user.id !== userId));
-          alert('User deleted successfully');
+        if (hasSupabase) {
+          const success = await SupabaseService.deleteUser(userId);
+          if (success) {
+            console.log('✅ User deleted successfully');
+            loadUsers(); // Refresh the list
+            onDeleteUser(userId);
+          } else {
+            alert('Failed to delete user. Please try again.');
+          }
         } else {
-          alert('Failed to delete user');
+          // Demo mode
+          setUsers(prev => prev.filter(user => user.id !== userId));
+          onDeleteUser(userId);
         }
       } catch (error) {
-        console.error('Error deleting user:', error);
-        alert('Error deleting user');
+        console.error('❌ Error deleting user:', error);
+        alert('An error occurred while deleting the user.');
       }
-    }
-  };
-
-  const handleEditUser = (user: any) => {
-    setEditingUser(user);
-    setShowEditModal(true);
-  };
-
-  const handleAssignQuest = (user: any) => {
-    setQuestUser(user);
-    setShowQuestModal(true);
-  };
-
-  const handleSaveUserEdit = async (updates: any) => {
-    if (!editingUser) return;
-
-    try {
-      const success = await SupabaseService.adminUpdateUserProfile(editingUser.id, updates);
-      if (success) {
-        setUsers(prev => prev.map(user => 
-          user.id === editingUser.id ? { ...user, ...updates } : user
-        ));
-        setShowEditModal(false);
-        setEditingUser(null);
-        alert('User updated successfully');
-      } else {
-        alert('Failed to update user');
-      }
-    } catch (error) {
-      console.error('Error updating user:', error);
-      alert('Error updating user');
-    }
-  };
-
-  const handleAssignSpecialQuest = async (questData: any) => {
-    if (!questUser) return;
-
-    try {
-      const success = await SupabaseService.assignSpecialQuest(questUser.id, questData);
-      if (success) {
-        // Refresh user data
-        loadUsers();
-        setShowQuestModal(false);
-        setQuestUser(null);
-        alert('Special quest assigned successfully');
-      } else {
-        alert('Failed to assign quest');
-      }
-    } catch (error) {
-      console.error('Error assigning quest:', error);
-      alert('Error assigning quest');
     }
   };
 
@@ -151,7 +134,7 @@ const AdminUserTable: React.FC<AdminUserTableProps> = ({ onUserSelect, refreshTr
     const now = new Date();
     const date = new Date(dateString);
     const diffInDays = Math.floor((now.getTime() - date.getTime()) / (24 * 60 * 60 * 1000));
-
+    
     if (diffInDays === 0) return 'Today';
     if (diffInDays === 1) return 'Yesterday';
     if (diffInDays < 7) return `${diffInDays} days ago`;
@@ -159,17 +142,13 @@ const AdminUserTable: React.FC<AdminUserTableProps> = ({ onUserSelect, refreshTr
     return `${Math.floor(diffInDays / 30)} months ago`;
   };
 
-  // Pagination
-  const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
-  const startIndex = (currentPage - 1) * usersPerPage;
-  const endIndex = startIndex + usersPerPage;
-  const currentUsers = filteredUsers.slice(startIndex, endIndex);
+  const totalPages = Math.ceil(totalUsers / usersPerPage);
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-lg shadow-md p-6">
+      <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
         <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
+          <div className="h-8 bg-gray-200 rounded mb-4"></div>
           <div className="space-y-3">
             {[...Array(5)].map((_, i) => (
               <div key={i} className="h-16 bg-gray-200 rounded"></div>
@@ -181,16 +160,25 @@ const AdminUserTable: React.FC<AdminUserTableProps> = ({ onUserSelect, refreshTr
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden">
+    <div className="bg-white rounded-xl shadow-lg border border-gray-200">
       {/* Header */}
       <div className="p-6 border-b border-gray-200">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-cinzel font-bold text-gray-800">User Management</h2>
-          <div className="flex items-center space-x-2">
-            <span className="text-sm text-gray-600 font-merriweather">
-              {filteredUsers.length} users total
-            </span>
+          <div>
+            <h3 className="text-xl font-bold text-gray-900">User Management</h3>
+            <p className="text-gray-600">
+              {totalUsers} total users
+              {!hasSupabase && <span className="text-orange-600 ml-2">(Demo Mode)</span>}
+            </p>
           </div>
+          <button
+            onClick={loadUsers}
+            disabled={isLoading}
+            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
         </div>
 
         {/* Search */}
@@ -200,8 +188,8 @@ const AdminUserTable: React.FC<AdminUserTableProps> = ({ onUserSelect, refreshTr
             type="text"
             placeholder="Search by username or email..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-amber-500 font-merriweather"
+            onChange={(e) => handleSearch(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
           />
         </div>
       </div>
@@ -211,116 +199,100 @@ const AdminUserTable: React.FC<AdminUserTableProps> = ({ onUserSelect, refreshTr
         <table className="w-full">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider font-cinzel">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 User
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider font-cinzel">
-                Stats
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Level & Progress
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider font-cinzel">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Activity
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider font-cinzel">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Status
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider font-cinzel">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Actions
               </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {currentUsers.map((user) => (
-              <tr key={user.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center">
-                    <Avatar
-                      src={user.avatar_url}
-                      alt={user.username}
-                      size="md"
-                      className="mr-4"
-                    />
-                    <div>
-                      <div className="flex items-center">
-                        <div className="text-sm font-medium text-gray-900 font-cinzel">
-                          {user.username}
-                        </div>
-                        {user.level >= 10 && (
-                          <Crown className="ml-2 text-yellow-500" size={16} />
-                        )}
-                      </div>
-                      <div className="text-sm text-gray-500 font-merriweather">
-                        {user.email}
-                      </div>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="space-y-1">
-                    <div className="flex items-center text-sm">
-                      <TrendingUp size={14} className="mr-1 text-blue-500" />
-                      <span className="font-cinzel">Level {user.level}</span>
-                    </div>
-                    <div className="flex items-center text-sm">
-                      <Coins size={14} className="mr-1 text-yellow-500" />
-                      <span className="font-merriweather">{user.coins || 0} coins</span>
-                    </div>
-                    <div className="flex items-center text-sm">
-                      <Award size={14} className="mr-1 text-green-500" />
-                      <span className="font-merriweather">{user.total_quests_completed || 0} quests</span>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900 font-merriweather">
-                    Joined {formatDate(user.date_created)}
-                  </div>
-                  <div className="text-sm text-gray-500 font-merriweather">
-                    Updated {formatTimeAgo(user.updated_at)}
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <Badge 
-                    color={user.is_active ? 'success' : 'error'}
-                    variant="subtle"
-                  >
-                    {user.is_active ? 'Active' : 'Inactive'}
-                  </Badge>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <div className="flex items-center justify-end space-x-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onUserSelect(user)}
-                      icon={<Eye size={16} />}
-                      title="View Details"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleEditUser(user)}
-                      icon={<Edit size={16} />}
-                      title="Edit User"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleAssignQuest(user)}
-                      icon={<Award size={16} />}
-                      title="Assign Quest"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDeleteUser(user.id, user.username)}
-                      icon={<Trash2 size={16} />}
-                      className="text-red-600 hover:text-red-700"
-                      title="Delete User"
-                    />
-                  </div>
+            {users.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-6 py-12 text-center">
+                  <User className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No Users Found</h3>
+                  <p className="text-gray-500">
+                    {searchQuery ? 'No users match your search criteria.' : 'No users have registered yet.'}
+                  </p>
                 </td>
               </tr>
-            ))}
+            ) : (
+              users.map((user) => (
+                <tr key={user.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0 h-10 w-10">
+                        <img
+                          className="h-10 w-10 rounded-full"
+                          src={user.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`}
+                          alt={user.username}
+                        />
+                      </div>
+                      <div className="ml-4">
+                        <div className="text-sm font-medium text-gray-900">{user.username}</div>
+                        <div className="text-sm text-gray-500">{user.email}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900">Level {user.level || 1}</div>
+                    <div className="text-sm text-gray-500">{user.xp || 0} XP</div>
+                    <div className="text-sm text-gray-500">{user.coins || 0} coins</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900">{user.total_quests_completed || 0} quests</div>
+                    <div className="text-sm text-gray-500">
+                      Joined {formatTimeAgo(user.date_created)}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      user.is_active 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-red-100 text-red-800'
+                    }`}>
+                      {user.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => onViewUser(user)}
+                        className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50"
+                        title="View Details"
+                      >
+                        <Eye size={16} />
+                      </button>
+                      <button
+                        onClick={() => onEditUser(user)}
+                        className="text-indigo-600 hover:text-indigo-900 p-1 rounded hover:bg-indigo-50"
+                        title="Edit User"
+                      >
+                        <Edit size={16} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteUser(user.id, user.username)}
+                        className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50"
+                        title="Delete User"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
@@ -328,337 +300,30 @@ const AdminUserTable: React.FC<AdminUserTableProps> = ({ onUserSelect, refreshTr
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="px-6 py-3 border-t border-gray-200 flex items-center justify-between">
-          <div className="text-sm text-gray-700 font-merriweather">
-            Showing {startIndex + 1} to {Math.min(endIndex, filteredUsers.length)} of {filteredUsers.length} users
+          <div className="text-sm text-gray-700">
+            Showing {((currentPage - 1) * usersPerPage) + 1} to {Math.min(currentPage * usersPerPage, totalUsers)} of {totalUsers} users
           </div>
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="ghost"
-              size="sm"
+          <div className="flex space-x-2">
+            <button
               onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
               disabled={currentPage === 1}
-              icon={<ChevronLeft size={16} />}
+              className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
             >
               Previous
-            </Button>
-            <span className="text-sm text-gray-700 font-cinzel">
+            </button>
+            <span className="px-3 py-1 text-sm">
               Page {currentPage} of {totalPages}
             </span>
-            <Button
-              variant="ghost"
-              size="sm"
+            <button
               onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
               disabled={currentPage === totalPages}
-              icon={<ChevronRight size={16} />}
+              className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
             >
               Next
-            </Button>
+            </button>
           </div>
         </div>
       )}
-
-      {/* Edit User Modal */}
-      {showEditModal && editingUser && (
-        <EditUserModal
-          user={editingUser}
-          onSave={handleSaveUserEdit}
-          onClose={() => {
-            setShowEditModal(false);
-            setEditingUser(null);
-          }}
-        />
-      )}
-
-      {/* Assign Quest Modal */}
-      {showQuestModal && questUser && (
-        <AssignQuestModal
-          user={questUser}
-          onAssign={handleAssignSpecialQuest}
-          onClose={() => {
-            setShowQuestModal(false);
-            setQuestUser(null);
-          }}
-        />
-      )}
-    </div>
-  );
-};
-
-// Edit User Modal Component
-const EditUserModal: React.FC<{
-  user: any;
-  onSave: (updates: any) => void;
-  onClose: () => void;
-}> = ({ user, onSave, onClose }) => {
-  const [formData, setFormData] = useState({
-    username: user.username || '',
-    email: user.email || '',
-    level: user.level || 1,
-    xp: user.xp || 0,
-    coins: user.coins || 0,
-    bio: user.bio || '',
-    is_active: user.is_active !== false
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSave(formData);
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
-          <h3 className="text-lg font-cinzel font-bold text-gray-800 mb-4">
-            Edit User: {user.username}
-          </h3>
-          
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 font-cinzel mb-1">
-                Username
-              </label>
-              <input
-                type="text"
-                value={formData.username}
-                onChange={(e) => setFormData(prev => ({ ...prev, username: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-amber-500 font-merriweather"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 font-cinzel mb-1">
-                Email
-              </label>
-              <input
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-amber-500 font-merriweather"
-                required
-              />
-            </div>
-
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 font-cinzel mb-1">
-                  Level
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="100"
-                  value={formData.level}
-                  onChange={(e) => setFormData(prev => ({ ...prev, level: parseInt(e.target.value) }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-amber-500 font-merriweather"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 font-cinzel mb-1">
-                  XP
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={formData.xp}
-                  onChange={(e) => setFormData(prev => ({ ...prev, xp: parseInt(e.target.value) }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-amber-500 font-merriweather"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 font-cinzel mb-1">
-                  Coins
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={formData.coins}
-                  onChange={(e) => setFormData(prev => ({ ...prev, coins: parseInt(e.target.value) }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-amber-500 font-merriweather"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 font-cinzel mb-1">
-                Bio
-              </label>
-              <textarea
-                value={formData.bio}
-                onChange={(e) => setFormData(prev => ({ ...prev, bio: e.target.value }))}
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-amber-500 font-merriweather"
-              />
-            </div>
-
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                id="is_active"
-                checked={formData.is_active}
-                onChange={(e) => setFormData(prev => ({ ...prev, is_active: e.target.checked }))}
-                className="mr-2"
-              />
-              <label htmlFor="is_active" className="text-sm font-medium text-gray-700 font-cinzel">
-                Active Account
-              </label>
-            </div>
-
-            <div className="flex space-x-3 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onClose}
-                className="flex-1"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                variant="primary"
-                className="flex-1"
-              >
-                Save Changes
-              </Button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Assign Quest Modal Component
-const AssignQuestModal: React.FC<{
-  user: any;
-  onAssign: (questData: any) => void;
-  onClose: () => void;
-}> = ({ user, onAssign, onClose }) => {
-  const [questData, setQuestData] = useState({
-    questName: '',
-    questType: 'special',
-    xpReward: 100,
-    coinsReward: 50,
-    description: ''
-  });
-
-  const questTypes = [
-    { value: 'special', label: 'Special Quest' },
-    { value: 'bonus', label: 'Bonus Challenge' },
-    { value: 'achievement', label: 'Achievement Unlock' },
-    { value: 'milestone', label: 'Milestone Reward' }
-  ];
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!questData.questName.trim()) return;
-    onAssign(questData);
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-        <div className="p-6">
-          <h3 className="text-lg font-cinzel font-bold text-gray-800 mb-4">
-            Assign Special Quest to {user.username}
-          </h3>
-          
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 font-cinzel mb-1">
-                Quest Name
-              </label>
-              <input
-                type="text"
-                value={questData.questName}
-                onChange={(e) => setQuestData(prev => ({ ...prev, questName: e.target.value }))}
-                placeholder="Enter quest name..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-amber-500 font-merriweather"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 font-cinzel mb-1">
-                Quest Type
-              </label>
-              <select
-                value={questData.questType}
-                onChange={(e) => setQuestData(prev => ({ ...prev, questType: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-amber-500 font-merriweather"
-              >
-                {questTypes.map(type => (
-                  <option key={type.value} value={type.value}>
-                    {type.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 font-cinzel mb-1">
-                  XP Reward
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={questData.xpReward}
-                  onChange={(e) => setQuestData(prev => ({ ...prev, xpReward: parseInt(e.target.value) }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-amber-500 font-merriweather"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 font-cinzel mb-1">
-                  Coin Reward
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={questData.coinsReward}
-                  onChange={(e) => setQuestData(prev => ({ ...prev, coinsReward: parseInt(e.target.value) }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-amber-500 font-merriweather"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 font-cinzel mb-1">
-                Description (Optional)
-              </label>
-              <textarea
-                value={questData.description}
-                onChange={(e) => setQuestData(prev => ({ ...prev, description: e.target.value }))}
-                rows={3}
-                placeholder="Quest description..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-amber-500 font-merriweather"
-              />
-            </div>
-
-            <div className="flex space-x-3 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onClose}
-                className="flex-1"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                variant="primary"
-                className="flex-1"
-              >
-                Assign Quest
-              </Button>
-            </div>
-          </form>
-        </div>
-      </div>
     </div>
   );
 };
