@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { SocialPost, User } from '../../types';
 import { SocialService } from '../../utils/socialService';
 import Avatar from '../ui/Avatar';
@@ -18,18 +18,39 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onLike, onCommen
   const [commentText, setCommentText] = useState('');
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [isLiking, setIsLiking] = useState(false);
+  const [localLikes, setLocalLikes] = useState<string[]>(post.likes || []);
+  const [localComments, setLocalComments] = useState(post.comments || []);
 
-  const isLiked = post.likes.includes(currentUser.id);
+  const isLiked = localLikes.includes(currentUser.id);
   const timeAgo = SocialService.formatTimeAgo(post.createdAt);
+
+  // Load actual likes and comments from Supabase
+  useEffect(() => {
+    // In a real implementation, you would fetch likes and comments here
+    // For now, we'll use the post data as-is
+  }, [post.id]);
 
   const handleLike = async () => {
     if (isLiking) return;
     
     setIsLiking(true);
     try {
+      // Optimistically update UI
+      if (isLiked) {
+        setLocalLikes(prev => prev.filter(id => id !== currentUser.id));
+      } else {
+        setLocalLikes(prev => [...prev, currentUser.id]);
+      }
+      
       await onLike(post.id);
     } catch (error) {
       console.error('Failed to like post:', error);
+      // Revert optimistic update on error
+      if (isLiked) {
+        setLocalLikes(prev => [...prev, currentUser.id]);
+      } else {
+        setLocalLikes(prev => prev.filter(id => id !== currentUser.id));
+      }
     } finally {
       setIsLiking(false);
     }
@@ -41,10 +62,24 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onLike, onCommen
 
     setIsSubmittingComment(true);
     try {
-      await onComment(post.id, commentText.trim());
+      // Optimistically add comment to UI
+      const newComment = {
+        id: crypto.randomUUID(),
+        userId: currentUser.id,
+        userName: currentUser.name,
+        userAvatar: currentUser.avatarUrl,
+        content: commentText.trim(),
+        createdAt: new Date()
+      };
+      
+      setLocalComments(prev => [...prev, newComment]);
       setCommentText('');
+      
+      await onComment(post.id, commentText.trim());
     } catch (error) {
       console.error('Failed to submit comment:', error);
+      // Remove optimistic comment on error
+      setLocalComments(prev => prev.filter(c => c.id !== newComment.id));
     } finally {
       setIsSubmittingComment(false);
     }
@@ -178,7 +213,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onLike, onCommen
               } ${isLiking ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <Heart size={16} sm:size={20} className={`${isLiked ? 'fill-current' : ''} ${isLiking ? 'animate-pulse' : ''}`} />
-              <span className="font-merriweather text-xs sm:text-sm font-medium">{post.likes.length}</span>
+              <span className="font-merriweather text-xs sm:text-sm font-medium">{localLikes.length}</span>
             </button>
             
             <button
@@ -186,7 +221,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onLike, onCommen
               className="flex items-center space-x-1 sm:space-x-2 text-gray-500 hover:text-blue-500 transition-colors duration-200 px-2 py-1 rounded-lg hover:bg-gray-50"
             >
               <MessageCircle size={16} sm:size={20} />
-              <span className="font-merriweather text-xs sm:text-sm font-medium">{post.comments.length}</span>
+              <span className="font-merriweather text-xs sm:text-sm font-medium">{localComments.length}</span>
             </button>
             
             <button className="flex items-center space-x-1 sm:space-x-2 text-gray-500 hover:text-green-500 transition-colors duration-200 px-2 py-1 rounded-lg hover:bg-gray-50">
@@ -199,9 +234,9 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onLike, onCommen
         {showComments && (
           <div className="border-t border-gray-100 pt-2 sm:pt-3">
             {/* Existing Comments */}
-            {post.comments.length > 0 && (
+            {localComments.length > 0 && (
               <div className="space-y-2 sm:space-y-3 mb-3 sm:mb-4">
-                {post.comments.map(comment => (
+                {localComments.map(comment => (
                   <div key={comment.id} className="flex items-start space-x-2 sm:space-x-3">
                     <Avatar
                       src={comment.userAvatar}
