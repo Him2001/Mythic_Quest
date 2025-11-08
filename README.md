@@ -61,6 +61,9 @@ VITE_GITHUB_CLIENT_SECRET=your-github-client-secret
 
 # OpenAI (optional, for AI features)
 VITE_OPENAI_API_KEY=your-openai-api-key
+
+# ElevenLabs (for voice features)
+VITE_ELEVENLABS_API_KEY=your-elevenlabs-api-key
 ```
 
 ## Getting Started
