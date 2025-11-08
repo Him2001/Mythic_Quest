@@ -94,11 +94,12 @@ const SocialFeed: React.FC<SocialFeedProps> = ({
         loadPosts();
       }
       
-      // Close modal - FIXED: Properly handle both external and internal modal states
+      // Close modal
       if (onCreatePostModalClose) {
         onCreatePostModalClose();
+      } else {
+        setInternalShowCreateModal(false);
       }
-      setInternalShowCreateModal(false);
 
       // Call external handler if provided
       if (onCreatePost) {
@@ -110,11 +111,11 @@ const SocialFeed: React.FC<SocialFeedProps> = ({
   };
 
   const handleCloseModal = () => {
-    // FIXED: Properly close both external and internal modal states
     if (onCreatePostModalClose) {
       onCreatePostModalClose();
+    } else {
+      setInternalShowCreateModal(false);
     }
-    setInternalShowCreateModal(false);
   };
 
   const handleLike = async (postId: string) => {
@@ -211,38 +212,40 @@ const SocialFeed: React.FC<SocialFeedProps> = ({
           </div>
         ) : (
           posts.map(post => (
-            <PostCard
-              key={post.id}
-              post={{
-                id: post.id,
-                userId: post.user_id,
-                userName: post.user_profiles?.username || 'Unknown User',
-                userAvatar: post.user_profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${post.user_profiles?.username}`,
-                userLevel: post.user_profiles?.level || 1,
-                content: {
-                  caption: post.content,
-                  mediaUrl: post.media_url,
-                  mediaType: post.media_type as 'image' | 'video' | undefined
-                },
-                questTag: post.quest_tag_id ? {
-                  questId: post.quest_tag_id,
-                  questTitle: post.quest_tag_title,
-                  questType: post.quest_tag_type
-                } : undefined,
-                achievementTag: post.achievement_tag_id ? {
-                  achievementId: post.achievement_tag_id,
-                  achievementTitle: post.achievement_tag_title,
-                  achievementType: post.achievement_tag_type
-                } : undefined,
-                likes: [], // Will be populated from post_likes table
-                comments: [], // Will be populated from post_comments table
-                createdAt: new Date(post.timestamp),
-                updatedAt: new Date(post.updated_at)
-              }}
-              currentUser={currentUser}
-              onLike={handleLike}
-              onComment={handleComment}
-            />
+            <div key={post.id} className="bg-white rounded-xl shadow-lg border border-amber-100 overflow-hidden fantasy-card">
+              {/* Post content would be rendered here */}
+              <div className="p-3 sm:p-4">
+                <div className="flex items-center mb-3">
+                  <img 
+                    src={post.user_profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${post.user_profiles?.username}`}
+                    alt={post.user_profiles?.username}
+                    className="w-8 h-8 sm:w-10 sm:h-10 rounded-full mr-3"
+                  />
+                  <div>
+                    <h4 className="font-cinzel font-bold text-gray-800 text-sm sm:text-base">{post.user_profiles?.username}</h4>
+                    <p className="text-xs sm:text-sm text-gray-500 font-merriweather">Level {post.user_profiles?.level}</p>
+                  </div>
+                </div>
+                
+                <p className="text-gray-800 font-merriweather mb-4 text-sm sm:text-base">{post.content}</p>
+                
+                {post.media_url && (
+                  <div className="mb-4">
+                    {post.media_type === 'video' ? (
+                      <video src={post.media_url} controls className="w-full rounded-lg" />
+                    ) : (
+                      <img src={post.media_url} alt="Post media" className="w-full rounded-lg" />
+                    )}
+                  </div>
+                )}
+                
+                <div className="flex items-center justify-between text-xs sm:text-sm text-gray-500">
+                  <span>{post.likes_count} likes</span>
+                  <span>{post.comments_count} comments</span>
+                  <span>{new Date(post.timestamp).toLocaleDateString()}</span>
+                </div>
+              </div>
+            </div>
           ))
         )}
       </div>
