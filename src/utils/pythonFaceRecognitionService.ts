@@ -87,6 +87,10 @@ class PythonFaceRecognitionService {
       }
 
       const data: RecognitionResult = await response.json();
+      console.log('🔍 API Response:', data);
+      console.log('📊 Similarity:', data.similarity);
+      console.log('✅ Success:', data.success);
+      console.log('👤 Username:', data.username);
       return data;
     } catch (error) {
       console.error('Recognition error:', error);
