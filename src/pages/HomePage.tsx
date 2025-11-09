@@ -5,7 +5,7 @@ import QuestCard from '../components/questSystem/QuestCard';
 import { User, Avatar, Quest } from '../types';
 import Button from '../components/ui/Button';
 import { Sparkles, ArrowRight, MapPin, Coins, TrendingUp } from 'lucide-react';
-import ElevenLabsVoice from '../components/integrations/ElevenLabsVoiceAPI';
+import SimpleElevenLabsVoice from '../components/voice/SimpleElevenLabsVoice';
 import { CoinSystem } from '../utils/coinSystem';
 import { VoiceMessageService } from '../utils/voiceMessageService';
 
@@ -200,10 +200,7 @@ const HomePage: React.FC<HomePageProps> = ({
     setIsSpeaking(false);
   };
 
-  const handleSpeakingChange = (speaking: boolean) => {
-    console.log('🎭 AVATAR ANIMATION: Speaking state changed:', speaking);
-    setIsSpeaking(speaking);
-  };
+
 
   // Handle quest completion with voice feedback
   const handleQuestComplete = (questId: string, distanceWalked?: number) => {
@@ -384,13 +381,17 @@ const HomePage: React.FC<HomePageProps> = ({
       
       {/* VOICE INTEGRATION - HIGHEST PRIORITY */}
       {voiceText && hasUserInteractedForAudio && (
-        <ElevenLabsVoice 
+        <SimpleElevenLabsVoice 
           key={voiceKey}
           text={voiceText} 
-          voiceId={import.meta.env.VITE_ELEVENLABS_VOICE_ID}
-          onComplete={handleVoiceComplete}
-          onError={handleVoiceError}
-          onSpeakingChange={handleSpeakingChange}
+          onComplete={() => {
+            handleVoiceComplete();
+            console.log('🎵 ✅ Simple Eleven Labs Voice completed successfully');
+          }}
+          onError={(error) => {
+            handleVoiceError(error);
+            console.error('🎵 ❌ Simple Eleven Labs Voice error:', error);
+          }}
         />
       )}
     </div>
