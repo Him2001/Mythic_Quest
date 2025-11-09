@@ -853,22 +853,6 @@ function App() {
         />
       )}
 
-      {/* Bolt.new Badge - Fixed position in bottom-right corner */}
-      <div className="fixed bottom-2 right-2 sm:bottom-4 sm:right-4 z-50">
-        <a
-          href="https://bolt.new/"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="block transition-transform duration-200 hover:scale-105 hover:shadow-lg"
-        >
-          <img
-            src="/white_circle_360x360.png"
-            alt="Built with Bolt.new"
-            className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 lg:w-16 lg:h-16 xl:w-18 xl:h-18 2xl:w-20 2xl:h-20 rounded-full shadow-md hover:shadow-lg transition-shadow duration-200"
-          />
-        </a>
-      </div>
-
       {/* Tavus video integration */}
       {tavusText && (
         <TavusVideoAvatar
