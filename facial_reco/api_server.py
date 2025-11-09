@@ -111,13 +111,8 @@ def ensure_models():
 
 app = Flask(__name__)
 
-# Enable CORS for your frontend + localhost
-CORS(app, origins=[
-    "http://localhost:5173",
-    "http://localhost:3000",
-    "https://mythicquest.netlify.app",
-    "https://691081bf40182da2b70916c0--mythicquest.netlify.app"
-], supports_credentials=True)
+# 🔓 Simple: allow all origins (fine for your use-case)
+CORS(app)
 
 # Initialize face engine and database (lazy loading)
 face_engine = None
