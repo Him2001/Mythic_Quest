@@ -1,9 +1,11 @@
 /**
  * Service to call Python facial recognition API
- * This uses the Flask API server running on localhost:5000
+ * Uses base URL from Vite env var with localhost fallback
  */
 
-const API_BASE_URL = 'http://localhost:5000';
+// Use environment variable for API base URL with localhost fallback
+const API_BASE_URL =
+  (import.meta as any).env?.VITE_FACE_RECOGNITION_API_URL || "http://localhost:5000";
 
 export interface RecognitionResult {
   success: boolean;
