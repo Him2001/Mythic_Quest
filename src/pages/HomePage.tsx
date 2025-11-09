@@ -5,7 +5,7 @@ import QuestCard from '../components/questSystem/QuestCard';
 import { User, Avatar, Quest } from '../types';
 import Button from '../components/ui/Button';
 import { Sparkles, ArrowRight, MapPin, Coins, TrendingUp } from 'lucide-react';
-import ElevenLabsVoice from '../components/integrations/ElevenLabsVoice';
+import ElevenLabsVoice from '../components/integrations/ElevenLabsVoiceAPI';
 import { CoinSystem } from '../utils/coinSystem';
 import { VoiceMessageService } from '../utils/voiceMessageService';
 
@@ -387,7 +387,7 @@ const HomePage: React.FC<HomePageProps> = ({
         <ElevenLabsVoice 
           key={voiceKey}
           text={voiceText} 
-          voiceId="MezYwaNLTOfydzsFJwwt"
+          voiceId={import.meta.env.VITE_ELEVENLABS_VOICE_ID}
           onComplete={handleVoiceComplete}
           onError={handleVoiceError}
           onSpeakingChange={handleSpeakingChange}

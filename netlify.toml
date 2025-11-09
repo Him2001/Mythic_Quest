@@ -1,0 +1,39 @@
+# Netlify deployment configuration
+[build]
+  publish = "dist"
+  command = "npm run build"
+
+[build.environment]
+  # Node version
+  NODE_VERSION = "18"
+
+# Headers for Eleven Labs API and audio playback
+[[headers]]
+  for = "/*"
+  [headers.values]
+    # Enable audio autoplay
+    Feature-Policy = "autoplay 'self'"
+    Permissions-Policy = "autoplay=(self)"
+    
+    # Security headers
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    
+    # Cache static assets
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# Redirects for SPA
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Environment variables will be set in Netlify dashboard
+# VITE_ELEVENLABS_API_KEY
+# VITE_ELEVENLABS_VOICE_ID
