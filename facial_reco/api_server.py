@@ -205,6 +205,30 @@ def base64_to_image(base64_string):
         print(f"Error decoding image: {e}")
         return None
 
+@app.route('/', methods=['GET', 'HEAD', 'OPTIONS'])
+def index():
+    """Root endpoint - for health checks"""
+    if request.method == 'OPTIONS':
+        resp = make_response('', 204)
+        resp.headers['Access-Control-Allow-Origin'] = '*'
+        resp.headers['Access-Control-Allow-Methods'] = 'GET, HEAD, OPTIONS'
+        resp.headers['Access-Control-Allow-Headers'] = 'Content-Type, Accept'
+        return resp
+    
+    if request.method == 'HEAD':
+        return '', 200
+    
+    return jsonify({
+        'status': 'ok',
+        'message': 'Facial Recognition API',
+        'version': '1.0',
+        'endpoints': {
+            'health': '/health',
+            'debug': '/debug',
+            'recognize': '/recognize (POST)'
+        }
+    })
+
 @app.route('/health', methods=['GET', 'OPTIONS'])
 def health():
     """Health check"""
