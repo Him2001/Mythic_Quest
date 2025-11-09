@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facial Recognition CORS Test</title>
+    <style>
+        body {
+            font-family: monospace;
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #fff;
+        }
+        button {
+            background: #007acc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #005a9e;
+        }
+        #output {
+            background: #252525;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+            max-height: 600px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .success { color: #4ec9b0; }
+        .error { color: #f48771; }
+        .warning { color: #dcdcaa; }
+        .info { color: #9cdcfe; }
+        h1 { color: #4ec9b0; }
+        h2 { color: #569cd6; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Facial Recognition API - CORS Test Suite</h1>
+    <p>Test your backend API's CORS configuration</p>
+    
+    <div>
+        <input type="text" id="apiUrl" value="https://facial-reco-backend.onrender.com" 
+               style="width: 400px; padding: 8px; background: #252525; color: #fff; border: 1px solid #444;">
+        <button onclick="runAllTests()">▶️ Run All Tests</button>
+        <button onclick="clearOutput()">🗑️ Clear</button>
+    </div>
+
+    <div>
+        <button onclick="testHealth()">1️⃣ Test Health</button>
+        <button onclick="testDebug()">2️⃣ Test Debug</button>
+        <button onclick="testOptions()">3️⃣ Test OPTIONS</button>
+        <button onclick="testPost()">4️⃣ Test POST</button>
+    </div>
+
+    <div id="output"></div>
+
+    <script>
+        const output = document.getElementById('output');
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type;
+            output.innerHTML += `<span class="${className}">[${timestamp}] ${message}</span>\n`;
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function clearOutput() {
+            output.innerHTML = '';
+        }
+
+        function getApiUrl() {
+            return document.getElementById('apiUrl').value;
+        }
+
+        async function testHealth() {
+            log('='.repeat(80), 'info');
+            log('🏥 Testing /health endpoint...', 'info');
+            log('='.repeat(80), 'info');
+            
+            try {
+                const url = `${getApiUrl()}/health`;
+                log(`📡 GET ${url}`, 'info');
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    mode: 'cors'
+                });
+                
+                log(`✅ Status: ${response.status} ${response.statusText}`, 'success');
+                log(`✅ CORS Header: ${response.headers.get('Access-Control-Allow-Origin')}`, 'success');
+                
+                const data = await response.json();
+                log(`📦 Response: ${JSON.stringify(data, null, 2)}`, 'success');
+                
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+                log(`❌ Type: ${error.name}`, 'error');
+            }
+        }
+
+        async function testDebug() {
+            log('='.repeat(80), 'info');
+            log('🐛 Testing /debug endpoint...', 'info');
+            log('='.repeat(80), 'info');
+            
+            try {
+                const url = `${getApiUrl()}/debug`;
+                log(`📡 GET ${url}`, 'info');
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    mode: 'cors'
+                });
+                
+                log(`✅ Status: ${response.status} ${response.statusText}`, 'success');
+                
+                // Log all CORS headers
+                log('📋 CORS Headers:', 'info');
+                for (let [key, value] of response.headers.entries()) {
+                    if (key.toLowerCase().includes('access-control')) {
+                        log(`   ${key}: ${value}`, 'success');
+                    }
+                }
+                
+                const data = await response.json();
+                log(`📦 Response: ${JSON.stringify(data, null, 2)}`, 'success');
+                
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+                log(`❌ Type: ${error.name}`, 'error');
+            }
+        }
+
+        async function testOptions() {
+            log('='.repeat(80), 'info');
+            log('🔀 Testing OPTIONS preflight...', 'info');
+            log('='.repeat(80), 'info');
+            
+            try {
+                const url = `${getApiUrl()}/recognize`;
+                log(`📡 OPTIONS ${url}`, 'info');
+                
+                const response = await fetch(url, {
+                    method: 'OPTIONS',
+                    mode: 'cors',
+                    headers: {
+                        'Access-Control-Request-Method': 'POST',
+                        'Access-Control-Request-Headers': 'Content-Type,Accept'
+                    }
+                });
+                
+                log(`✅ Status: ${response.status} ${response.statusText}`, 'success');
+                
+                // Log all CORS headers
+                log('📋 Preflight Response Headers:', 'info');
+                for (let [key, value] of response.headers.entries()) {
+                    if (key.toLowerCase().includes('access-control')) {
+                        log(`   ${key}: ${value}`, 'success');
+                    }
+                }
+                
+                if (response.status === 204 || response.status === 200) {
+                    log('✅ Preflight request successful!', 'success');
+                } else {
+                    log(`⚠️  Unexpected status: ${response.status}`, 'warning');
+                }
+                
+            } catch (error) {
+                log(`❌ Preflight Error: ${error.message}`, 'error');
+                log(`❌ Type: ${error.name}`, 'error');
+            }
+        }
+
+        async function testPost() {
+            log('='.repeat(80), 'info');
+            log('📮 Testing POST /debug...', 'info');
+            log('='.repeat(80), 'info');
+            
+            try {
+                const url = `${getApiUrl()}/debug`;
+                log(`📡 POST ${url}`, 'info');
+                
+                const response = await fetch(url, {
+                    method: 'POST',
+                    mode: 'cors',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ test: true, timestamp: Date.now() })
+                });
+                
+                log(`✅ Status: ${response.status} ${response.statusText}`, 'success');
+                log(`✅ CORS Header: ${response.headers.get('Access-Control-Allow-Origin')}`, 'success');
+                
+                const data = await response.json();
+                log(`📦 Response: ${JSON.stringify(data, null, 2)}`, 'success');
+                
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+                log(`❌ Type: ${error.name}`, 'error');
+            }
+        }
+
+        async function runAllTests() {
+            clearOutput();
+            log('🚀 Running all CORS tests...', 'info');
+            log('', 'info');
+            
+            await testHealth();
+            await new Promise(r => setTimeout(r, 500));
+            
+            await testDebug();
+            await new Promise(r => setTimeout(r, 500));
+            
+            await testOptions();
+            await new Promise(r => setTimeout(r, 500));
+            
+            await testPost();
+            
+            log('', 'info');
+            log('='.repeat(80), 'info');
+            log('✅ All tests complete!', 'success');
+            log('='.repeat(80), 'info');
+        }
+
+        // Auto-run on load
+        window.addEventListener('load', () => {
+            log('🔧 CORS Test Suite loaded', 'info');
+            log('📝 Click "Run All Tests" to start testing', 'info');
+            log('', 'info');
+        });
+    </script>
+</body>
+</html>

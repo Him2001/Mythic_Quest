@@ -111,27 +111,37 @@ def ensure_models():
 
 app = Flask(__name__)
 
-# 🔓 CORS configuration - Allow all origins
+# 🔓 CRITICAL FIX: Simple CORS configuration
 CORS(app, 
-     resources={r"/*": {
-         "origins": "*",
-         "methods": ["GET", "POST", "OPTIONS"],
-         "allow_headers": ["Content-Type", "Accept", "Authorization"],
-         "expose_headers": ["Content-Type"],
-         "supports_credentials": False,
-         "max_age": 3600
-     }})
+     resources={r"/*": {"origins": "*"}},
+     send_wildcard=True,
+     always_send=True,
+     supports_credentials=False)
 
-# Add after-request handler to ensure CORS headers on ALL responses
+# Add after-request handler to FORCE CORS headers on ALL responses
 @app.after_request
 def after_request(response):
-    response.headers.add('Access-Control-Allow-Origin', '*')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Accept,Authorization')
-    response.headers.add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
-    response.headers.add('Access-Control-Max-Age', '3600')
+    # FORCE these headers on every single response
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Accept, Authorization'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS, PUT, DELETE'
+    response.headers['Access-Control-Max-Age'] = '3600'
     
     # Debug logging
-    print(f"📤 Response headers: {dict(response.headers)}")
+    print(f"📤 Response Status: {response.status}")
+    print(f"📤 CORS Origin Header: {response.headers.get('Access-Control-Allow-Origin')}")
+    print(f"📤 All Response Headers: {dict(response.headers)}")
+    return response
+
+# Add error handler to ensure CORS even on errors
+@app.errorhandler(Exception)
+def handle_error(e):
+    print(f"❌ ERROR CAUGHT: {str(e)}")
+    import traceback
+    traceback.print_exc()
+    response = jsonify({'error': str(e)})
+    response.status_code = 500
+    response.headers['Access-Control-Allow-Origin'] = '*'
     return response
 
 # Initialize face engine and database (lazy loading)
@@ -260,32 +270,69 @@ def recognize():
         
         print(f"✅ Image decoded: {image.shape}")
         
-        # Get face engine and database
-        engine = get_face_engine()
-        db = get_face_db()
+        # Get face engine and database with error handling
+        print("🔧 Loading face engine...")
+        try:
+            engine = get_face_engine()
+            print("✅ Face engine loaded")
+        except Exception as e:
+            print(f"❌ Failed to load face engine: {e}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({'error': f'Failed to load face engine: {str(e)}'}), 500
+        
+        print("📚 Loading face database...")
+        try:
+            db = get_face_db()
+            print(f"✅ Face database loaded ({len(db) if db else 0} users)")
+        except Exception as e:
+            print(f"❌ Failed to load database: {e}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({'error': f'Failed to load database: {str(e)}'}), 500
         
         if not db:
+            print("❌ Database is empty")
             return jsonify({'error': 'Face database is empty'}), 500
         
         # Extract face embedding
-        emb = engine.get_face_embedding(image)
-        if emb is None:
-            return jsonify({
-                'success': False,
-                'message': 'No face detected in the image'
-            }), 200
+        print("🔍 Extracting face embedding...")
+        try:
+            emb = engine.get_face_embedding(image)
+            if emb is None:
+                print("⚠️ No face detected in image")
+                return jsonify({
+                    'success': False,
+                    'message': 'No face detected in the image'
+                }), 200
+            print(f"✅ Face embedding extracted: shape {emb.shape}")
+        except Exception as e:
+            print(f"❌ Failed to extract embedding: {e}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({'error': f'Failed to extract face embedding: {str(e)}'}), 500
         
         # Find best match
-        threshold = data.get('threshold', 0.45)
-        username, score = find_best_match(emb, db, threshold=threshold)
+        print("🔎 Finding best match...")
+        try:
+            threshold = data.get('threshold', 0.45)
+            username, score = find_best_match(emb, db, threshold=threshold)
+            print(f"🎯 Match result: username={username}, score={score}")
+        except Exception as e:
+            print(f"❌ Failed to find match: {e}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({'error': f'Failed to find match: {str(e)}'}), 500
         
         if username is None:
+            print(f"⚠️ No match found (best score: {score})")
             return jsonify({
                 'success': False,
                 'message': f'No match found (best similarity = {score:.3f})',
                 'similarity': float(score)
             }), 200
         
+        print(f"✅ Match found: {username} (similarity: {score})")
         return jsonify({
             'success': True,
             'username': username,
@@ -295,7 +342,9 @@ def recognize():
         
     except Exception as e:
         print(f"❌ Recognition error: {e}")
-        return jsonify({'error': str(e)}), 500
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e), 'type': type(e).__name__}), 500
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
