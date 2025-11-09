@@ -3,9 +3,11 @@
  * Uses base URL from Vite env var with localhost fallback
  */
 
-// Use environment variable for API base URL with localhost fallback
+// Use environment variable for API base URL with production fallback
 const API_BASE_URL =
-  (import.meta as any).env?.VITE_FACE_RECOGNITION_API_URL || "http://localhost:5000";
+  (import.meta as any).env?.VITE_FACE_RECOGNITION_API_URL || 
+  "https://facial-reco-backend.onrender.com" || 
+  "http://localhost:5000";
 
 export interface RecognitionResult {
   success: boolean;
@@ -26,7 +28,14 @@ class PythonFaceRecognitionService {
    */
   async checkHealth(): Promise<boolean> {
     try {
-      const response = await fetch(`${this.apiUrl}/health`);
+      const response = await fetch(`${this.apiUrl}/health`, {
+        method: 'GET',
+        mode: 'cors',
+        credentials: 'omit',
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
       const data = await response.json();
       return data.status === 'ok';
     } catch (error) {
@@ -70,11 +79,14 @@ class PythonFaceRecognitionService {
       // Convert video frame to base64
       const base64Image = this.videoFrameToBase64(video);
 
-      // Call the Python API
+      // Call the Python API with CORS configuration
       const response = await fetch(`${this.apiUrl}/recognize`, {
         method: 'POST',
+        mode: 'cors',
+        credentials: 'omit',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
         body: JSON.stringify({
           image: base64Image,

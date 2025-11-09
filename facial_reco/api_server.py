@@ -114,9 +114,27 @@ app = Flask(__name__)
 @app.after_request
 def after_request(response):
     """Add CORS headers to all responses"""
-    response.headers['Access-Control-Allow-Origin'] = '*'
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
-    response.headers['Access-Control-Allow-Methods'] = 'GET,POST,OPTIONS'
+    origin = request.headers.get('Origin')
+    
+    # Allow specific domains and all Netlify preview domains
+    allowed_origins = [
+        'http://localhost:5173',
+        'http://localhost:3000',
+        'https://mythicquest.netlify.app',
+        'https://69107e36f7e81592f039d655--mythicquest.netlify.app'
+    ]
+    
+    # Allow all Netlify preview domains
+    if origin and ('--mythicquest.netlify.app' in origin or origin in allowed_origins):
+        response.headers['Access-Control-Allow-Origin'] = origin
+    elif origin is None:  # Allow requests without origin (like direct API calls)
+        response.headers['Access-Control-Allow-Origin'] = '*'
+    
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization,Accept'
+    response.headers['Access-Control-Allow-Methods'] = 'GET,POST,OPTIONS,PUT,DELETE'
+    response.headers['Access-Control-Allow-Credentials'] = 'false'
+    response.headers['Access-Control-Max-Age'] = '86400'  # Cache preflight for 24 hours
+    
     return response
 
 # Initialize face engine and database (lazy loading)
