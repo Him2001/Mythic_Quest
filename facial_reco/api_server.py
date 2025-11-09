@@ -8,6 +8,7 @@ import urllib.request
 import cv2
 import numpy as np
 import base64
+import json
 import sys
 import os
 
@@ -76,11 +77,24 @@ def get_face_engine():
     return face_engine
 
 def get_face_db():
-    """Lazy load face database"""
+    """Lazy load face database from environment variable or file"""
     global face_db
     if face_db is None:
-        db_path = os.path.join(os.path.dirname(__file__), 'database.json')
-        face_db = load_face_db(db_path)
+        # Try loading from environment variable first (for Render deployment)
+        db_env = os.environ.get("FACE_DB_JSON")
+        if db_env:
+            try:
+                face_db = json.loads(db_env)
+                print(f"✅ Loaded face database from environment variable ({len(face_db)} users)")
+            except json.JSONDecodeError as e:
+                print(f"⚠️ Failed to parse FACE_DB_JSON: {e}")
+                face_db = {}
+        else:
+            # Fall back to database.json file (for local development)
+            db_path = os.path.join(os.path.dirname(__file__), 'database.json')
+            face_db = load_face_db(db_path)
+            if face_db:
+                print(f"✅ Loaded face database from file ({len(face_db)} users)")
     return face_db
 
 def base64_to_image(base64_string):
