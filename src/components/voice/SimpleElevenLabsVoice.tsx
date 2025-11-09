@@ -86,8 +86,24 @@ const SimpleElevenLabsVoice: React.FC<SimpleElevenLabsVoiceProps> = ({
       };
 
       // Start playing
-      await audio.play();
-      console.log('🎵 ✅ Eleven Labs voice generation successful');
+      try {
+        await audio.play();
+        console.log('🎵 ✅ Eleven Labs voice generation successful');
+      } catch (playError) {
+        console.warn('🎵 ⚠️ Autoplay blocked by browser - user interaction required');
+        
+        // Try to play on next user interaction
+        const playOnInteraction = () => {
+          audio.play().then(() => {
+            console.log('🎵 ✅ Voice playing after user interaction');
+            document.removeEventListener('click', playOnInteraction);
+            document.removeEventListener('touchstart', playOnInteraction);
+          });
+        };
+        
+        document.addEventListener('click', playOnInteraction, { once: true });
+        document.addEventListener('touchstart', playOnInteraction, { once: true });
+      }
 
     } catch (error) {
       console.error('🎵 ❌ Eleven Labs generation failed:', error);
@@ -99,10 +115,14 @@ const SimpleElevenLabsVoice: React.FC<SimpleElevenLabsVoiceProps> = ({
 
   // Start voice generation when component mounts
   useEffect(() => {
-    generateAndPlayVoice();
+    // Add a small delay to ensure proper rendering
+    const timer = setTimeout(() => {
+      generateAndPlayVoice();
+    }, 100);
 
     // Cleanup on unmount
     return () => {
+      clearTimeout(timer);
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;

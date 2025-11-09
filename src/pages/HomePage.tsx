@@ -379,8 +379,8 @@ const HomePage: React.FC<HomePageProps> = ({
         </div>
       </div>
       
-      {/* VOICE INTEGRATION - HIGHEST PRIORITY */}
-      {voiceText && hasUserInteractedForAudio && (
+      {/* VOICE INTEGRATION - ELEVEN LABS ONLY */}
+      {voiceText && (
         <SimpleElevenLabsVoice 
           key={voiceKey}
           text={voiceText} 
