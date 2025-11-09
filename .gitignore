@@ -23,3 +23,15 @@ dist-ssr
 *.sln
 *.sw?
 .env
+# Large model files - don't commit to GitHub
+facial_reco/models/*.onnx
+public/*.onnx
+facial_reco/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+*.onnx
+
+# Environment files
+.env.local
