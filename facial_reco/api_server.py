@@ -111,8 +111,16 @@ def ensure_models():
 
 app = Flask(__name__)
 
-# 🔓 Simple: allow all origins (fine for your use-case)
-CORS(app)
+# 🔓 Enhanced CORS configuration for production
+CORS(app, 
+     resources={r"/*": {
+         "origins": ["*"],
+         "methods": ["GET", "POST", "OPTIONS"],
+         "allow_headers": ["Content-Type", "Accept"],
+         "expose_headers": ["Content-Type"],
+         "supports_credentials": False,
+         "max_age": 3600
+     }})
 
 # Initialize face engine and database (lazy loading)
 face_engine = None
@@ -174,12 +182,21 @@ def health():
     """Health check"""
     return jsonify({'status': 'ok', 'message': 'Facial recognition API is running'})
 
-@app.route('/recognize', methods=['POST'])
+@app.route('/recognize', methods=['POST', 'OPTIONS'])
 def recognize():
     """Recognize face from image"""
     
+    # Handle OPTIONS request for CORS preflight
+    if request.method == 'OPTIONS':
+        response = jsonify({'status': 'ok'})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Accept')
+        response.headers.add('Access-Control-Allow-Methods', 'POST,OPTIONS')
+        return response, 200
+    
     try:
         print("🔍 Recognition request received")
+        print(f"📍 Origin: {request.headers.get('Origin', 'No origin header')}")
         
         data = request.json
         if 'image' not in data:
