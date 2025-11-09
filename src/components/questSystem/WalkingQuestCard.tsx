@@ -4,8 +4,9 @@ import Card from '../ui/Card';
 import Badge from '../ui/Badge';
 import Button from '../ui/Button';
 import ProgressBar from '../ui/ProgressBar';
-import { CheckCircle, MapPin, Play, Square, Navigation, Award, AlertCircle, Coins, Plus } from 'lucide-react';
+import { CheckCircle, MapPin, Play, Square, Navigation, Award, AlertCircle, Coins, Plus, Activity } from 'lucide-react';
 import { gpsTracker } from '../../utils/gpsTracker';
+import { stepCounter } from '../../utils/stepCounterService';
 import { CoinSystem } from '../../utils/coinSystem';
 import { SoundEffects } from '../../utils/soundEffects';
 
@@ -26,12 +27,24 @@ const WalkingQuestCard: React.FC<WalkingQuestCardProps> = ({
   const [currentDistance, setCurrentDistance] = useState(quest.progress || 0);
   const [error, setError] = useState<string>('');
   const [permissionGranted, setPermissionGranted] = useState(false);
+  
+  // Step counter states
+  const [currentSteps, setCurrentSteps] = useState(quest.currentSteps || 0);
+  const [stepPermissionGranted, setStepPermissionGranted] = useState(false);
+  const [stepCountingSupported, setStepCountingSupported] = useState(false);
 
   const targetDistance = quest.targetDistance || 5000; // 5km default
+  const targetSteps = quest.targetSteps || 6500; // Default ~5km in steps
   const progressPercentage = Math.min(100, Math.round((currentDistance / targetDistance) * 100));
+  const stepProgressPercentage = Math.min(100, Math.round((currentSteps / targetSteps) * 100));
   
   // Calculate coin reward
   const coinReward = quest.coinReward || CoinSystem.calculateQuestReward(quest.type, quest.difficulty);
+
+  // Check step counter support on mount
+  useEffect(() => {
+    setStepCountingSupported(stepCounter.isStepCountingSupported());
+  }, []);
 
   useEffect(() => {
     // Update quest progress when distance changes
@@ -39,11 +52,11 @@ const WalkingQuestCard: React.FC<WalkingQuestCardProps> = ({
       onUpdateProgress(quest.id, currentDistance);
     }
 
-    // Auto-complete quest when target is reached
-    if (currentDistance >= targetDistance && !quest.completed) {
+    // Auto-complete quest when target is reached (either by distance OR steps)
+    if ((currentDistance >= targetDistance || currentSteps >= targetSteps) && !quest.completed) {
       handleCompleteQuest();
     }
-  }, [currentDistance, targetDistance, quest.completed, quest.id, quest.progress, onUpdateProgress]);
+  }, [currentDistance, currentSteps, targetDistance, targetSteps, quest.completed, quest.id, quest.progress, onUpdateProgress]);
 
   const formatDistance = (meters: number): string => {
     if (meters >= 1000) {
@@ -59,6 +72,7 @@ const WalkingQuestCard: React.FC<WalkingQuestCardProps> = ({
       // Play movement sound
       SoundEffects.playSound('movement');
       
+      // Start GPS tracking
       await gpsTracker.requestPermission();
       setPermissionGranted(true);
       
@@ -72,6 +86,27 @@ const WalkingQuestCard: React.FC<WalkingQuestCardProps> = ({
           SoundEffects.playSound('error');
         }
       );
+
+      // Start step counting if supported
+      if (stepCountingSupported) {
+        try {
+          await stepCounter.requestPermission();
+          setStepPermissionGranted(true);
+          
+          stepCounter.startCounting(
+            (stepCount) => {
+              setCurrentSteps(stepCount);
+            },
+            (errorMsg) => {
+              console.warn('Step counting error:', errorMsg);
+              // Don't fail the entire tracking if step counting fails
+            }
+          );
+        } catch (stepErr) {
+          console.warn('Failed to start step counting:', stepErr);
+          // Continue with GPS tracking even if step counting fails
+        }
+      }
       
       setIsTracking(true);
       onStart(quest.id);
@@ -85,7 +120,13 @@ const WalkingQuestCard: React.FC<WalkingQuestCardProps> = ({
   };
 
   const handleStopTracking = () => {
-    const finalDistance = gpsTracker.stopTracking();
+    gpsTracker.stopTracking();
+    
+    // Stop step counting if it was active
+    if (stepCountingSupported && stepCounter.isActive()) {
+      stepCounter.stopCounting();
+    }
+    
     setIsTracking(false);
     
     // Play stop sound
@@ -165,11 +206,42 @@ const WalkingQuestCard: React.FC<WalkingQuestCardProps> = ({
           
           {isTracking && (
             <div className="mt-2 text-xs text-blue-600 font-cinzel flex items-center">
-              <Navigation size={10} sm:size={12} className="mr-1 animate-pulse" />
+              <Navigation size={12} className="mr-1 animate-pulse" />
               GPS tracking active - Keep moving!
             </div>
           )}
         </div>
+
+        {/* Step Count Progress (only show if supported) */}
+        {stepCountingSupported && (
+          <div className="mb-3 sm:mb-4">
+            <div className="flex justify-between text-xs sm:text-sm text-gray-600 mb-1 sm:mb-2 font-cinzel">
+              <span>Step Progress</span>
+              <span>{currentSteps.toLocaleString()} / {targetSteps.toLocaleString()} steps</span>
+            </div>
+            <ProgressBar 
+              progress={stepProgressPercentage} 
+              color="accent"
+              height="md"
+              animated={isTracking}
+              showText
+            />
+            
+            {isTracking && stepPermissionGranted && (
+              <div className="mt-2 text-xs text-purple-600 font-cinzel flex items-center">
+                <Activity size={12} className="mr-1 animate-pulse" />
+                Step counting active!
+              </div>
+            )}
+            
+            {!stepPermissionGranted && isTracking && (
+              <div className="mt-2 text-xs text-amber-600 font-cinzel flex items-center">
+                <Activity size={12} className="mr-1" />
+                Step counting unavailable - using GPS only
+              </div>
+            )}
+          </div>
+        )}
         
         {/* Error Display */}
         {error && (
@@ -199,12 +271,13 @@ const WalkingQuestCard: React.FC<WalkingQuestCardProps> = ({
         <div className="mt-3 sm:mt-4 space-y-2 sm:space-y-3">
           {quest.completed ? (
             <div className="flex items-center justify-center p-2 sm:p-3 bg-green-50 border border-green-200 rounded-lg">
-              <CheckCircle className="text-green-600 mr-2" size={14} sm:size={16} />
+              <CheckCircle className="text-green-600 mr-2" size={16} />
               <span className="font-cinzel text-green-800 font-bold text-xs sm:text-sm">
-                Quest Completed - {formatDistance(currentDistance)} walked!
+                Quest Completed - {formatDistance(currentDistance)} walked
+                {stepCountingSupported && currentSteps > 0 && `, ${currentSteps.toLocaleString()} steps`}!
               </span>
               <div className="ml-2 flex items-center text-green-600">
-                <Coins size={12} sm:size={14} className="mr-1" />
+                <Coins size={14} className="mr-1" />
                 <span className="text-xs sm:text-sm font-cinzel">+{coinReward} earned</span>
               </div>
             </div>
@@ -215,15 +288,15 @@ const WalkingQuestCard: React.FC<WalkingQuestCardProps> = ({
                   variant="primary" 
                   fullWidth
                   onClick={handleStartTracking}
-                  icon={<Play size={14} sm:size={16} />}
+                  icon={<Play size={16} />}
                   className="font-cinzel magical-glow text-xs sm:text-sm"
                   soundEffect="movement"
                 >
                   <div className="flex items-center justify-center">
-                    <span>Start GPS Tracking</span>
+                    <span>Start {stepCountingSupported ? 'GPS + Step' : 'GPS'} Tracking</span>
                     <div className="ml-2 flex items-center text-amber-200">
                       <Plus size={10} className="mr-1" />
-                      <Coins size={12} sm:size={14} className="mr-1" />
+                      <Coins size={14} className="mr-1" />
                       <span className="text-xs">{coinReward}</span>
                     </div>
                   </div>
@@ -234,7 +307,7 @@ const WalkingQuestCard: React.FC<WalkingQuestCardProps> = ({
                     variant="secondary" 
                     fullWidth
                     onClick={handleStopTracking}
-                    icon={<Square size={14} sm:size={16} />}
+                    icon={<Square size={16} />}
                     className="font-cinzel text-xs sm:text-sm"
                     soundEffect="click"
                   >
@@ -252,7 +325,7 @@ const WalkingQuestCard: React.FC<WalkingQuestCardProps> = ({
                         <span>Complete Quest!</span>
                         <div className="ml-2 flex items-center text-amber-200">
                           <Plus size={10} className="mr-1" />
-                          <Coins size={12} sm:size={14} className="mr-1" />
+                          <Coins size={14} className="mr-1" />
                           <span className="text-xs">{coinReward}</span>
                         </div>
                       </div>

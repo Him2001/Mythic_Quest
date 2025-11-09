@@ -4,6 +4,7 @@ export const mockUser: User = {
   id: '1',
   name: 'Adventurer',
   email: 'user@example.com',
+  password: 'hashed_password_here', // Mock password hash
   level: 3,
   xp: 340,
   xpToNextLevel: 500,
@@ -13,6 +14,9 @@ export const mockUser: User = {
   dailyWalkingDistance: 0,
   totalWalkingDistance: 0,
   lastWalkingDate: new Date().toISOString().split('T')[0],
+  dailyStepCount: 0,
+  totalStepCount: 0,
+  lastStepCountDate: new Date().toISOString().split('T')[0],
   mythicCoins: 240, // Starting with some coins based on completed quests (12 * 20)
   inventory: [], // Empty inventory to start
   posts: [],
@@ -23,7 +27,8 @@ export const mockUser: User = {
   isAdmin: false,
   isActive: true,
   lastLoginDate: new Date(),
-  createdAt: new Date('2024-01-15')
+  createdAt: new Date('2024-01-15'),
+  chronicles: [] // Empty chronicles to start
 };
 
 export const mockAvatars: Avatar[] = [
@@ -69,6 +74,8 @@ export const mockQuests: Quest[] = [
     completed: false,
     progress: 0,
     targetDistance: 5000,
+    targetSteps: 6500,
+    currentSteps: 0,
     isTracking: false
   },
   {
@@ -102,6 +109,8 @@ export const mockQuests: Quest[] = [
     completed: false,
     progress: 0,
     targetDistance: 3000,
+    targetSteps: 4000,
+    currentSteps: 0,
     isTracking: false
   }
 ];

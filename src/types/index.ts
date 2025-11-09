@@ -12,6 +12,9 @@ export interface User {
   dailyWalkingDistance: number; // meters walked today
   totalWalkingDistance: number; // total meters walked all time
   lastWalkingDate: string; // ISO date string for daily reset
+  dailyStepCount: number; // steps taken today
+  totalStepCount: number; // total steps taken all time
+  lastStepCountDate: string; // ISO date string for daily step reset
   mythicCoins: number; // New currency system
   inventory: InventoryItem[]; // User's purchased items
   posts: SocialPost[]; // User's social media posts
@@ -101,6 +104,8 @@ export interface Quest {
   totalRequired?: number;
   isTracking?: boolean; // for GPS tracking quests
   targetDistance?: number; // in meters for walking quests
+  targetSteps?: number; // target steps for walking quests
+  currentSteps?: number; // current step count for walking quests
   targetLocation?: MagicalLocation; // for location-based quests
 }
 
