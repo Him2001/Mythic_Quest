@@ -21,7 +21,7 @@ export interface User {
   following: string[]; // IDs of users they follow
   followers: string[]; // IDs of users following them
   bio?: string; // User bio
-  authMethod: 'email' | 'google' | 'facebook' | 'github';
+  authMethod: 'email' | 'google' | 'facebook' | 'github' | 'face';
   isAdmin?: boolean;
   isActive: boolean;
   lastLoginDate: Date;

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SupabaseAuthService } from './utils/supabaseAuthService';
 import { SupabaseService } from './utils/supabaseService';
+import { AuthService } from './utils/authService';
 import { SoundEffects } from './utils/soundEffects';
 import { User } from './types';
 
@@ -181,6 +182,14 @@ function App() {
 
         // Don't override admin users
         if (user?.isAdmin) return;
+
+        // Don't override face recognition users
+        // Check if current user is logged in via face recognition
+        const currentUser = AuthService.getCurrentUser();
+        if (currentUser && currentUser.authMethod === 'face') {
+          console.log('⚠️ Ignoring Supabase auth change - user logged in via face recognition');
+          return;
+        }
 
         setUser(user);
         setIsAuthenticated(!!user);
