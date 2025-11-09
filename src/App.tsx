@@ -44,7 +44,7 @@ function App() {
   const [quests, setQuests] = useState(mockQuests);
   const [chronicles, setChronicles] = useState<any[]>([]);
   const [tavusText, setTavusText] = useState('');
-  
+
   // Coin system state
   const [coinAnimationTrigger, setCoinAnimationTrigger] = useState(false);
   const [lastCoinReward, setLastCoinReward] = useState(0);
@@ -70,7 +70,7 @@ function App() {
   // Initialize sound effects on app load
   useEffect(() => {
     SoundEffects.initialize();
-    
+
     // Play welcome sound sequence after a short delay
     setTimeout(() => {
       SoundEffects.playWelcomeSequence();
@@ -83,11 +83,11 @@ function App() {
       const adminSession = localStorage.getItem('mythic_admin_session');
       if (adminSession) {
         const { user: adminUser, timestamp } = JSON.parse(adminSession);
-        
+
         // Check if session is still valid (24 hours)
         const sessionAge = Date.now() - timestamp;
         const maxAge = 24 * 60 * 60 * 1000; // 24 hours
-        
+
         if (sessionAge < maxAge && adminUser.isAdmin) {
           setUser(adminUser);
           setIsAuthenticated(true);
@@ -105,68 +105,60 @@ function App() {
     return false;
   };
 
-  // Check authentication on app load
   useEffect(() => {
     const checkAuth = async () => {
       try {
         setConnectionError(null);
-        
+
         // First check for admin session
         if (checkAdminSession()) {
           return;
         }
-        
+
         // Check if Supabase is configured
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
         const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-        
+
         if (supabaseUrl && supabaseKey) {
           console.log('Supabase configured, attempting connection...');
           setHasSupabase(true);
-          
+
           // Set a timeout for the auth check
           const authCheckPromise = SupabaseAuthService.getCurrentSession();
-          const timeoutPromise = new Promise((_, reject) => 
+          const timeoutPromise = new Promise((_, reject) =>
             setTimeout(() => reject(new Error('Connection timeout')), 10000)
           );
-          
+
           try {
             const { user, error } = await Promise.race([authCheckPromise, timeoutPromise]) as any;
-            
+
             if (error) {
               throw new Error(error);
             }
-            
+
             if (user) {
               console.log('User authenticated:', user.name);
               setUser(user);
               setIsAuthenticated(true);
             } else {
               console.log('No authenticated user found');
+              // Don't auto-login, just show sign-in page
             }
           } catch (authError) {
             console.warn('Supabase auth check failed:', authError);
-            setConnectionError('Failed to connect to Supabase. Using demo mode.');
-            
-            // Fallback to demo mode
+            // Don't set connection error or auto-login
+            // Just mark Supabase as unavailable and show sign-in page
             setHasSupabase(false);
-            setUser(mockUser);
-            setIsAuthenticated(true);
           }
         } else {
-          console.log('Supabase not configured, using demo mode');
+          console.log('Supabase not configured');
           setHasSupabase(false);
-          setUser(mockUser);
-          setIsAuthenticated(true);
+          // Don't auto-login, just show sign-in page
         }
       } catch (error) {
         console.error('Error during app initialization:', error);
-        setConnectionError('Application initialization failed. Using demo mode.');
-        
-        // Fallback to demo mode
+        // Don't set connection error or auto-login
         setHasSupabase(false);
-        setUser(mockUser);
-        setIsAuthenticated(true);
       } finally {
         setIsLoading(false);
       }
@@ -176,22 +168,23 @@ function App() {
   }, []);
 
   // Set up auth state listener only after initial check
+  // Set up auth state listener only after initial check
   useEffect(() => {
-    if (!hasSupabase || !isAuthenticated || user?.isAdmin) return;
+    if (!hasSupabase || user?.isAdmin) return;
 
     let subscription: any = null;
-    
+
     try {
       const { data } = SupabaseAuthService.onAuthStateChange((user) => {
         console.log('Auth state changed:', user ? user.name : 'signed out');
-        
+
         // Don't override admin users
         if (user?.isAdmin) return;
-        
+
         setUser(user);
         setIsAuthenticated(!!user);
       });
-      
+
       subscription = data?.subscription;
     } catch (error) {
       console.warn('Failed to set up auth state listener:', error);
@@ -202,8 +195,7 @@ function App() {
         subscription.unsubscribe();
       }
     };
-  }, [hasSupabase, isAuthenticated, user?.isAdmin]);
-
+  }, [hasSupabase, user?.isAdmin]); // Remove isAuthenticated from dependencies
   // Initialize social posts on first load
   useEffect(() => {
     if (isAuthenticated) {
@@ -218,8 +210,9 @@ function App() {
   const handleSignIn = async (userData: User) => {
     setUser(userData);
     setIsAuthenticated(true);
+    setAuthView('signin'); // ADD THIS LINE to ensure we're on signin view
     setConnectionError(null);
-    
+
     // Play portal sound for sign in
     SoundEffects.playSound('portal');
   };
@@ -228,15 +221,16 @@ function App() {
     try {
       // Clear admin session if it exists
       localStorage.removeItem('mythic_admin_session');
-      
+
       if (hasSupabase && !user?.isAdmin) {
         await SupabaseAuthService.signOut();
       }
       setUser(null);
       setIsAuthenticated(false);
+      setAuthView('signin'); // ADD THIS LINE
       setActiveTab('home');
       setConnectionError(null);
-      
+
       // Play portal sound for sign out
       SoundEffects.playSound('portal');
     } catch (error) {
@@ -244,21 +238,22 @@ function App() {
       // Force sign out even if there's an error
       setUser(null);
       setIsAuthenticated(false);
+      setAuthView('signin'); // ADD THIS LINE
       setActiveTab('home');
     }
   };
 
   const updateDailyWalkingDistance = async (additionalDistance: number) => {
     if (!user) return;
-    
+
     const today = new Date().toISOString().split('T')[0];
     const isNewDay = user.lastWalkingDate !== today;
     const newDailyDistance = isNewDay ? additionalDistance : user.dailyWalkingDistance + additionalDistance;
     const newTotalDistance = user.totalWalkingDistance + additionalDistance;
-    
+
     setUser(prevUser => {
       if (!prevUser) return prevUser;
-      
+
       return {
         ...prevUser,
         dailyWalkingDistance: newDailyDistance,
@@ -284,13 +279,13 @@ function App() {
 
   const awardCoins = async (amount: number, type: CoinTransaction['type'], description: string, animationType: 'quest' | 'level_up' | 'bonus' = 'quest') => {
     if (!user) return;
-    
+
     const newCoinBalance = user.mythicCoins + amount;
-    
+
     // Update user's coin balance
     setUser(prevUser => {
       if (!prevUser) return prevUser;
-      
+
       return {
         ...prevUser,
         mythicCoins: newCoinBalance
@@ -324,13 +319,13 @@ function App() {
 
   const spendCoins = async (amount: number, description: string) => {
     if (!user) return;
-    
+
     const newCoinBalance = user.mythicCoins - amount;
-    
+
     // Update user's coin balance
     setUser(prevUser => {
       if (!prevUser) return prevUser;
-      
+
       return {
         ...prevUser,
         mythicCoins: newCoinBalance
@@ -349,17 +344,17 @@ function App() {
     // Create transaction record
     const transaction = CoinSystem.createTransaction(-amount, 'purchase', description);
     setCoinTransactions(prev => [transaction, ...prev]);
-    
+
     // Play coin spend sound
     SoundEffects.playSound('coin');
   };
 
   const addToInventory = (item: InventoryItem) => {
     if (!user) return;
-    
+
     setUser(prevUser => {
       if (!prevUser) return prevUser;
-      
+
       return {
         ...prevUser,
         inventory: [...prevUser.inventory, item]
@@ -369,13 +364,13 @@ function App() {
 
   const handleCompleteQuest = async (questId: string, distanceWalked?: number) => {
     if (!user) return;
-    
-    setQuests(prevQuests => 
-      prevQuests.map(quest => 
+
+    setQuests(prevQuests =>
+      prevQuests.map(quest =>
         quest.id === questId ? { ...quest, completed: true, isTracking: false } : quest
       )
     );
-    
+
     const completedQuest = quests.find(q => q.id === questId);
     if (completedQuest && !completedQuest.completed) {
       // Update walking distance if it's a walking quest
@@ -388,19 +383,19 @@ function App() {
       let newLevel = user.level;
       let newXpToNextLevel = user.xpToNextLevel;
       let leveledUp = false;
-      
+
       if (newXP >= user.xpToNextLevel) {
         newLevel += 1;
         newXpToNextLevel = Math.floor(user.xpToNextLevel * 1.5);
         leveledUp = true;
         setTavusText(`Congratulations! You've reached level ${newLevel} in your journey. The realms of Eldoria grow stronger with your dedication.`);
       }
-      
+
       const newQuestsCompleted = user.questsCompleted + 1;
-      
+
       setUser(prevUser => {
         if (!prevUser) return prevUser;
-        
+
         return {
           ...prevUser,
           xp: newXP,
@@ -415,7 +410,7 @@ function App() {
         try {
           await SupabaseAuthService.updateUserProgress(user.id, newXP, newLevel, user.mythicCoins);
           await SupabaseAuthService.updateQuestsCompleted(user.id, newQuestsCompleted);
-          
+
           // Record quest completion in Supabase
           const questCoinReward = completedQuest.coinReward || CoinSystem.calculateQuestReward(completedQuest.type, completedQuest.difficulty);
           await SupabaseAuthService.recordQuestCompletion(
@@ -464,25 +459,25 @@ function App() {
 
   const handleLocationQuestComplete = async (questId: string, xpReward: number) => {
     if (!user) return;
-    
+
     const oldLevel = user.level;
     const newXP = user.xp + xpReward;
     let newLevel = user.level;
     let newXpToNextLevel = user.xpToNextLevel;
     let leveledUp = false;
-    
+
     if (newXP >= user.xpToNextLevel) {
       newLevel += 1;
       newXpToNextLevel = Math.floor(user.xpToNextLevel * 1.5);
       leveledUp = true;
       setTavusText(`Congratulations! You've discovered a magical location and reached level ${newLevel}! Your wellness journey grows ever stronger.`);
     }
-    
+
     const newQuestsCompleted = user.questsCompleted + 1;
-    
+
     setUser(prevUser => {
       if (!prevUser) return prevUser;
-      
+
       return {
         ...prevUser,
         xp: newXP,
@@ -497,7 +492,7 @@ function App() {
       try {
         await SupabaseAuthService.updateUserProgress(user.id, newXP, newLevel, user.mythicCoins);
         await SupabaseAuthService.updateQuestsCompleted(user.id, newQuestsCompleted);
-        
+
         // Record location quest completion
         const locationCoinReward = CoinSystem.calculateQuestReward('location', 'medium');
         await SupabaseAuthService.recordQuestCompletion(
@@ -544,16 +539,16 @@ function App() {
   };
 
   const handleStartQuest = (questId: string) => {
-    setQuests(prevQuests => 
-      prevQuests.map(quest => 
+    setQuests(prevQuests =>
+      prevQuests.map(quest =>
         quest.id === questId ? { ...quest, isTracking: true } : quest
       )
     );
   };
 
   const handleUpdateQuestProgress = (questId: string, progress: number) => {
-    setQuests(prevQuests => 
-      prevQuests.map(quest => 
+    setQuests(prevQuests =>
+      prevQuests.map(quest =>
         quest.id === questId ? { ...quest, progress } : quest
       )
     );
@@ -561,7 +556,7 @@ function App() {
 
   const handleChronicleAdd = async (chronicle: any) => {
     if (!user) return;
-    
+
     // Save chronicle to Supabase if available
     if (hasSupabase && !user.isAdmin) {
       try {
@@ -576,7 +571,7 @@ function App() {
           chronicle.imageUrl,
           chronicle.isPrivate || false
         );
-        
+
         if (savedChronicle) {
           setChronicles(prev => [savedChronicle, ...prev]);
         }
@@ -633,12 +628,12 @@ function App() {
   if (authView === 'signin' && !isAuthenticated) {
     const adminEmail = 'admin@123';
     const adminPassword = 'admin123';
-    
+
     // Check if admin credentials were entered
     const urlParams = new URLSearchParams(window.location.search);
     const email = urlParams.get('email');
     const password = urlParams.get('password');
-    
+
     if (email === adminEmail && password === adminPassword) {
       // Create admin user
       const adminUser: User = {
@@ -648,13 +643,13 @@ function App() {
         email: adminEmail,
         isAdmin: true
       };
-      
+
       // Store admin session
       localStorage.setItem('mythic_admin_session', JSON.stringify({
         user: adminUser,
         timestamp: Date.now()
       }));
-      
+
       // Set admin user
       setUser(adminUser);
       setIsAuthenticated(true);
@@ -662,7 +657,7 @@ function App() {
   }
 
   // Authentication flow (skip if in demo mode)
-  if (!isAuthenticated && hasSupabase) {
+  if (!isAuthenticated) {
     switch (authView) {
       case 'signup':
         return (
@@ -719,9 +714,9 @@ function App() {
     switch (activeTab) {
       case 'quests':
         return (
-          <QuestsPage 
-            quests={quests} 
-            onCompleteQuest={handleCompleteQuest} 
+          <QuestsPage
+            quests={quests}
+            onCompleteQuest={handleCompleteQuest}
             onStartQuest={handleStartQuest}
             onUpdateProgress={handleUpdateQuestProgress}
           />
@@ -735,7 +730,7 @@ function App() {
         );
       case 'heroes':
         return (
-          <HeroesPage 
+          <HeroesPage
             user={user}
             onUserUpdate={handleUserUpdate}
             pendingLevelUpShare={pendingLevelUpShare}
@@ -759,7 +754,7 @@ function App() {
         );
       default:
         return (
-          <HomePage 
+          <HomePage
             user={user}
             avatar={avatar}
             quests={quests}
@@ -777,34 +772,33 @@ function App() {
     <div className="min-h-screen bg-fantasy bg-cover bg-fixed bg-center relative">
       {/* Background overlay */}
       <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-black/40 pointer-events-none" />
-      
-      {/* Connection status banner */}
-      {connectionError && (
+
+      {/* Connection status banner - REMOVED */}
+      {/* {connectionError && (
         <div className="fixed top-0 left-0 right-0 bg-orange-600 text-white text-center py-2 z-50">
           <p className="text-xs sm:text-sm font-cinzel px-2">
             ⚠️ {connectionError}
           </p>
         </div>
-      )}
-      
+      )} */}
+
       {/* Demo mode banner */}
-      {!hasSupabase && !connectionError && (
+      {/* {!hasSupabase && !connectionError && (
         <div className="fixed top-0 left-0 right-0 bg-amber-600 text-white text-center py-2 z-50">
           <p className="text-xs sm:text-sm font-cinzel px-2">
-            🎮 Demo Mode - Experience the full Mythic Quest adventure! 
             <span className="ml-2 text-amber-200 hidden sm:inline">Connect Supabase for full functionality</span>
           </p>
         </div>
-      )}
-      
-      <Navbar 
-        user={user} 
-        activeTab={activeTab} 
+      )} */}
+
+      <Navbar
+        user={user}
+        activeTab={activeTab}
         onTabChange={setActiveTab}
         onSignOut={handleSignOut}
         quests={quests}
       />
-      
+
       <main className={`relative ${(!hasSupabase || connectionError) ? 'pt-20 sm:pt-28' : 'pt-16 sm:pt-20'} pb-4 sm:pb-6`}>
         <div className="container mx-auto px-2 sm:px-4">
           <div className="relative backdrop-blur-sm bg-white/80 rounded-lg sm:rounded-2xl shadow-xl border border-amber-100/20 overflow-hidden">
@@ -816,12 +810,12 @@ function App() {
           </div>
         </div>
       </main>
-      
+
       {/* Magical particle effects */}
       <div className="fixed inset-0 pointer-events-none z-0">
         <div className="magical-particles" />
       </div>
-      
+
       {/* Coin Animation */}
       <CoinAnimation
         amount={lastCoinReward}
@@ -843,7 +837,7 @@ function App() {
           onShareAchievement={handleShareLevelUpAchievement}
         />
       )}
-      
+
       {/* Bolt.new Badge - Fixed position in bottom-right corner */}
       <div className="fixed bottom-2 right-2 sm:bottom-4 sm:right-4 z-50">
         <a
@@ -859,11 +853,11 @@ function App() {
           />
         </a>
       </div>
-      
+
       {/* Tavus video integration */}
       {tavusText && (
-        <TavusVideoAvatar 
-          text={tavusText} 
+        <TavusVideoAvatar
+          text={tavusText}
           templateId={avatar.videoTemplateId}
         />
       )}

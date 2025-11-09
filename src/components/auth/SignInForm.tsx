@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
 import { User } from '../../types';
 import { SupabaseAuthService } from '../../utils/supabaseAuthService';
+import { AuthService } from '../../utils/authService';
+import { getAccountForFace } from '../../utils/faceAccountService';
 import AuthLayout from './AuthLayout';
 import Button from '../ui/Button';
-import { Eye, EyeOff, Mail, Lock, LogIn } from 'lucide-react';
+import FaceRecognitionCamera from './FaceRecognitionCamera';
+import { Eye, EyeOff, Mail, Lock, LogIn, Camera } from 'lucide-react';
+
 
 interface SignInFormProps {
   onSignIn: (user: User) => void;
@@ -23,6 +27,7 @@ const SignInForm: React.FC<SignInFormProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>('');
+  const [showCamera, setShowCamera] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -40,7 +45,7 @@ const SignInForm: React.FC<SignInFormProps> = ({
 
     try {
       // Check for admin credentials
-      if (formData.email === 'admin@123' && formData.password === 'admin@123') {
+      if (formData.email === 'admin@123' && formData.password === 'admin123') {
         const adminUser: User = {
           id: 'admin-user-id',
           name: 'Administrator',
@@ -82,24 +87,99 @@ const SignInForm: React.FC<SignInFormProps> = ({
         return;
       }
 
-      // Regular user authentication
-      const { user, error } = await SupabaseAuthService.signIn(formData.email, formData.password);
-      
-      if (error) {
-        setError(error);
-        return;
-      }
+      // Check if Supabase is available
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const hasSupabase = !!(supabaseUrl && supabaseKey);
 
-      if (user) {
-        onSignIn(user);
+      if (hasSupabase) {
+        // Try Supabase authentication first
+        console.log('Supabase is configured, attempting authentication...');
+        const { user, error } = await SupabaseAuthService.signIn(formData.email, formData.password);
+
+        if (user) {
+          // Success with Supabase
+          console.log('Sign in successful via Supabase');
+          onSignIn(user);
+          return;
+        }
+
+        // If Supabase fails, check if it's a "user not found" or "invalid credentials" error
+        // These errors suggest the account might exist in localStorage instead
+        const isAuthError = error && (
+          error.toLowerCase().includes('invalid login credentials') ||
+          error.toLowerCase().includes('invalid email or password') ||
+          error.toLowerCase().includes('user not found') ||
+          error.toLowerCase().includes('email not confirmed')
+        );
+
+        if (isAuthError) {
+          // Fallback to localStorage for old accounts that might not be in Supabase yet
+          console.log('Supabase authentication failed, checking localStorage for legacy account...');
+          const result = AuthService.signIn({
+            email: formData.email,
+            password: formData.password
+          });
+
+          if (result.success && result.user) {
+            console.log('Found account in localStorage, signing in...');
+            onSignIn(result.user);
+            return;
+          } else {
+            // User doesn't exist in either place
+            console.error('Account not found in Supabase or localStorage');
+            setError(error || result.message || 'Invalid email or password. Please check your credentials.');
+            return;
+          }
+        } else if (error) {
+          // Other Supabase errors (network, server, etc.)
+          console.error('Supabase error:', error);
+          setError(error);
+          return;
+        } else {
+          console.error('Unknown sign in failure');
+          setError('Sign in failed. Please try again.');
+          return;
+        }
       } else {
-        setError('Sign in failed. Please try again.');
+        // No Supabase configured, use localStorage only
+        const result = AuthService.signIn({
+          email: formData.email,
+          password: formData.password
+        });
+
+        if (result.success && result.user) {
+          onSignIn(result.user);
+        } else {
+          setError(result.message || 'Sign in failed. Please try again.');
+        }
       }
     } catch (error) {
       console.error('Sign in error:', error);
       setError('An unexpected error occurred. Please try again.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleFaceRecognized = (faceUsername: string) => {
+    console.log(`Face recognized: ${faceUsername}`);
+    
+    // Get account for recognized face
+    const user = getAccountForFace(faceUsername);
+    
+    if (user) {
+      // Update last login
+      user.lastLoginDate = new Date();
+      AuthService.updateUser(user);
+      AuthService.setCurrentUser(user);
+      
+      // Close camera and sign in
+      setShowCamera(false);
+      onSignIn(user);
+    } else {
+      setError(`Face recognized as ${faceUsername}, but no account found. Please contact support.`);
+      setShowCamera(false);
     }
   };
 
@@ -172,7 +252,7 @@ const SignInForm: React.FC<SignInFormProps> = ({
             />
             <span className="ml-2 text-sm text-gray-600 font-merriweather">Remember me</span>
           </label>
-          
+
           <button
             type="button"
             onClick={onForgotPassword}
@@ -183,16 +263,41 @@ const SignInForm: React.FC<SignInFormProps> = ({
           </button>
         </div>
 
-        <Button
-          type="submit"
-          variant="primary"
-          fullWidth
-          disabled={isLoading}
-          icon={<LogIn size={20} />}
-          className="magical-glow"
-        >
-          {isLoading ? 'Signing In...' : 'Enter the Realm'}
-        </Button>
+        <div className="space-y-3">
+          <Button
+            type="submit"
+            variant="primary"
+            fullWidth
+            disabled={isLoading}
+            icon={<LogIn size={20} />}
+            className="magical-glow"
+          >
+            {isLoading ? 'Signing In...' : 'Enter the Realm'}
+          </Button>
+
+          {/* Divider */}
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-amber-300"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-gradient-to-br from-amber-50 to-amber-100 text-gray-600 font-merriweather">
+                Or
+              </span>
+            </div>
+          </div>
+
+          {/* Face Recognition Button */}
+          <button
+            type="button"
+            onClick={() => setShowCamera(true)}
+            disabled={isLoading}
+            className="w-full flex items-center justify-center gap-2 py-3 px-4 border-2 border-amber-300 rounded-lg bg-white/80 backdrop-blur-sm hover:bg-amber-50 hover:border-amber-400 transition-all duration-300 font-cinzel font-bold text-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Camera size={20} />
+            <span>Sign In with Face Recognition</span>
+          </button>
+        </div>
 
         <div className="text-center">
           <p className="text-gray-600 font-merriweather">
@@ -208,6 +313,13 @@ const SignInForm: React.FC<SignInFormProps> = ({
           </p>
         </div>
       </form>
+
+      {/* Face Recognition Camera Modal */}
+      <FaceRecognitionCamera
+        isOpen={showCamera}
+        onClose={() => setShowCamera(false)}
+        onRecognized={handleFaceRecognized}
+      />
     </AuthLayout>
   );
 };

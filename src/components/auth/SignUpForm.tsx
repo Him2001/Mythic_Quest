@@ -4,6 +4,8 @@ import { User } from '../../types';
 import AuthLayout from './AuthLayout';
 import Button from '../ui/Button';
 import { Eye, EyeOff, Mail, Lock, User as UserIcon, UserPlus } from 'lucide-react';
+import { AuthService } from '../../utils/authService';
+
 
 interface SignUpFormProps {
   onSignUp: (user: User) => void;
@@ -73,18 +75,40 @@ const SignUpForm: React.FC<SignUpFormProps> = ({
     }
 
     try {
-      const { user, error: authError } = await SupabaseAuthService.signUp(
-        formData.email,
-        formData.password,
-        formData.username
-      );
+      // Check if Supabase is available
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const hasSupabase = !!(supabaseUrl && supabaseKey);
 
-      if (authError) {
-        setError(authError);
-      } else if (user) {
-        onSignUp(user);
+      if (hasSupabase) {
+        // Use Supabase authentication
+        const { user, error: authError } = await SupabaseAuthService.signUp(
+          formData.email,
+          formData.password,
+          formData.username
+        );
+
+        if (authError) {
+          setError(authError);
+        } else if (user) {
+          onSignUp(user);
+        } else {
+          setError('Account creation failed. Please try again.');
+        }
       } else {
-        setError('Account creation failed. Please try again.');
+        // Fallback to localStorage-based authentication
+        const result = AuthService.signUp({
+          name: formData.username,
+          email: formData.email,
+          password: formData.password,
+          confirmPassword: formData.confirmPassword
+        });
+
+        if (result.success && result.user) {
+          onSignUp(result.user);
+        } else {
+          setError(result.message || 'Account creation failed. Please try again.');
+        }
       }
     } catch (err) {
       setError('An unexpected error occurred. Please try again.');
@@ -94,11 +118,11 @@ const SignUpForm: React.FC<SignUpFormProps> = ({
     }
   };
 
-  const isFormValid = formData.username.trim() && 
-                     formData.email.trim() && 
-                     formData.password && 
-                     formData.confirmPassword &&
-                     formData.password === formData.confirmPassword;
+  const isFormValid = formData.username.trim() &&
+    formData.email.trim() &&
+    formData.password &&
+    formData.confirmPassword &&
+    formData.password === formData.confirmPassword;
 
   return (
     <AuthLayout

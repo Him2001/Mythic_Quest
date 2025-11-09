@@ -32,6 +32,25 @@ export class SupabaseService {
     }
   }
 
+  // Find user profile by email (requires checking auth.users via a database function or admin API)
+  // Note: This is a helper that tries to find user by checking if they can authenticate
+  // For direct email lookup, we'd need a database function or admin access
+  static async getUserProfileByEmail(email: string) {
+    if (!this.isAvailable()) {
+      return null;
+    }
+
+    try {
+      // Since we can't directly query auth.users, we'll need to use a different approach
+      // For now, this will be handled in the auth service
+      // This is a placeholder for future implementation with database functions
+      return null;
+    } catch (error) {
+      console.error('Error in getUserProfileByEmail:', error);
+      return null;
+    }
+  }
+
   // Admin: Get all user profiles with comprehensive stats
   static async getAllUserProfiles() {
     if (!this.isAvailable()) {

@@ -94,25 +94,43 @@ export class SupabaseAuthService {
     }
 
     try {
+      console.log('Attempting Supabase sign in for email:', email);
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
       });
 
       if (error) {
-        return { user: null, error: error.message };
+        console.error('Supabase auth error:', error.message, error);
+        // Provide more specific error messages
+        let errorMessage = error.message;
+        
+        // Check for common error types
+        if (error.message.includes('Invalid login credentials')) {
+          errorMessage = 'Invalid email or password. Please check your credentials and try again.';
+        } else if (error.message.includes('Email not confirmed')) {
+          errorMessage = 'Please confirm your email address before signing in. Check your inbox for a confirmation email.';
+        } else if (error.message.includes('Too many requests')) {
+          errorMessage = 'Too many sign-in attempts. Please wait a moment and try again.';
+        }
+        
+        return { user: null, error: errorMessage };
       }
 
       if (data.user) {
+        console.log('Supabase auth successful, fetching user profile for ID:', data.user.id);
         const profile = await SupabaseService.getUserProfile(data.user.id);
         if (profile) {
+          console.log('User profile found:', profile.username);
           const user = this.convertProfileToUser(profile, data.user.email!);
           return { user, error: null };
         } else {
+          console.error('User profile not found in database for ID:', data.user.id);
           return { user: null, error: 'User profile not found. Please contact support.' };
         }
       }
 
+      console.error('No user data returned from Supabase auth');
       return { user: null, error: 'Sign in failed. Please try again.' };
     } catch (error) {
       console.error('Sign in error:', error);

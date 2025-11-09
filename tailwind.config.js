@@ -24,7 +24,7 @@ export default {
         'magical': '0 0 15px rgba(255, 215, 0, 0.3)',
       },
       backgroundImage: {
-        'fantasy': "url('/scenario-inspired-by-videogame_compressed.jpg')",
+        'fantasy': "url('/background.jpg')",
       },
     },
   },

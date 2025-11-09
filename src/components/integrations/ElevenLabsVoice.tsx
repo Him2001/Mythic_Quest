@@ -1,196 +1,173 @@
 import React, { useEffect, useRef, useState } from 'react';
 
-interface ElevenLabsVoiceProps {
+interface WebSpeechVoiceProps {
   text: string;
-  voiceId: string;
+  voiceId?: string; // Optional: voice name or language code
   onComplete?: () => void;
   onError?: (error: string) => void;
   onSpeakingChange?: (speaking: boolean) => void;
 }
 
-const ElevenLabsVoice: React.FC<ElevenLabsVoiceProps> = ({
+const WebSpeechVoice: React.FC<WebSpeechVoiceProps> = ({
   text,
   voiceId,
   onComplete,
   onError,
   onSpeakingChange
 }) => {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [audioUrl, setAudioUrl] = useState<string>('');
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const hasStartedRef = useRef(false);
   const componentMountedRef = useRef(true);
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
 
-  // API key
-  const API_KEY = 'sk_2373d20772128d71bfc6997232f631eed0f769241a18c032';
+  // Load available voices
+  useEffect(() => {
+    const loadVoices = () => {
+      const availableVoices = window.speechSynthesis.getVoices();
+      setVoices(availableVoices);
+      console.log('🎵 Available voices:', availableVoices.map(v => `${v.name} (${v.lang})`));
+    };
+
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+
+    return () => {
+      window.speechSynthesis.onvoiceschanged = null;
+    };
+  }, []);
 
   // Cleanup function
   const cleanup = () => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.removeEventListener('loadstart', handleLoadStart);
-      audioRef.current.removeEventListener('canplay', handleCanPlay);
-      audioRef.current.removeEventListener('play', handlePlay);
-      audioRef.current.removeEventListener('ended', handleEnded);
-      audioRef.current.removeEventListener('error', handleError);
-      audioRef.current = null;
-    }
-    if (audioUrl) {
-      URL.revokeObjectURL(audioUrl);
-      setAudioUrl('');
+    if (utteranceRef.current) {
+      window.speechSynthesis.cancel();
+      utteranceRef.current = null;
     }
   };
 
-  // Event handlers
-  const handleLoadStart = () => {
-    console.log('🎵 Audio loading started');
-  };
-
-  const handleCanPlay = () => {
-    console.log('🎵 Audio can play, starting playback');
-    if (audioRef.current && componentMountedRef.current) {
-      audioRef.current.play().catch(error => {
-        console.error('🎵 Playback failed:', error);
-        if (onError) onError(`Playback failed: ${error.message}`);
-      });
-    }
-  };
-
-  const handlePlay = () => {
-    console.log('🎵 Audio playback started');
-    if (onSpeakingChange) onSpeakingChange(true);
-  };
-
-  const handleEnded = () => {
-    console.log('🎵 Audio playback completed');
-    if (onSpeakingChange) onSpeakingChange(false);
-    if (onComplete) onComplete();
-    cleanup();
-  };
-
-  const handleError = (event: Event) => {
-    console.error('🎵 Audio playback error:', event);
-    if (onSpeakingChange) onSpeakingChange(false);
-    if (onError) onError('Audio playback failed');
-    cleanup();
-  };
-
-  // Generate and play audio
-  const generateAndPlayAudio = async () => {
+  // Generate and play speech
+  const generateAndPlaySpeech = () => {
     if (!text.trim() || hasStartedRef.current || !componentMountedRef.current) {
       return;
     }
 
     hasStartedRef.current = true;
-    setIsGenerating(true);
 
     try {
-      console.log('🎵 Generating audio for text:', text.substring(0, 50) + '...');
+      console.log('🎵 Generating speech for text:', text.substring(0, 50) + '...');
 
-      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
-        method: 'POST',
-        headers: {
-          'Accept': 'audio/mpeg',
-          'Content-Type': 'application/json',
-          'xi-api-key': API_KEY
-        },
-        body: JSON.stringify({
-          text: text,
-          model_id: 'eleven_monolingual_v1',
-          voice_settings: {
-            stability: 0.5,
-            similarity_boost: 0.75,
-            style: 0.0,
-            use_speaker_boost: true
-          }
-        })
-      });
+      const utterance = new SpeechSynthesisUtterance(text);
+      utteranceRef.current = utterance;
 
-      if (!response.ok) {
-        throw new Error(`ElevenLabs API error: ${response.status} ${response.statusText}`);
+      // Find and set voice
+      if (voiceId && voices.length > 0) {
+        const selectedVoice = voices.find(
+          voice => voice.name === voiceId || voice.lang.includes(voiceId)
+        );
+        if (selectedVoice) {
+          utterance.voice = selectedVoice;
+          console.log('🎵 Using voice:', selectedVoice.name);
+        }
       }
 
-      const audioBlob = await response.blob();
-      
-      if (!componentMountedRef.current) {
-        return;
-      }
+      // Configure speech parameters
+      // More animated/energetic
+      // In the generateAndPlaySpeech function, replace the configuration section:
 
-      const audioUrl = URL.createObjectURL(audioBlob);
-      setAudioUrl(audioUrl);
+      // Configure speech parameters - Male with deep bass
+     // Configure speech parameters - Wizard voice
+// Old man Gandalf voice - ancient, wise, deep
+// 1) Core Gandalf baseline (deep but still natural)
+utterance.rate = 0.7;      // Slow, but not robotic
+utterance.pitch = 0.32;    // Very deep
+utterance.volume = 0.95;   // Strong presence
 
-      // Create and configure audio element
-      const audio = new Audio(audioUrl);
-      audioRef.current = audio;
+// 2) Prefer British male voices (sounds closer to Gandalf)
+if (voices.length > 0) {
+  const preferredOrder = [
+    // Common deeper UK/male labels across browsers
+    (v: SpeechSynthesisVoice) => v.lang === 'en-GB' && /male|daniel|george|brian|richard/i.test(v.name),
+    (v: SpeechSynthesisVoice) => v.lang === 'en-GB',
+    (v: SpeechSynthesisVoice) => /male|david|george|mark|barry|richard/i.test(v.name),
+    (v: SpeechSynthesisVoice) => v.lang.startsWith('en-')
+  ];
 
-      // Configure audio for background playback
-      audio.preload = 'auto';
-      audio.crossOrigin = 'anonymous';
-      
-      // Add event listeners
-      audio.addEventListener('loadstart', handleLoadStart);
-      audio.addEventListener('canplay', handleCanPlay);
-      audio.addEventListener('play', handlePlay);
-      audio.addEventListener('ended', handleEnded);
-      audio.addEventListener('error', handleError);
+  let selected: SpeechSynthesisVoice | undefined;
+  for (const pick of preferredOrder) {
+    selected = voices.find(pick as any);
+    if (selected) break;
+  }
 
-      // Start loading
-      audio.load();
+  if (selected) {
+    utterance.voice = selected;
+    console.log('🧙 Using deep UK/male voice:', selected.name, selected.lang);
+  } else {
+    console.log('🧙 Defaulting to any English voice');
+  }
+}
 
-      console.log('🎵 Audio generation completed, starting playback');
+// 3) Subtle anti-robot tweaks
+utterance.onstart = () => {
+  // Start slightly quieter then ramp to full to avoid “AI pop-in”
+  try { utterance.volume = 0.9; setTimeout(() => { utterance.volume = 0.95; }, 120); } catch {}
+};
+
+      utterance.onend = () => {
+        console.log('🎵 Speech completed');
+        if (onSpeakingChange) onSpeakingChange(false);
+        if (onComplete) onComplete();
+        cleanup();
+      };
+
+      utterance.onerror = (event) => {
+        console.error('🎵 Speech error:', event);
+        if (onSpeakingChange) onSpeakingChange(false);
+        if (onError) onError(`Speech failed: ${event.error}`);
+        cleanup();
+      };
+
+      // Start speaking
+      window.speechSynthesis.speak(utterance);
+      console.log('🎵 Speech generation started');
 
     } catch (error) {
-      console.error('🎵 Failed to generate audio:', error);
+      console.error('🎵 Failed to generate speech:', error);
       if (onError) {
         onError(error instanceof Error ? error.message : 'Unknown error occurred');
       }
       if (onSpeakingChange) onSpeakingChange(false);
-    } finally {
-      setIsGenerating(false);
     }
   };
 
-  // Start generation when component mounts
+  // Start generation when component mounts and voices are loaded
   useEffect(() => {
     componentMountedRef.current = true;
-    generateAndPlayAudio();
+    
+    if (voices.length > 0) {
+      generateAndPlaySpeech();
+    }
 
-    // Cleanup on unmount
     return () => {
       componentMountedRef.current = false;
       cleanup();
     };
-  }, [text, voiceId]);
+  }, [text, voiceId, voices]);
 
-  // Prevent page unload from stopping audio
+  // Handle page visibility
   useEffect(() => {
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      // Don't prevent unload, but keep audio playing
-      if (audioRef.current && !audioRef.current.paused) {
-        console.log('🎵 Page unloading, but audio will continue');
-      }
-    };
-
     const handleVisibilityChange = () => {
-      // Ensure audio continues when tab becomes hidden
-      if (document.hidden && audioRef.current && !audioRef.current.paused) {
-        console.log('🎵 Tab hidden, ensuring audio continues');
-        // Force audio to continue playing
-        audioRef.current.play().catch(console.warn);
+      if (document.hidden && utteranceRef.current) {
+        console.log('🎵 Tab hidden, speech continues in background');
       }
     };
 
-    window.addEventListener('beforeunload', handleBeforeUnload);
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
 
-  // Don't render anything visible
   return null;
 };
 
-export default ElevenLabsVoice;
+export default WebSpeechVoice;

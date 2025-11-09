@@ -9,8 +9,18 @@
 @layer base {
   html {
     font-family: 'Merriweather', serif;
-    background: #1a1a1a url('/scenario-inspired-by-videogame_compressed.jpg') no-repeat center center fixed;
+    background: #1a1a1a url('/background.jpg') no-repeat center center fixed;
     background-size: cover;
+    min-height: 100%;
+  }
+  
+  body {
+    font-family: 'Merriweather', serif;
+    background: #1a1a1a url('/background.jpg') no-repeat center center fixed;
+    background-size: cover;
+    min-height: 100vh;
+    margin: 0;
+    padding: 0;
   }
   
   h1, h2, h3, h4, h5, h6 {
