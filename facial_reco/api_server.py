@@ -19,56 +19,66 @@ from utils import FaceEngine, load_face_db, find_best_match
 
 
 def download_google_drive_file(file_id, filepath, expected_min_size_mb=1):
-    """Download file from Google Drive handling virus scan warning"""
+    """Download file from Google Drive using gdown library"""
     import time
-    import requests
-    from urllib.parse import parse_qs, urlparse
     
     max_retries = 3
-    session = requests.Session()
     
     for attempt in range(max_retries):
         try:
             print(f"📥 Downloading {filepath.name} (attempt {attempt + 1}/{max_retries})...")
+            print(f"🆔 File ID: {file_id}")
             
-            # Try direct download first
-            download_url = f"https://drive.google.com/uc?export=download&id={file_id}"
-            print(f"🔗 URL: {download_url}")
-            
-            response = session.get(download_url, stream=True)
-            
-            # Check if we got the virus warning page
-            if 'text/html' in response.headers.get('content-type', ''):
-                print("🦠 Got virus warning page, extracting confirmation token...")
+            # Try using gdown first (it handles Google Drive better)
+            try:
+                import gdown
+                url = f"https://drive.google.com/uc?id={file_id}"
+                gdown.download(url, str(filepath), quiet=False)
                 
-                # Look for the confirmation form
-                content = response.text
-                if 'confirm=' in content:
-                    # Extract the confirm token
+            except ImportError:
+                print("⚠️ gdown not available, falling back to requests...")
+                # Fallback to requests method
+                import requests
+                session = requests.Session()
+                
+                # Try direct download
+                download_url = f"https://drive.google.com/uc?export=download&id={file_id}"
+                response = session.get(download_url, stream=True)
+                
+                # Handle virus warning page
+                if 'text/html' in response.headers.get('content-type', ''):
+                    print("🦠 Handling virus warning page...")
+                    content = response.text
+                    
+                    # Look for download link in the page
                     import re
-                    confirm_match = re.search(r'confirm=([^&"]+)', content)
-                    if confirm_match:
-                        confirm_token = confirm_match.group(1)
-                        print(f"🔑 Found confirm token, downloading...")
-                        
-                        # Download with confirmation
-                        confirmed_url = f"https://drive.google.com/uc?export=download&confirm={confirm_token}&id={file_id}"
+                    download_link_match = re.search(r'href="(/uc\?export=download[^"]+)"', content)
+                    if download_link_match:
+                        download_path = download_link_match.group(1)
+                        confirmed_url = f"https://drive.google.com{download_path}"
+                        print(f"🔗 Found download link: {confirmed_url[:80]}...")
                         response = session.get(confirmed_url, stream=True)
                     else:
-                        print("❌ Could not find confirmation token")
-                        raise Exception("Could not bypass virus warning")
-                else:
-                    print("❌ No confirmation token found in response")
-                    raise Exception("Unexpected response from Google Drive")
-            
-            # Save the file
-            print("💾 Saving file...")
-            with open(filepath, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        f.write(chunk)
+                        # Try the old token method as fallback
+                        confirm_match = re.search(r'confirm=([a-zA-Z0-9_-]+)', content)
+                        if confirm_match:
+                            confirm_token = confirm_match.group(1)
+                            confirmed_url = f"https://drive.google.com/uc?export=download&confirm={confirm_token}&id={file_id}"
+                            response = session.get(confirmed_url, stream=True)
+                        else:
+                            raise Exception("Could not find download link or confirmation token")
+                
+                # Save the file
+                print("💾 Saving file...")
+                with open(filepath, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        if chunk:
+                            f.write(chunk)
             
             # Validate the download
+            if not filepath.exists():
+                raise Exception("File was not created")
+                
             file_size_mb = filepath.stat().st_size / (1024 * 1024)
             print(f"📊 Downloaded file size: {file_size_mb:.2f} MB")
             
@@ -82,8 +92,8 @@ def download_google_drive_file(file_id, filepath, expected_min_size_mb=1):
             
             # Check if it's actually an ONNX file
             with open(filepath, 'rb') as f:
-                header = f.read(100)  # Read more bytes for better detection
-                if b'<html' in header.lower() or b'google drive' in header.lower():
+                header = f.read(100)
+                if b'<html' in header.lower():
                     print("❌ Downloaded HTML page instead of file!")
                     filepath.unlink()
                     if attempt < max_retries - 1:
