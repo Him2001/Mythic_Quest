@@ -110,7 +110,15 @@ def ensure_models():
         print("✅ scrfd_10g_bnkps.onnx already exists")
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, origins=['*'], methods=['GET', 'POST', 'OPTIONS'], allow_headers=['Content-Type', 'Authorization'])
+
+@app.after_request
+def after_request(response):
+    """Add CORS headers to all responses"""
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+    return response
 
 # Initialize face engine and database (lazy loading)
 face_engine = None
@@ -172,9 +180,17 @@ def health():
     """Health check"""
     return jsonify({'status': 'ok', 'message': 'Facial recognition API is running'})
 
-@app.route('/recognize', methods=['POST'])
+@app.route('/recognize', methods=['POST', 'OPTIONS'])
 def recognize():
     """Recognize face from image"""
+    # Handle preflight OPTIONS request
+    if request.method == 'OPTIONS':
+        response = jsonify({'status': 'ok'})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+        response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        return response
+    
     try:
         print("🔍 Recognition request received")
         
