@@ -163,23 +163,38 @@ const SignInForm: React.FC<SignInFormProps> = ({
   };
 
   const handleFaceRecognized = (faceUsername: string) => {
-    console.log(`Face recognized: ${faceUsername}`);
+    console.log('====================================');
+    console.log('🎯 handleFaceRecognized called');
+    console.log('👤 Face username received:', faceUsername);
+    console.log('====================================');
     
     // Get account for recognized face
     const user = getAccountForFace(faceUsername);
     
+    console.log('📊 Result from getAccountForFace:', user ? 'User found' : 'No user found');
+    
     if (user) {
+      console.log('✅ User found, logging in:', user.email, user.name);
+      
       // Update last login
       user.lastLoginDate = new Date();
       AuthService.updateUser(user);
       AuthService.setCurrentUser(user);
       
+      console.log('✅ User updated and set as current');
+      
       // Close camera and sign in
       setShowCamera(false);
+      console.log('📸 Camera closed');
+      
+      console.log('🚀 Calling onSignIn callback');
       onSignIn(user);
+      console.log('====================================');
     } else {
+      console.error('❌ No user found for face:', faceUsername);
       setError(`Face recognized as ${faceUsername}, but no account found. Please contact support.`);
       setShowCamera(false);
+      console.log('====================================');
     }
   };
 
