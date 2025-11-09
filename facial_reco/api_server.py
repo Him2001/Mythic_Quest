@@ -18,46 +18,76 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from utils import FaceEngine, load_face_db, find_best_match
 
 
-def download_file_with_validation(url, filepath, expected_min_size_mb=1):
-    """Download file with validation and retry logic"""
+def download_google_drive_file(file_id, filepath, expected_min_size_mb=1):
+    """Download file from Google Drive handling virus scan warning"""
     import time
+    import requests
+    from urllib.parse import parse_qs, urlparse
     
     max_retries = 3
+    session = requests.Session()
+    
     for attempt in range(max_retries):
         try:
             print(f"📥 Downloading {filepath.name} (attempt {attempt + 1}/{max_retries})...")
-            print(f"🔗 URL: {url}")
             
-            # Download the file
-            urllib.request.urlretrieve(url, filepath)
+            # Try direct download first
+            download_url = f"https://drive.google.com/uc?export=download&id={file_id}"
+            print(f"🔗 URL: {download_url}")
             
-            # Check file size
+            response = session.get(download_url, stream=True)
+            
+            # Check if we got the virus warning page
+            if 'text/html' in response.headers.get('content-type', ''):
+                print("🦠 Got virus warning page, extracting confirmation token...")
+                
+                # Look for the confirmation form
+                content = response.text
+                if 'confirm=' in content:
+                    # Extract the confirm token
+                    import re
+                    confirm_match = re.search(r'confirm=([^&"]+)', content)
+                    if confirm_match:
+                        confirm_token = confirm_match.group(1)
+                        print(f"🔑 Found confirm token: {confirm_token}")
+                        
+                        # Download with confirmation
+                        confirmed_url = f"https://drive.google.com/uc?export=download&confirm={confirm_token}&id={file_id}"
+                        print(f"🔗 Confirmed URL: {confirmed_url}")
+                        response = session.get(confirmed_url, stream=True)
+                    else:
+                        print("❌ Could not find confirmation token")
+                        raise Exception("Could not bypass virus warning")
+            
+            # Save the file
+            print("💾 Saving file...")
+            with open(filepath, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+            
+            # Validate the download
             file_size_mb = filepath.stat().st_size / (1024 * 1024)
             print(f"📊 Downloaded file size: {file_size_mb:.2f} MB")
             
             if file_size_mb < expected_min_size_mb:
                 print(f"❌ File too small ({file_size_mb:.2f} MB < {expected_min_size_mb} MB)")
-                filepath.unlink()  # Delete the bad file
+                filepath.unlink()
                 if attempt < max_retries - 1:
                     print("🔄 Retrying in 5 seconds...")
                     time.sleep(5)
                 continue
             
-            # Check if it's actually an ONNX file (binary format)
+            # Check if it's actually an ONNX file
             with open(filepath, 'rb') as f:
-                header = f.read(4)
-                if not header.startswith(b'\x08'):  # ONNX files typically start with this
-                    print(f"❌ File doesn't appear to be a valid ONNX file (header: {header})")
-                    # Check if it's an HTML error page
-                    f.seek(0)
-                    content = f.read(1000).decode('utf-8', errors='ignore')
-                    if '<html' in content.lower() or 'google drive' in content.lower():
-                        print("❌ Downloaded HTML page instead of file - Google Drive link issue!")
-                        filepath.unlink()
-                        if attempt < max_retries - 1:
-                            print("🔄 Retrying in 5 seconds...")
-                            time.sleep(5)
-                        continue
+                header = f.read(100)  # Read more bytes for better detection
+                if b'<html' in header.lower() or b'google drive' in header.lower():
+                    print("❌ Downloaded HTML page instead of file!")
+                    filepath.unlink()
+                    if attempt < max_retries - 1:
+                        print("🔄 Retrying in 5 seconds...")
+                        time.sleep(5)
+                    continue
             
             print(f"✅ Successfully downloaded and validated {filepath.name}")
             return True
@@ -71,6 +101,48 @@ def download_file_with_validation(url, filepath, expected_min_size_mb=1):
                 time.sleep(5)
     
     print(f"❌ Failed to download {filepath.name} after {max_retries} attempts")
+    return False
+
+def download_file_with_validation(url, filepath, expected_min_size_mb=1):
+    """Download file with validation and retry logic"""
+    # Check if it's a Google Drive URL and extract file ID
+    if 'drive.google.com' in url and 'id=' in url:
+        import re
+        file_id_match = re.search(r'id=([^&]+)', url)
+        if file_id_match:
+            file_id = file_id_match.group(1)
+            print(f"🔍 Detected Google Drive file ID: {file_id}")
+            return download_google_drive_file(file_id, filepath, expected_min_size_mb)
+    
+    # Fallback to regular download for non-Google Drive URLs
+    import time
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            print(f"� Downloading {filepath.name} (attempt {attempt + 1}/{max_retries})...")
+            print(f"🔗 URL: {url}")
+            
+            urllib.request.urlretrieve(url, filepath)
+            
+            file_size_mb = filepath.stat().st_size / (1024 * 1024)
+            print(f"📊 Downloaded file size: {file_size_mb:.2f} MB")
+            
+            if file_size_mb >= expected_min_size_mb:
+                print(f"✅ Successfully downloaded {filepath.name}")
+                return True
+            else:
+                print(f"❌ File too small ({file_size_mb:.2f} MB < {expected_min_size_mb} MB)")
+                filepath.unlink()
+                
+        except Exception as e:
+            print(f"❌ Download attempt {attempt + 1} failed: {e}")
+            if filepath.exists():
+                filepath.unlink()
+            
+        if attempt < max_retries - 1:
+            print("🔄 Retrying in 5 seconds...")
+            time.sleep(5)
+    
     return False
 
 def ensure_models():
