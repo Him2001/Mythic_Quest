@@ -111,29 +111,29 @@ def ensure_models():
 
 app = Flask(__name__)
 
-# Simplified CORS - we'll handle it explicitly in after_request
-# Commenting out flask_cors to avoid conflicts
-# CORS(app)
+# Enable CORS for all origins
+CORS(app, resources={
+    r"/*": {
+        "origins": "*",
+        "methods": ["GET", "POST", "OPTIONS", "PUT", "DELETE"],
+        "allow_headers": ["Content-Type", "Accept", "Authorization"],
+        "expose_headers": ["Content-Type"],
+        "supports_credentials": False,
+        "max_age": 3600
+    }
+})
 
-# Add after-request handler with explicit origin checking
+# Add after-request handler to ensure CORS headers are always present
 @app.after_request
 def after_request(response):
-    origin = request.headers.get('Origin')
-    allowed = [
-        'https://69108876824cacbe42c9c57f--mythicquest.netlify.app',
-        'https://6910939e419437dab9005d4b--mythicquest.netlify.app',
-        'https://mythicquest.netlify.app',  # Your production domain
-        'http://localhost:5173',  # Vite dev
-        'http://localhost:3000',  # Alternative dev port
-    ]
-    
-    # Allow all origins for now (you can restrict to allowed list later)
+    # Ensure CORS headers are set (redundant but safe)
     response.headers['Access-Control-Allow-Origin'] = '*'
     response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Accept, Authorization'
     response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS, PUT, DELETE'
     response.headers['Access-Control-Max-Age'] = '3600'
     
     # Debug logging
+    origin = request.headers.get('Origin')
     print(f"📤 Response Status: {response.status}")
     print(f"📤 Origin: {origin}")
     print(f"📤 CORS Origin Header: {response.headers.get('Access-Control-Allow-Origin')}")
