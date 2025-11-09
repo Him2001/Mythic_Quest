@@ -14,6 +14,7 @@ import AdminDashboard from './components/admin/AdminDashboard';
 
 // Main App Components
 import Navbar from './components/layout/Navbar';
+import LandingPage from './pages/LandingPage';
 import HomePage from './pages/HomePage';
 import QuestsPage from './pages/QuestsPage';
 import HeroesPage from './pages/HeroesPage';
@@ -32,7 +33,7 @@ import { CoinTransaction, InventoryItem } from './types';
 function App() {
   // Auth state
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [authView, setAuthView] = useState<'signin' | 'signup' | 'forgot'>('signin');
+  const [authView, setAuthView] = useState<'landing' | 'signin' | 'signup' | 'forgot'>('landing');
   const [isLoading, setIsLoading] = useState(true);
   const [hasSupabase, setHasSupabase] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
@@ -659,6 +660,13 @@ function App() {
   // Authentication flow (skip if in demo mode)
   if (!isAuthenticated) {
     switch (authView) {
+      case 'landing':
+        return (
+          <LandingPage
+            onGetStarted={() => setAuthView('signup')}
+            onSignIn={() => setAuthView('signin')}
+          />
+        );
       case 'signup':
         return (
           <SignUpForm
@@ -672,12 +680,19 @@ function App() {
             onBackToSignIn={() => setAuthView('signin')}
           />
         );
-      default:
+      case 'signin':
         return (
           <SignInForm
             onSignIn={handleSignIn}
             onSwitchToSignUp={() => setAuthView('signup')}
             onForgotPassword={() => setAuthView('forgot')}
+          />
+        );
+      default:
+        return (
+          <LandingPage
+            onGetStarted={() => setAuthView('signup')}
+            onSignIn={() => setAuthView('signin')}
           />
         );
     }
