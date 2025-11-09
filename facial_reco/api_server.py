@@ -154,31 +154,37 @@ def ensure_models():
     W600K_URL = os.environ.get("W600K_URL")
     SCRFD_URL = os.environ.get("SCRFD_URL")
     
+    print(f"🔗 W600K_URL: {'SET' if W600K_URL else 'NOT SET'}")
+    print(f"🔗 SCRFD_URL: {'SET' if SCRFD_URL else 'NOT SET'}")
+    
     # Download w600k_r50.onnx if URL is set
     w600k_path = models_dir / "w600k_r50.onnx"
     if not w600k_path.exists():
         if W600K_URL:
-            success = download_file_with_validation(W600K_URL, w600k_path, expected_min_size_mb=20)
+            print(f"⬇️ Downloading w600k_r50.onnx...")
+            success = download_file_with_validation(W600K_URL, w600k_path, expected_min_size_mb=50)
             if not success:
                 print("❌ Failed to download w600k_r50.onnx")
         else:
-            print("W600K_URL not set, skipping w600k_r50.onnx download.")
+            print("⚠️ W600K_URL not set, skipping w600k_r50.onnx download.")
+    else:
+        print("✅ w600k_r50.onnx already exists")
     
     # Download scrfd_10g_bnkps.onnx if URL is set
     scrfd_path = models_dir / "scrfd_10g_bnkps.onnx"
     if not scrfd_path.exists():
         if SCRFD_URL:
+            print(f"⬇️ Downloading scrfd_10g_bnkps.onnx...")
             success = download_file_with_validation(SCRFD_URL, scrfd_path, expected_min_size_mb=10)
             if not success:
                 print("❌ Failed to download scrfd_10g_bnkps.onnx")
         else:
-            print("SCRFD_URL not set, skipping scrfd_10g_bnkps.onnx download.")
+            print("⚠️ SCRFD_URL not set, skipping scrfd_10g_bnkps.onnx download.")
+    else:
+        print("✅ scrfd_10g_bnkps.onnx already exists")
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
-
-# Ensure models are present at startup
-ensure_models()
 
 # Simple health-check route
 @app.route("/ping")
@@ -337,6 +343,10 @@ if __name__ == "__main__":
     print("🚀 Starting Facial Recognition API Server...")
     print("=" * 60)
     
+    # Ensure models are downloaded at startup
+    print("\n📦 Ensuring models are available...")
+    ensure_models()
+    
     # Pre-load and verify everything
     print("\n📦 Checking models...")
     models_dir = Path(__file__).parent / "models"
@@ -370,6 +380,12 @@ if __name__ == "__main__":
             print(f"  Registered users: {', '.join(test_db.keys())}")
     except Exception as e:
         print(f"  ❌ Error loading database: {e}")
+    
+    # Final check - ensure both models exist before starting server
+    if not w600k_exists or not scrfd_exists:
+        print("\n❌ CRITICAL: Missing model files!")
+        print("Cannot start server without both ONNX models.")
+        exit(1)
     
     print(f"\n🌐 API will be available at http://0.0.0.0:{port}")
     print("=" * 60)
