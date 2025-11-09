@@ -1,7 +1,7 @@
 """
 Flask API server for facial recognition - Clean Dropbox version
 """
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, make_response
 from flask_cors import CORS
 from pathlib import Path
 import cv2
@@ -111,17 +111,23 @@ def ensure_models():
 
 app = Flask(__name__)
 
-# 🔓 CRITICAL FIX: Simple CORS configuration
-CORS(app, 
-     resources={r"/*": {"origins": "*"}},
-     send_wildcard=True,
-     always_send=True,
-     supports_credentials=False)
+# Simplified CORS - we'll handle it explicitly in after_request
+# Commenting out flask_cors to avoid conflicts
+# CORS(app)
 
-# Add after-request handler to FORCE CORS headers on ALL responses
+# Add after-request handler with explicit origin checking
 @app.after_request
 def after_request(response):
-    # FORCE these headers on every single response
+    origin = request.headers.get('Origin')
+    allowed = [
+        'https://69108876824cacbe42c9c57f--mythicquest.netlify.app',
+        'https://6910939e419437dab9005d4b--mythicquest.netlify.app',
+        'https://mythicquest.netlify.app',  # Your production domain
+        'http://localhost:5173',  # Vite dev
+        'http://localhost:3000',  # Alternative dev port
+    ]
+    
+    # Allow all origins for now (you can restrict to allowed list later)
     response.headers['Access-Control-Allow-Origin'] = '*'
     response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Accept, Authorization'
     response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS, PUT, DELETE'
@@ -129,8 +135,8 @@ def after_request(response):
     
     # Debug logging
     print(f"📤 Response Status: {response.status}")
+    print(f"📤 Origin: {origin}")
     print(f"📤 CORS Origin Header: {response.headers.get('Access-Control-Allow-Origin')}")
-    print(f"📤 All Response Headers: {dict(response.headers)}")
     return response
 
 # Add error handler to ensure CORS even on errors
@@ -202,54 +208,61 @@ def base64_to_image(base64_string):
 @app.route('/health', methods=['GET', 'OPTIONS'])
 def health():
     """Health check"""
-    print(f"🏥 Health check - Method: {request.method}")
-    print(f"🏥 Health check - Origin: {request.headers.get('Origin', 'None')}")
-    print(f"🏥 Health check - Headers: {dict(request.headers)}")
-    
     if request.method == 'OPTIONS':
-        return '', 204
+        resp = make_response('', 204)
+        resp.headers['Access-Control-Allow-Origin'] = '*'
+        resp.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
+        resp.headers['Access-Control-Allow-Headers'] = 'Content-Type, Accept'
+        return resp
     
+    print(f"🏥 Health check - Method: {request.method}, Origin: {request.headers.get('Origin', 'None')}")
     return jsonify({'status': 'ok', 'message': 'Facial recognition API is running'})
 
 @app.route('/debug', methods=['GET', 'POST', 'OPTIONS'])
 def debug():
     """Debug endpoint to test CORS"""
-    print("=" * 80)
-    print("🐛 DEBUG ENDPOINT CALLED")
-    print(f"   Method: {request.method}")
-    print(f"   Origin: {request.headers.get('Origin', 'None')}")
-    print(f"   Headers: {dict(request.headers)}")
-    print("=" * 80)
-    
     if request.method == 'OPTIONS':
-        print("✅ OPTIONS request - returning 204")
-        return '', 204
+        resp = make_response('', 204)
+        resp.headers['Access-Control-Allow-Origin'] = '*'
+        resp.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+        resp.headers['Access-Control-Allow-Headers'] = 'Content-Type, Accept'
+        return resp
+    
+    print("🐛 DEBUG ENDPOINT CALLED")
+    print(f"   Method: {request.method}, Origin: {request.headers.get('Origin', 'None')}")
     
     return jsonify({
         'status': 'ok',
         'method': request.method,
         'origin': request.headers.get('Origin', 'None'),
-        'headers': dict(request.headers),
-        'message': 'Debug endpoint working - CORS should be enabled'
+        'message': 'Debug endpoint working - CORS should be enabled',
+        'cors_header': '*'
     })
 
 @app.route('/recognize', methods=['POST', 'OPTIONS'])
 def recognize():
     """Recognize face from image"""
     
+    # --- Explicitly handle preflight OPTIONS request ---
+    if request.method == 'OPTIONS':
+        print("✅ Handling OPTIONS preflight for /recognize")
+        print(f"   Origin: {request.headers.get('Origin', 'None')}")
+        resp = make_response('', 204)
+        resp.headers['Access-Control-Allow-Origin'] = '*'  # Allow all origins
+        resp.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+        resp.headers['Access-Control-Allow-Headers'] = 'Content-Type, Accept, Authorization'
+        resp.headers['Access-Control-Max-Age'] = '3600'
+        print(f"   Returning 204 with CORS headers")
+        return resp
+    # ----------------------------------------------------
+    
     print("=" * 80)
-    print(f"📨 INCOMING REQUEST")
+    print(f"📨 INCOMING POST REQUEST to /recognize")
     print(f"   Method: {request.method}")
     print(f"   Origin: {request.headers.get('Origin', 'None')}")
     print(f"   Content-Type: {request.headers.get('Content-Type', 'None')}")
-    print(f"   User-Agent: {request.headers.get('User-Agent', 'None')}")
-    print(f"   All Headers: {dict(request.headers)}")
+    print(f"   User-Agent: {request.headers.get('User-Agent', 'None')[:50]}...")
     print("=" * 80)
-    
-    # Handle OPTIONS request for CORS preflight
-    if request.method == 'OPTIONS':
-        print("✅ Handling OPTIONS preflight request")
-        return '', 204
     
     try:
         print("🔍 Processing POST recognition request")
