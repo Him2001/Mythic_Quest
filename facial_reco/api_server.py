@@ -126,34 +126,56 @@ def health():
 def recognize():
     """Recognize face from image"""
     try:
+        # Add debug logging
+        print("=" * 50)
+        print("🔍 RECOGNIZE ENDPOINT CALLED")
+        print("=" * 50)
+        
         data = request.json
         
         if 'image' not in data:
             return jsonify({'error': 'No image provided'}), 400
         
         # Decode base64 image
+        print("📸 Decoding image...")
         image = base64_to_image(data['image'])
         if image is None:
+            print("❌ Failed to decode image")
             return jsonify({'error': 'Failed to decode image'}), 400
         
+        print(f"✅ Image decoded: {image.shape}")
+        
         # Get face engine and database
+        print("🔧 Loading face engine...")
         engine = get_face_engine()
+        print("✅ Face engine loaded")
+        
+        print("📚 Loading face database...")
         db = get_face_db()
+        print(f"✅ Face database loaded: {len(db) if db else 0} users")
         
         if not db:
+            print("❌ Face database is empty!")
             return jsonify({'error': 'Face database is empty or not found'}), 500
         
         # Get face embedding
+        print("🧠 Extracting face embedding...")
         emb = engine.get_face_embedding(image)
         if emb is None:
+            print("❌ No face detected in image")
             return jsonify({
                 'success': False,
                 'message': 'No face detected in the image'
             }), 200
         
+        print(f"✅ Face embedding extracted: shape {emb.shape}")
+        
         # Find best match
         threshold = data.get('threshold', 0.45)
+        print(f"🔍 Finding best match (threshold={threshold})...")
         username, score = find_best_match(emb, db, threshold=threshold)
+        
+        print(f"📊 Best match: {username} (score={score:.3f})")
         
         if username is None:
             return jsonify({
@@ -170,14 +192,48 @@ def recognize():
         }), 200
         
     except Exception as e:
-        print(f"Error in recognize endpoint: {e}")
+        print("=" * 50)
+        print("❌ ERROR IN RECOGNIZE ENDPOINT:")
+        print(str(e))
+        import traceback
+        traceback.print_exc()
+        print("=" * 50)
         return jsonify({'error': str(e)}), 500
 
 if __name__ == "__main__":
     import os
     port = int(os.environ.get("PORT", 5000))
-    print("Starting Facial Recognition API Server...")
-    print("Make sure the models are in the 'models' directory")
-    print(f"API will be available at http://0.0.0.0:{port}")
+    
+    print("=" * 60)
+    print("🚀 Starting Facial Recognition API Server...")
+    print("=" * 60)
+    
+    # Pre-load and verify everything
+    print("\n📦 Checking models...")
+    models_dir = Path(__file__).parent / "models"
+    w600k_exists = (models_dir / "w600k_r50.onnx").exists()
+    scrfd_exists = (models_dir / "scrfd_10g_bnkps.onnx").exists()
+    print(f"  w600k_r50.onnx: {'✅' if w600k_exists else '❌'}")
+    print(f"  scrfd_10g_bnkps.onnx: {'✅' if scrfd_exists else '❌'}")
+    
+    print("\n📚 Checking face database...")
+    db_env = os.environ.get("FACE_DB_JSON")
+    db_file = Path(__file__).parent / "database.json"
+    print(f"  FACE_DB_JSON env var: {'✅ SET' if db_env else '❌ NOT SET'}")
+    print(f"  database.json file: {'✅ EXISTS' if db_file.exists() else '❌ NOT FOUND'}")
+    
+    # Try loading database
+    try:
+        test_db = get_face_db()
+        print(f"  Database users: {len(test_db) if test_db else 0}")
+        if test_db:
+            print(f"  Registered users: {', '.join(test_db.keys())}")
+    except Exception as e:
+        print(f"  ❌ Error loading database: {e}")
+    
+    print(f"\n🌐 API will be available at http://0.0.0.0:{port}")
+    print("=" * 60)
+    print()
+    
     app.run(host="0.0.0.0", port=port, debug=False)
 
