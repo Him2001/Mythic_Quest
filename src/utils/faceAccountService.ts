@@ -15,14 +15,14 @@ const FACE_ACCOUNT_MAPPINGS: FaceAccountMapping[] = [
   {
     faceUsername: 'akhilven',
     accountEmail: 'akhilven@gmail.com',
-    accountName: 'akhil',
+    accountName: 'Akhil',
     accountPassword: 'akhil@1969'
   },
   {
     faceUsername: 'mvnshpra',
-    accountEmail: 'mvnshpra@gmail.com',
-    accountName: 'Sai Himanshu Praneeth',
-    accountPassword: 'himanshu@1969'
+    accountEmail: 'mvnshpra@buffalo.edu',
+    accountName: 'M V N S H Praneeth',
+    accountPassword: 'Praneeth@1969'
   }
 ];
 

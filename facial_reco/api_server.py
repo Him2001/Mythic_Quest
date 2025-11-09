@@ -13,6 +13,15 @@ import os
 import time
 import requests
 
+# --- Force-set Dropbox model URLs (for local debugging or fallback) ---
+os.environ["W600K_URL"] = "https://www.dropbox.com/scl/fi/pocojod1lg0tv6ipv3y9g/w600k_r50.onnx?rlkey=dfrstynu59w4kzppfapnyxqwo&st=v0k5q59a&dl=1"
+os.environ["SCRFD_URL"] = "https://www.dropbox.com/scl/fi/wls097vickm7v2avxk5g2/scrfd_10g_bnkps.onnx?rlkey=yy2cc9p9wxbm75zfb6947djok&st=fo6wwtyf&dl=1"
+
+# Optional: confirm for logs
+print("🔗 W600K_URL set to:", os.environ["W600K_URL"])
+print("🔗 SCRFD_URL set to:", os.environ["SCRFD_URL"])
+
+
 # Add the facial_reco directory to the path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
