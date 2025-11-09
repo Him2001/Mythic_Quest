@@ -21,15 +21,28 @@ def ensure_models():
     """Ensure required model files exist; download if missing."""
     models_dir = Path(__file__).parent / "models"
     models_dir.mkdir(exist_ok=True)
-    urls = {
-        "w600k_r50.onnx": "YOUR_MODEL_URL_1",
-        "scrfd_10g_bnkps.onnx": "YOUR_MODEL_URL_2",
-    }
-    for name, url in urls.items():
-        file_path = models_dir / name
-        if not file_path.exists():
-            print(f"Downloading {name} ...")
-            urllib.request.urlretrieve(url, file_path)
+    
+    # Read model URLs from environment variables
+    W600K_URL = os.environ.get("W600K_URL")
+    SCRFD_URL = os.environ.get("SCRFD_URL")
+    
+    # Download w600k_r50.onnx if URL is set
+    w600k_path = models_dir / "w600k_r50.onnx"
+    if not w600k_path.exists():
+        if W600K_URL:
+            print(f"Downloading w600k_r50.onnx from {W600K_URL}...")
+            urllib.request.urlretrieve(W600K_URL, w600k_path)
+        else:
+            print("W600K_URL not set, skipping w600k_r50.onnx download.")
+    
+    # Download scrfd_10g_bnkps.onnx if URL is set
+    scrfd_path = models_dir / "scrfd_10g_bnkps.onnx"
+    if not scrfd_path.exists():
+        if SCRFD_URL:
+            print(f"Downloading scrfd_10g_bnkps.onnx from {SCRFD_URL}...")
+            urllib.request.urlretrieve(SCRFD_URL, scrfd_path)
+        else:
+            print("SCRFD_URL not set, skipping scrfd_10g_bnkps.onnx download.")
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
