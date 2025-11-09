@@ -49,15 +49,17 @@ def download_google_drive_file(file_id, filepath, expected_min_size_mb=1):
                     confirm_match = re.search(r'confirm=([^&"]+)', content)
                     if confirm_match:
                         confirm_token = confirm_match.group(1)
-                        print(f"🔑 Found confirm token: {confirm_token}")
+                        print(f"🔑 Found confirm token, downloading...")
                         
                         # Download with confirmation
                         confirmed_url = f"https://drive.google.com/uc?export=download&confirm={confirm_token}&id={file_id}"
-                        print(f"🔗 Confirmed URL: {confirmed_url}")
                         response = session.get(confirmed_url, stream=True)
                     else:
                         print("❌ Could not find confirmation token")
                         raise Exception("Could not bypass virus warning")
+                else:
+                    print("❌ No confirmation token found in response")
+                    raise Exception("Unexpected response from Google Drive")
             
             # Save the file
             print("💾 Saving file...")
