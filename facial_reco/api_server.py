@@ -111,16 +111,28 @@ def ensure_models():
 
 app = Flask(__name__)
 
-# 🔓 Enhanced CORS configuration for production
+# 🔓 CORS configuration - Allow all origins
 CORS(app, 
      resources={r"/*": {
-         "origins": ["*"],
+         "origins": "*",
          "methods": ["GET", "POST", "OPTIONS"],
-         "allow_headers": ["Content-Type", "Accept"],
+         "allow_headers": ["Content-Type", "Accept", "Authorization"],
          "expose_headers": ["Content-Type"],
          "supports_credentials": False,
          "max_age": 3600
      }})
+
+# Add after-request handler to ensure CORS headers on ALL responses
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Accept,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+    response.headers.add('Access-Control-Max-Age', '3600')
+    
+    # Debug logging
+    print(f"📤 Response headers: {dict(response.headers)}")
+    return response
 
 # Initialize face engine and database (lazy loading)
 face_engine = None
@@ -177,29 +189,68 @@ def base64_to_image(base64_string):
         print(f"Error decoding image: {e}")
         return None
 
-@app.route('/health', methods=['GET'])
+@app.route('/health', methods=['GET', 'OPTIONS'])
 def health():
     """Health check"""
+    print(f"🏥 Health check - Method: {request.method}")
+    print(f"🏥 Health check - Origin: {request.headers.get('Origin', 'None')}")
+    print(f"🏥 Health check - Headers: {dict(request.headers)}")
+    
+    if request.method == 'OPTIONS':
+        return '', 204
+    
     return jsonify({'status': 'ok', 'message': 'Facial recognition API is running'})
+
+@app.route('/debug', methods=['GET', 'POST', 'OPTIONS'])
+def debug():
+    """Debug endpoint to test CORS"""
+    print("=" * 80)
+    print("🐛 DEBUG ENDPOINT CALLED")
+    print(f"   Method: {request.method}")
+    print(f"   Origin: {request.headers.get('Origin', 'None')}")
+    print(f"   Headers: {dict(request.headers)}")
+    print("=" * 80)
+    
+    if request.method == 'OPTIONS':
+        print("✅ OPTIONS request - returning 204")
+        return '', 204
+    
+    return jsonify({
+        'status': 'ok',
+        'method': request.method,
+        'origin': request.headers.get('Origin', 'None'),
+        'headers': dict(request.headers),
+        'message': 'Debug endpoint working - CORS should be enabled'
+    })
 
 @app.route('/recognize', methods=['POST', 'OPTIONS'])
 def recognize():
     """Recognize face from image"""
     
+    print("=" * 80)
+    print(f"📨 INCOMING REQUEST")
+    print(f"   Method: {request.method}")
+    print(f"   Origin: {request.headers.get('Origin', 'None')}")
+    print(f"   Content-Type: {request.headers.get('Content-Type', 'None')}")
+    print(f"   User-Agent: {request.headers.get('User-Agent', 'None')}")
+    print(f"   All Headers: {dict(request.headers)}")
+    print("=" * 80)
+    
     # Handle OPTIONS request for CORS preflight
     if request.method == 'OPTIONS':
-        response = jsonify({'status': 'ok'})
-        response.headers.add('Access-Control-Allow-Origin', '*')
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Accept')
-        response.headers.add('Access-Control-Allow-Methods', 'POST,OPTIONS')
-        return response, 200
+        print("✅ Handling OPTIONS preflight request")
+        return '', 204
     
     try:
-        print("🔍 Recognition request received")
-        print(f"📍 Origin: {request.headers.get('Origin', 'No origin header')}")
+        print("🔍 Processing POST recognition request")
         
         data = request.json
+        if not data:
+            print("❌ No JSON data received")
+            return jsonify({'error': 'No JSON data provided'}), 400
+            
         if 'image' not in data:
+            print("❌ No image in JSON data")
             return jsonify({'error': 'No image provided'}), 400
         
         # Decode image
