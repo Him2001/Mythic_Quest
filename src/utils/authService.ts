@@ -49,14 +49,14 @@ export class AuthService {
   static getAllUsers(): User[] {
     try {
       const data = localStorage.getItem(this.STORAGE_KEY);
-      const users = data ? JSON.parse(data) : [];
-      
-      // Ensure admin account exists
-      if (users.length === 0) {
+      if (!data) {
+        // Initialize storage if empty and return empty array to avoid recursion
         this.initializeStorage();
-        return this.getAllUsers();
+        const newData = localStorage.getItem(this.STORAGE_KEY);
+        return newData ? JSON.parse(newData) : [];
       }
       
+      const users = JSON.parse(data);
       return users;
     } catch (error) {
       console.error('Failed to load users:', error);
